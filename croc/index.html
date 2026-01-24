@@ -50,7 +50,7 @@
         }
         .settings-box h3 {
             margin: 0 0 10px 0;
-            font-size: 16px;
+            font-size: 14px;
             color: #007bff;
         }
         .settings-box ol {
@@ -74,19 +74,32 @@
 
     <!-- Блок инструкции -->
     <div class="settings-box">
-        <h3>Как настроить:</h3>
-        <ol>
-            <li>На странице <strong>Дать</strong> нажмите кнопку <strong>Копировать секрет</strong>.</li>
+        <ul>
+            <li>На странице ➤ <strong>Дать / Send</strong> нажмите кнопку 🗐.</li>
             <li>Из Секрета и параметров Посредника сформируется Deep Link и QR-код.</li>
-            <li>Нажмите кнопку <strong>Настроить открытие ссылок в приложении</strong>.</li>
-            <li>Включите <strong>Открывать поддерживаемые ссылки</strong>.</li>
-            <li>В меню <strong>Поддерживаемые адреса</strong> отметьте <strong>abakum.github.io</strong>.</li>
-        </ol>
+            <li>В диалоге <strong>Deep Link</strong> нажмите ⚙️ <strong>О приложении / App info</strong>.</li>
+        </ul>
+        <div class="tip">APP_OPEN_BY_DEFAULT_SETTINGS</div>
+        <h3>На Андроиде 12+: </h3>
+        <ul>
+            <li>Включите 🟢 <strong>Открывать поддерживаемые ссылки / Open supported links</strong>.</li>
+            <li>В меню ❯ <strong>Добавить ссылку</strong> отметьте 🟢 <strong>abakum.github.io</strong>
+                 и нажмите <strong>Добавить</strong>.</li>
+        </ul>
+        <div class="tip">APPLICATION_DETAILS_SETTINGS</div>
+        <h3>На Андроиде 11-: </h3>
+        <ul>
+            <li>В меню ⌵ <strong>Дополнительно / Advanced</strong>.</li>
+            <li>Нажмите <strong>Открывать по умолчанию / Open by default</strong>.</li>
+            <li>В меню <strong>Открывать поддерживаемые ссылки / Open supported links</strong> выберите
+                 <strong>Открывать в этом приложении / Open in this app</strong>.</li>
+            <li>В меню <strong>Поддерживаемые ссылки / Supported links</strong> увидите <strong>abakum.github.io</strong>.</li>
+        </ul>
     </div>
 
     <!-- Ссылка для открытия приложения с Fallback на APK -->
     <a href="intent://abakum.github.io/croc#ODM1NC1oYXJ2YXJkLW5ldmFkYS10cnVjawpkZWZhdWx0CmNyb2Muc2Nob2xsei5jb20#Intent;scheme=https;package=com.github.howeyc.crocgui;S.browser_fallback_url=https://github.com/abakum/crocgui/releases/download/v1.11.40/crocgui-arm64.apk;end;" class="btn btn-primary">
-        Открыть в Croc
+        Открыть Croc
     </a>
     <div class="tip">Если приложение установлено, оно откроется. Если нет — начнется загрузка APK для arm64</div>
 
