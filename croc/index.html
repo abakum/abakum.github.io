@@ -17,7 +17,6 @@
             border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.1s;
         }
         .btn-primary { background-color: #007bff; }
-        .btn-secondary { background-color: #6c757d; font-size: 14px; width: 130px; padding: 10px; }
         .btn:active { transform: translateY(2px); }
         
         .settings-box {
@@ -29,28 +28,8 @@
         .settings-box h3:first-of-type { border-top: none; padding-top: 0; }
         .settings-box ul { padding-left: 20px; margin: 0; }
         .tip { font-size: 11px; color: #888; margin-top: 5px; font-style: italic; text-transform: uppercase; }
-        .hidden { display: none; }
         
-        .download-grid { display: flex; flex-wrap: wrap; justify-content: center; max-width: 400px; gap: 5px; }
-        
-        .api-selector {
-            margin: 15px 0;
-            padding: 15px;
-            background: #fff;
-            border-radius: 8px;
-            border: 1px solid #007bff;
-            max-width: 380px;
-        }
-        .api-selector p {
-            margin: 0 0 10px 0;
-            font-size: 14px;
-            color: #333;
-        }
-        .api-btn {
-            width: 140px !important;
-            margin: 4px !important;
-            min-height: 40px;
-        }
+        .download-grid { display: flex; flex-direction: column; align-items: center; gap: 5px; }
     </style>
 </head>
 <body>
@@ -68,7 +47,7 @@
             <ul>
                 <li>В диалоге <strong>Deep Link</strong> нажмите ⚙️ <strong>Открывать по умолчанию / Open by default</strong>.</li>
                 <li>Включите 🟢 <strong>Открывать поддерживаемые ссылки / Open supported links</strong>.</li>
-                <li>В меню ❯ <strong>Добавить ссылку</strong> отметьте 🟢 <strong>abakum.github.io</strong>
+                <li>В меню ❯ <strong>Добавить ссылку</strong> отметьте ✅ <strong>abakum.github.io</strong>
                     и нажмите <strong>Добавить</strong>.</li>
             </ul>
             <div class="tip">APP_OPEN_BY_DEFAULT_SETTINGS</div>
@@ -77,237 +56,38 @@
         <div id="android-11-minus">
             <h3>Android 11- (API 30-):</h3>
             <ul>
-            <li>В диалоге <strong>Deep Link</strong> нажмите ⚙️ <strong>О приложении / App info</strong>.</li>
-            <li>В меню ⌵ <strong>Дополнительно / Advanced</strong>.</li>
-            <li>Нажмите <strong>Открывать по умолчанию / Open by default</strong>.</li>
-            <li>В меню <strong>Открывать поддерживаемые ссылки / Open supported links</strong> выберите
-                 <strong>Открывать в этом приложении / Open in this app</strong>.</li>
-            <li>В меню <strong>Поддерживаемые ссылки / Supported links</strong> увидите <strong>abakum.github.io</strong>.</li>
-        </ul>
-        <div class="tip">APPLICATION_DETAILS_SETTINGS</div>
+                <li>В диалоге <strong>Deep Link</strong> нажмите ⚙️ <strong>О приложении / App info</strong>.</li>
+                <li>В меню ⌵ <strong>Дополнительно / Advanced</strong> -> <strong>Открывать по умолчанию / Open by default</strong>.</li>
+                <li>В меню <strong>Открывать поддерживаемые ссылки / Open supported links</strong> выберите <strong>Открывать в этом приложении / Open in this app</strong>.</li>
+            </ul>
+            <div class="tip">APPLICATION_DETAILS_SETTINGS</div>
         </div>
     </div>
 
-    <div class="api-selector">
-        <p><strong>Выберите версию Android:</strong></p>
-        <button onclick="setApiLevel(31)" class="btn-secondary api-btn">Android 12+ (API 31+)</button>
-        <button onclick="setApiLevel(30)" class="btn-secondary api-btn">Android 11- (API 30-)</button>
-        <button onclick="setNonAndroid()" class="btn-secondary api-btn" style="background-color: #6c757d;">Не Android</button>
-    </div>
-
-    <a id="intent-link" href="https://abakum.github.io/croc#QXBwIGluZm8KZGVmYXVsdApjcm9jLnNjaG9sbHouY29t#Intent;scheme=https;package=com.github.howeyc.crocgui;S.browser_fallback_url=crocgui-arm64.apk;end;" class="btn btn-primary">
-        Открыть Croc
-    </a>
-    <p id="auto-detected" style="font-size: 12px; color: #28a745; font-weight: bold; margin: 10px 0;"></p>
-
     <hr style="width: 50%; margin: 20px 0; border: 0; border-top: 1px solid #ccc;">
 
-    <p style="font-size: 14px; color: #666;">Скачать APK вручную:</p>
-    <div class="download-grid">
-        <a href="crocgui-arm64.apk" class="btn btn-secondary">arm64</a>
-        <a href="crocgui-arm.apk" class="btn btn-secondary">arm (v7)</a>
-        <a href="crocgui-amd64.apk" class="btn btn-secondary">amd64</a>
-        <a href="crocgui-386.apk" class="btn btn-secondary">386 (x86)</a>
+    <p style="font-size: 14px; color: #666;">Открыть Croc или скачать APK для вашей архитектуры:</p>
+    
+    <div class="download-grid" id="links-container">
+        <!-- Кнопки формируются скриптом ниже для чистоты кода -->
+        <a href="crocgui-arm64.apk" class="btn btn-primary">arm64 (v8)</a>
+        <a href="crocgui-arm.apk" class="btn btn-primary">arm (v7)</a>
+        <a href="crocgui-amd64.apk" class="btn btn-primary">amd64 (x86_64)</a>
+        <a href="crocgui-386.apk" class="btn btn-primary">386 (x86)</a>
     </div>
 
     <script>
         (function() {
             const releasePath = "https://github.com/abakum/crocgui/releases/download/v1.11.40/";
-            const ua = navigator.userAgent;
-            const a12block = document.getElementById('android-12-plus');
-            const a11block = document.getElementById('android-11-minus');
-            const infoText = document.getElementById('auto-detected');
-            
-            let arch = "arm64";
-            let androidVersion = 0;
+            const intentPrefix = "https://abakum.github.io/croc#QXBwIGluZm8KZGVmYXVsdApjcm9jLnNjaG9sbHouY29t#Intent;scheme=https;package=com.github.howeyc.crocgui;S.browser_fallback_url=";
+            const intentSuffix = ";end;";
 
-            // Обновляем ссылки для скачивания
-            const manualLinks = document.querySelectorAll('.download-grid a');
-            manualLinks.forEach(link => {
-                const fileName = link.getAttribute('href');
-                if (fileName && !fileName.startsWith('http')) {
-                    link.href = releasePath + fileName;
-                }
+            const links = document.querySelectorAll('#links-container a');
+            links.forEach(link => {
+                const apkFile = link.getAttribute('href');
+                const fullApkUrl = releasePath + apkFile;
+                link.href = intentPrefix + fullApkUrl + intentSuffix;
             });
-
-            // Определяем архитектуру
-            function detectArchitecture() {
-                if (ua.indexOf("x86_64") > -1 || ua.indexOf("amd64") > -1) {
-                    return "amd64";
-                } else if (ua.indexOf("i686") > -1 || ua.indexOf("i386") > -1 || ua.indexOf("x86") > -1) {
-                    return "386";
-                } else if (ua.indexOf("armv7") > -1 || ua.indexOf("armeabi") > -1) {
-                    return "arm";
-                } else if (ua.indexOf("aarch64") > -1 || ua.indexOf("arm64") > -1) {
-                    return "arm64";
-                }
-                return "arm64";
-            }
-
-            // Пытаемся определить Android версию
-            function detectAndroidVersion() {
-                const isAndroid = /Android/i.test(ua);
-                
-                // Способ 1: Из User-Agent
-                let versionFromUA = 0;
-                if (isAndroid) {
-                    const match = ua.match(/Android\s([0-9\.]+)/);
-                    if (match) {
-                        versionFromUA = parseFloat(match[1]);
-                    }
-                }
-                
-                // Способ 2: Проверка фич Android 12+
-                const hasAndroid12Features = (
-                    'colorScheme' in document.documentElement.style ||
-                    window.matchMedia('(prefers-color-scheme: dark)').matches ||
-                    window.matchMedia('(dynamic-range: high)').matches ||
-                    ('getDisplayMedia' in navigator.mediaDevices || 'displayCapture' in navigator.mediaDevices)
-                );
-                
-                // Приоритет: User-Agent, потом фичи
-                let detectedVersion = versionFromUA;
-                
-                // Если из UA не определили, но есть фичи Android 12+, предполагаем новую версию
-                if (detectedVersion === 0 && hasAndroid12Features) {
-                    detectedVersion = 12;
-                }
-                
-                // Если из UA версия меньше 12, но есть современные фичи
-                if (detectedVersion < 12 && detectedVersion > 0 && hasAndroid12Features) {
-                    detectedVersion = 12; // Возможно UA устарел
-                }
-                
-                return {
-                    version: detectedVersion,
-                    fromUA: versionFromUA,
-                    hasModernFeatures: hasAndroid12Features,
-                    isAndroid: isAndroid
-                };
-            }
-
-            // Функция для установки API уровня
-            window.setApiLevel = function(apiLevel) {
-                if (a12block && a11block) {
-                    // Показываем только выбранную инструкцию
-                    if (apiLevel >= 31) {
-                        a12block.classList.remove('hidden');
-                        a11block.classList.add('hidden');
-                    } else {
-                        a12block.classList.add('hidden');
-                        a11block.classList.remove('hidden');
-                    }
-                 }
-                
-                // Сохраняем выбор пользователя
-                localStorage.setItem('userSelectedApiLevel', apiLevel);
-                localStorage.setItem('isNonAndroid', 'false');
-                
-                // Обновляем информацию
-                updateInfoText(apiLevel >= 31 ? '12+' : '11-', apiLevel);
-            };
-
-            // Функция для не Android устройств
-            window.setNonAndroid = function() {
-                if (a12block && a11block) {
-                    // ПОКАЗЫВАЕМ ОБЕ ИНСТРУКЦИИ для не Android
-                    a12block.classList.remove('hidden');
-                    a11block.classList.remove('hidden');
-                 }
-                
-                // Сохраняем выбор пользователя
-                localStorage.setItem('isNonAndroid', 'true');
-                localStorage.removeItem('userSelectedApiLevel');
-                
-                // Обновляем информацию
-                updateNonAndroidInfo();
-            };
-
-            // Обновление информационного текста для Android
-            function updateInfoText(androidVersionText, apiLevel) {
-                if (infoText) {
-                    const detected = detectAndroidVersion();
-                    const arch = detectArchitecture();
-                    
-                    let info = ``;
-                    
-                    if (detected.version > 0) {
-                        info += `Обнаружено: Android ${detected.version}.`;
-                        if (detected.version !== detected.fromUA && detected.fromUA > 0) {
-                            info += ` (UA: ${detected.fromUA})`;
-                        }
-                    }
-                    
-                    info += ` Архитектура: ${arch}`;
-                    
-                    infoText.innerHTML = info;
-                    infoText.style.color = apiLevel >= 31 ? '#28a745' : '#ffc107';
-                }
-                
-            }
-
-            // Обновление информационного текста для не Android
-            function updateNonAndroidInfo() {
-                if (infoText) {
-                    const detected = detectAndroidVersion();
-                    const arch = detectArchitecture();
-                    
-                    let info = 'Устройство: Не Android';
-                    
-                    // Добавляем информацию об архитектуре, если определили
-                    if (arch !== "arm64") {
-                        info += ` | Архитектура: ${arch}`;
-                    }
-                    
-                    if (!detected.isAndroid && detected.hasModernFeatures) {
-                        info += ' (Обнаружены современные функции браузера)';
-                    }
-                    
-                    infoText.innerHTML = info;
-                    infoText.style.color = '#6c757d';
-                }
-                
-            }
-
-            // Основная логика
-            const detected = detectAndroidVersion();
-            arch = detectArchitecture();
-            
-            // Проверяем сохраненный выбор пользователя
-            const savedApiLevel = localStorage.getItem('userSelectedApiLevel');
-            const isNonAndroid = localStorage.getItem('isNonAndroid') === 'true';
-            
-            if (isNonAndroid) {
-                // Пользователь ранее выбрал "Не Android" - показываем обе инструкции
-                setNonAndroid();
-            } else if (savedApiLevel) {
-                // Используем сохраненный выбор Android версии
-                setApiLevel(parseInt(savedApiLevel));
-            } else {
-                // Автоматическое определение
-                if (detected.isAndroid) {
-                    // Для Android устройств - показываем рекомендованную версию
-                    let recommendedApiLevel = 30;
-                    
-                    if (detected.version >= 12) {
-                        recommendedApiLevel = 31;
-                    }
-                    
-                    setApiLevel(recommendedApiLevel);
-                    
-                } else {
-                    // Для не Android устройств - показываем обе инструкции
-                    setNonAndroid();
-                 }
-            }
-            
-            // Обновляем Intent ссылку
-            const intentLink = document.getElementById('intent-link');
-            if (intentLink) {
-                const apkFile = `crocgui-${arch}.apk`;
-                const fullApkPath = releasePath + apkFile;
-                intentLink.href = intentLink.href.replace("crocgui-arm64.apk", encodeURIComponent(fullApkPath));
-            }
         })();
     </script>
 
