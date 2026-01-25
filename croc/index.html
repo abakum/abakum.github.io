@@ -25,7 +25,7 @@
             padding: 15px; margin: 20px auto; max-width: 380px;
             text-align: left; font-size: 14px; color: #333; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        .settings-box h3 { margin: 15px 0 10px 0; font-size: 14px; color: #007bff; border-top: 1px dashed #eee; padding-top: 10px; }
+        .settings-box h3 { margin: 10px 0 0 0; font-size: 12px; color: #007bff; border-top: 1px dashed #eee; padding-top: 10px; }
         .settings-box h3:first-of-type { border-top: none; padding-top: 0; }
         .settings-box ul { padding-left: 20px; margin: 0; }
         .tip { font-size: 11px; color: #888; margin-top: 5px; font-style: italic; text-transform: uppercase; }
@@ -46,18 +46,17 @@
 
         <div id="android-12-plus">
             <h3>Android 12+ (API 31+):</h3>
-            <div class="tip">APP_OPEN_BY_DEFAULT_SETTINGS</div>
             <ul>
                 <li>В диалоге <strong>Deep Link</strong> нажмите ⚙️ <strong>Открывать по умолчанию / Open by default</strong>.</li>
                 <li>Включите 🟢 <strong>Открывать поддерживаемые ссылки / Open supported links</strong>.</li>
                 <li>В меню ❯ <strong>Добавить ссылку</strong> отметьте 🟢 <strong>abakum.github.io</strong>
                     и нажмите <strong>Добавить</strong>.</li>
             </ul>
+            <div class="tip">APP_OPEN_BY_DEFAULT_SETTINGS</div>
         </div>
 
         <div id="android-11-minus">
-            <h3>Android 11- (API 30-)</h3>
-            <div class="tip">APPLICATION_DETAILS_SETTINGS</div>
+            <h3>Android 11- (API 30-):</h3>
             <ul>
             <li>В диалоге <strong>Deep Link</strong> нажмите ⚙️ <strong>О приложении / App info</strong>.</li>
             <li>В меню ⌵ <strong>Дополнительно / Advanced</strong>.</li>
@@ -66,11 +65,11 @@
                  <strong>Открывать в этом приложении / Open in this app</strong>.</li>
             <li>В меню <strong>Поддерживаемые ссылки / Supported links</strong> увидите <strong>abakum.github.io</strong>.</li>
         </ul>
+        <div class="tip">APPLICATION_DETAILS_SETTINGS</div>
         </div>
     </div>
 
-    <!-- Основная кнопка с динамическим Fallback -->
-    <a id="intent-link" href="https://abakum.github.io/croc#QXBwIGluZm8KZGVmYXVsdApjcm9jLnNjaG9sbHouY29t#Intent;scheme=https;package=com.github.howeyc.crocgui;S.browser_fallback_url=https://github.com/abakum/crocgui/releases/download/v1.11.40/crocgui-arm64.apk;end;" class="btn btn-primary">
+    <a id="intent-link" href="https://abakum.github.io/croc#QXBwIGluZm8KZGVmYXVsdApjcm9jLnNjaG9sbHouY29t#Intent;scheme=https;package=com.github.howeyc.crocgui;S.browser_fallback_url=crocgui-arm64.apk;end;" class="btn btn-primary">
         Открыть Croc
     </a>
     <p id="auto-detected" style="font-size: 12px; color: #28a745; font-weight: bold;"></p>
@@ -87,18 +86,16 @@
 
     <script>
         (function() {
+            const releasePath = "https://github.com/abakum/crocgui/releases/download/v1.11.40/";
             const ua = navigator.userAgent;
             const isAndroid = /Android/i.test(ua);
             const a12block = document.getElementById('android-12-plus');
             const a11block = document.getElementById('android-11-minus');
             const infoText = document.getElementById('auto-detected');
             
-            // Базовый путь к вашему релизу v1.11.40
-            const releasePath = "https://github.com/abakum/crocgui/releases/download/v1.11.40/";
             
-            let arch = "arm64"; // Архитектура по умолчанию
+            let arch = "arm64";
 
-            // 1. Обработка кнопок ручного скачивания (добавляем префикс релиза)
             const manualLinks = document.querySelectorAll('.download-grid a');
             manualLinks.forEach(link => {
                 const fileName = link.getAttribute('href');
@@ -108,8 +105,7 @@
             });
 
             if (isAndroid) {
-                // 2. Определение версии Android
-                const match = ua.match(/Android\s([0-9\.]+)/);
+                 const match = ua.match(/Android\s([0-9\.]+)/);
                 if (match) {
                     const version = parseInt(match[1]);
                     if (version >= 12) {
@@ -119,22 +115,19 @@
                     }
                 }
 
-                // 3. Уточнение архитектуры для основной кнопки
                 if (ua.indexOf("x86_64") > -1 || ua.indexOf("amd64") > -1) arch = "amd64";
                 else if (ua.indexOf("i686") > -1 || ua.indexOf("i386") > -1 || ua.indexOf("x86") > -1) arch = "386";
                 else if (ua.indexOf("armv7") > -1 || ua.indexOf("armeabi") > -1) arch = "arm";
                 else if (ua.indexOf("aarch64") > -1 || ua.indexOf("arm64") > -1) arch = "arm64";
 
-                // 4. Обновление Intent-ссылки (заменяем только имя файла в fallback_url)
                 const intentLink = document.getElementById('intent-link');
                 if (intentLink) {
                     const apkFile = `crocgui-${arch}.apk`;
-                    intentLink.href = intentLink.href.replace(/crocgui-arm64\.apk/, apkFile);
+                    const fullApkPath = releasePath + apkFile;
+                    intentLink.href = intentLink.href.replace("crocgui-arm64.apk", fullApkPath);
                 }
-                
-                if (infoText) infoText.innerText = `Определен Android. Оптимальный APK: ${arch}`;
-            } else {
-                if (infoText) infoText.innerText = "Система не определена (показаны все инструкции)";
+                    
+                if (infoText) infoText.innerText = `Android: $(version). APK: ${arch}`;            
             }
         })();
     </script>
