@@ -57,13 +57,17 @@
             font-weight: bold;
             margin: 5px 0;
         }
-        .non-android-info {
+        .non-android-note {
             background: #f8f9fa;
-            border-left: 4px solid #6c757d;
+            border: 1px dashed #6c757d;
+            border-radius: 8px;
             padding: 10px;
             margin: 10px 0;
-            text-align: left;
             font-size: 13px;
+            color: #666;
+        }
+        .non-android-note strong {
+            color: #333;
         }
     </style>
 </head>
@@ -101,14 +105,9 @@
         <div class="tip">APPLICATION_DETAILS_SETTINGS</div>
         </div>
         
-        <div id="non-android-block" class="non-android-info hidden">
-            <p><strong>Для не Android устройств:</strong></p>
-            <p>Эта инструкция предназначена для Android устройств. Если у вас другое устройство, пожалуйста:</p>
-            <ul>
-                <li>Используйте Android эмулятор на компьютере</li>
-                <li>Или установите приложение на Android устройство</li>
-                <li>Доступны APK для скачивания ниже</li>
-            </ul>
+        <div id="non-android-note" class="non-android-note hidden">
+            <p><strong>📱 Информация для не Android устройств:</strong></p>
+            <p>Если вы используете Android эмулятор или планируете установить приложение на Android устройство, выберите соответствующую версию Android выше.</p>
         </div>
     </div>
 
@@ -141,7 +140,7 @@
             const ua = navigator.userAgent;
             const a12block = document.getElementById('android-12-plus');
             const a11block = document.getElementById('android-11-minus');
-            const nonAndroidBlock = document.getElementById('non-android-block');
+            const nonAndroidNote = document.getElementById('non-android-note');
             const infoText = document.getElementById('auto-detected');
             const recommendationText = document.getElementById('recommendation');
             
@@ -215,18 +214,17 @@
 
             // Функция для установки API уровня
             window.setApiLevel = function(apiLevel) {
-                if (a12block && a11block && nonAndroidBlock) {
-                    // Скрываем все блоки
-                    a12block.classList.add('hidden');
-                    a11block.classList.add('hidden');
-                    nonAndroidBlock.classList.add('hidden');
-                    
-                    // Показываем выбранный
+                if (a12block && a11block && nonAndroidNote) {
+                    // Показываем только выбранную инструкцию
                     if (apiLevel >= 31) {
                         a12block.classList.remove('hidden');
+                        a11block.classList.add('hidden');
                     } else {
+                        a12block.classList.add('hidden');
                         a11block.classList.remove('hidden');
                     }
+                    // Скрываем заметку для не Android
+                    nonAndroidNote.classList.add('hidden');
                 }
                 
                 // Сохраняем выбор пользователя
@@ -239,12 +237,12 @@
 
             // Функция для не Android устройств
             window.setNonAndroid = function() {
-                if (a12block && a11block && nonAndroidBlock) {
-                    // Скрываем Android инструкции
-                    a12block.classList.add('hidden');
-                    a11block.classList.add('hidden');
-                    // Показываем блок для не Android
-                    nonAndroidBlock.classList.remove('hidden');
+                if (a12block && a11block && nonAndroidNote) {
+                    // ПОКАЗЫВАЕМ ОБЕ ИНСТРУКЦИИ для не Android
+                    a12block.classList.remove('hidden');
+                    a11block.classList.remove('hidden');
+                    // Показываем заметку для не Android
+                    nonAndroidNote.classList.remove('hidden');
                 }
                 
                 // Сохраняем выбор пользователя
@@ -252,28 +250,10 @@
                 localStorage.removeItem('userSelectedApiLevel');
                 
                 // Обновляем информацию
-                if (infoText) {
-                    const detected = detectAndroidVersion();
-                    const arch = detectArchitecture();
-                    
-                    let info = 'Устройство: Не Android';
-                    if (!detected.isAndroid && detected.hasModernFeatures) {
-                        info += ' (Обнаружены современные функции)';
-                    }
-                    info += ` | Архитектура: ${arch}`;
-                    
-                    infoText.innerHTML = info;
-                    infoText.style.color = '#6c757d';
-                }
-                
-                // Обновляем рекомендацию
-                if (recommendationText) {
-                    recommendationText.innerHTML = 'Выбрано: Не Android устройство';
-                    recommendationText.style.color = '#6c757d';
-                }
+                updateNonAndroidInfo();
             };
 
-            // Обновление информационного текста
+            // Обновление информационного текста для Android
             function updateInfoText(androidVersionText, apiLevel) {
                 if (infoText) {
                     const detected = detectAndroidVersion();
@@ -303,13 +283,39 @@
                         recommendation = 'Рекомендуется: Android 12+ (API 31+)';
                     } else if (detected.version >= 5 && detected.version < 12) {
                         recommendation = 'Рекомендуется: Android 11- (API 30-)';
-                    } else if (!detected.isAndroid) {
-                        recommendation = 'Устройство не Android';
                     }
                     
                     recommendationText.innerHTML = recommendation;
                     recommendationText.style.color = detected.version >= 12 ? '#28a745' : 
                                                    detected.version > 0 ? '#ffc107' : '#6c757d';
+                }
+            }
+
+            // Обновление информационного текста для не Android
+            function updateNonAndroidInfo() {
+                if (infoText) {
+                    const detected = detectAndroidVersion();
+                    const arch = detectArchitecture();
+                    
+                    let info = 'Устройство: Не Android';
+                    
+                    // Добавляем информацию об архитектуре, если определили
+                    if (arch !== "arm64") {
+                        info += ` | Архитектура: ${arch}`;
+                    }
+                    
+                    if (!detected.isAndroid && detected.hasModernFeatures) {
+                        info += ' (Обнаружены современные функции браузера)';
+                    }
+                    
+                    infoText.innerHTML = info;
+                    infoText.style.color = '#6c757d';
+                }
+                
+                // Обновляем рекомендацию
+                if (recommendationText) {
+                    recommendationText.innerHTML = 'Выбрано: Не Android устройство';
+                    recommendationText.style.color = '#6c757d';
                 }
             }
 
@@ -322,28 +328,36 @@
             const isNonAndroid = localStorage.getItem('isNonAndroid') === 'true';
             
             if (isNonAndroid) {
-                // Пользователь ранее выбрал "Не Android"
+                // Пользователь ранее выбрал "Не Android" - показываем обе инструкции
                 setNonAndroid();
             } else if (savedApiLevel) {
                 // Используем сохраненный выбор Android версии
                 setApiLevel(parseInt(savedApiLevel));
             } else {
-                // Автоматическое определение и показ рекомендации
-                let recommendedApiLevel = 30;
-                
-                if (detected.version >= 12 || (!detected.isAndroid && detected.hasModernFeatures)) {
-                    recommendedApiLevel = 31;
-                }
-                
-                // Показываем рекомендованную версию
-                setApiLevel(recommendedApiLevel);
-                
-                // Обновляем информацию с детекцией
-                updateInfoText(recommendedApiLevel >= 31 ? '12+' : '11-', recommendedApiLevel);
-                
-                // Добавляем примечание об автоматическом определении
-                if (recommendationText) {
-                    recommendationText.innerHTML += '<br><small>(определено автоматически)</small>';
+                // Автоматическое определение
+                if (detected.isAndroid) {
+                    // Для Android устройств - показываем рекомендованную версию
+                    let recommendedApiLevel = 30;
+                    
+                    if (detected.version >= 12) {
+                        recommendedApiLevel = 31;
+                    }
+                    
+                    setApiLevel(recommendedApiLevel);
+                    
+                    // Добавляем примечание об автоматическом определении
+                    if (recommendationText) {
+                        recommendationText.innerHTML += '<br><small>(определено автоматически)</small>';
+                    }
+                } else {
+                    // Для не Android устройств - показываем обе инструкции
+                    setNonAndroid();
+                    
+                    // Добавляем примечание
+                    if (recommendationText) {
+                        recommendationText.innerHTML = 'Устройство не Android - показаны обе инструкции';
+                        recommendationText.style.color = '#6c757d';
+                    }
                 }
             }
             
