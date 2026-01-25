@@ -88,6 +88,7 @@
         (function() {
             const releasePath = "https://github.com/abakum/crocgui/releases/download/v1.11.40/";
             const ua = navigator.userAgent;
+            if (infoText) infoText.innerText = `UA: ${ua}`;            
             const isAndroid = /Android/i.test(ua);
             const a12block = document.getElementById('android-12-plus');
             const a11block = document.getElementById('android-11-minus');
@@ -128,7 +129,7 @@
                     intentLink.href = intentLink.href.replace("crocgui-arm64.apk", fullApkPath);
                 }
                     
-                if (infoText) infoText.innerText = `UA: ${ua}. Android: ${version}. APK: ${arch}`;            
+                if (infoText) infoText.innerText = `Android: ${version}. APK: ${arch}`;            
             }
         })();
     </script>
