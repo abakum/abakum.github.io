@@ -105,7 +105,7 @@
             });
 
             if (isAndroid) {
-                 const match = ua.match(/Android\s([0-9\.]+)/);
+                const match = ua.match(/Android\s([0-9\.]+)/);
                 if (match) {
                     const version = parseInt(match[1]);
                     if (version >= 12) {
@@ -127,7 +127,7 @@
                     intentLink.href = intentLink.href.replace("crocgui-arm64.apk", fullApkPath);
                 }
                     
-                if (infoText) infoText.innerText = `Android: $(version). APK: ${arch}`;            
+                if (infoText) infoText.innerText = `Android: ${version}. APK: ${arch}`;            
             }
         })();
     </script>
