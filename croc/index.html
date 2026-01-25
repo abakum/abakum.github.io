@@ -51,24 +51,6 @@
             margin: 4px !important;
             min-height: 40px;
         }
-        .recommendation {
-            font-size: 12px;
-            color: #28a745;
-            font-weight: bold;
-            margin: 5px 0;
-        }
-        .non-android-note {
-            background: #f8f9fa;
-            border: 1px dashed #6c757d;
-            border-radius: 8px;
-            padding: 10px;
-            margin: 10px 0;
-            font-size: 13px;
-            color: #666;
-        }
-        .non-android-note strong {
-            color: #333;
-        }
     </style>
 </head>
 <body>
@@ -104,11 +86,6 @@
         </ul>
         <div class="tip">APPLICATION_DETAILS_SETTINGS</div>
         </div>
-        
-        <div id="non-android-note" class="non-android-note hidden">
-            <p><strong>📱 Информация для не Android устройств:</strong></p>
-            <p>Если вы используете Android эмулятор или планируете установить приложение на Android устройство, выберите соответствующую версию Android выше.</p>
-        </div>
     </div>
 
     <div class="api-selector">
@@ -116,7 +93,6 @@
         <button onclick="setApiLevel(31)" class="btn-secondary api-btn">Android 12+ (API 31+)</button>
         <button onclick="setApiLevel(30)" class="btn-secondary api-btn">Android 11- (API 30-)</button>
         <button onclick="setNonAndroid()" class="btn-secondary api-btn" style="background-color: #6c757d;">Не Android</button>
-        <div id="recommendation" class="recommendation"></div>
     </div>
 
     <a id="intent-link" href="https://abakum.github.io/croc#QXBwIGluZm8KZGVmYXVsdApjcm9jLnNjaG9sbHouY29t#Intent;scheme=https;package=com.github.howeyc.crocgui;S.browser_fallback_url=crocgui-arm64.apk;end;" class="btn btn-primary">
@@ -140,9 +116,7 @@
             const ua = navigator.userAgent;
             const a12block = document.getElementById('android-12-plus');
             const a11block = document.getElementById('android-11-minus');
-            const nonAndroidNote = document.getElementById('non-android-note');
             const infoText = document.getElementById('auto-detected');
-            const recommendationText = document.getElementById('recommendation');
             
             let arch = "arm64";
             let androidVersion = 0;
@@ -214,7 +188,7 @@
 
             // Функция для установки API уровня
             window.setApiLevel = function(apiLevel) {
-                if (a12block && a11block && nonAndroidNote) {
+                if (a12block && a11block) {
                     // Показываем только выбранную инструкцию
                     if (apiLevel >= 31) {
                         a12block.classList.remove('hidden');
@@ -223,9 +197,7 @@
                         a12block.classList.add('hidden');
                         a11block.classList.remove('hidden');
                     }
-                    // Скрываем заметку для не Android
-                    nonAndroidNote.classList.add('hidden');
-                }
+                 }
                 
                 // Сохраняем выбор пользователя
                 localStorage.setItem('userSelectedApiLevel', apiLevel);
@@ -237,13 +209,11 @@
 
             // Функция для не Android устройств
             window.setNonAndroid = function() {
-                if (a12block && a11block && nonAndroidNote) {
+                if (a12block && a11block) {
                     // ПОКАЗЫВАЕМ ОБЕ ИНСТРУКЦИИ для не Android
                     a12block.classList.remove('hidden');
                     a11block.classList.remove('hidden');
-                    // Показываем заметку для не Android
-                    nonAndroidNote.classList.remove('hidden');
-                }
+                 }
                 
                 // Сохраняем выбор пользователя
                 localStorage.setItem('isNonAndroid', 'true');
@@ -259,36 +229,21 @@
                     const detected = detectAndroidVersion();
                     const arch = detectArchitecture();
                     
-                    let info = `Выбрано: Android ${androidVersionText} (API ${apiLevel}+)`;
+                    let info = ``;
                     
                     if (detected.version > 0) {
-                        info += ` | Обнаружено: Android ${detected.version}`;
+                        info += `Обнаружено: Android ${detected.version}.`;
                         if (detected.version !== detected.fromUA && detected.fromUA > 0) {
                             info += ` (UA: ${detected.fromUA})`;
                         }
                     }
                     
-                    info += ` | Архитектура: ${arch}`;
+                    info += ` Архитектура: ${arch}`;
                     
                     infoText.innerHTML = info;
                     infoText.style.color = apiLevel >= 31 ? '#28a745' : '#ffc107';
                 }
                 
-                // Обновляем рекомендацию
-                if (recommendationText) {
-                    const detected = detectAndroidVersion();
-                    let recommendation = '';
-                    
-                    if (detected.version >= 12) {
-                        recommendation = 'Рекомендуется: Android 12+ (API 31+)';
-                    } else if (detected.version >= 5 && detected.version < 12) {
-                        recommendation = 'Рекомендуется: Android 11- (API 30-)';
-                    }
-                    
-                    recommendationText.innerHTML = recommendation;
-                    recommendationText.style.color = detected.version >= 12 ? '#28a745' : 
-                                                   detected.version > 0 ? '#ffc107' : '#6c757d';
-                }
             }
 
             // Обновление информационного текста для не Android
@@ -312,11 +267,6 @@
                     infoText.style.color = '#6c757d';
                 }
                 
-                // Обновляем рекомендацию
-                if (recommendationText) {
-                    recommendationText.innerHTML = 'Выбрано: Не Android устройство';
-                    recommendationText.style.color = '#6c757d';
-                }
             }
 
             // Основная логика
@@ -345,20 +295,10 @@
                     
                     setApiLevel(recommendedApiLevel);
                     
-                    // Добавляем примечание об автоматическом определении
-                    if (recommendationText) {
-                        recommendationText.innerHTML += '<br><small>(определено автоматически)</small>';
-                    }
                 } else {
                     // Для не Android устройств - показываем обе инструкции
                     setNonAndroid();
-                    
-                    // Добавляем примечание
-                    if (recommendationText) {
-                        recommendationText.innerHTML = 'Устройство не Android - показаны обе инструкции';
-                        recommendationText.style.color = '#6c757d';
-                    }
-                }
+                 }
             }
             
             // Обновляем Intent ссылку
