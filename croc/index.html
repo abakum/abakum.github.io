@@ -40,7 +40,7 @@
 
     <div class="settings-box">
         <ul>
-            <li>На странице ➤ <strong>Дать / Send</strong> нажмите кнопку 🗐.</li>
+            <li>На странице ➤ <strong>Дать / Send</strong> нажмите кнопку <strong>🗐</strong>.</li>
             <li>Из Секрета и параметров Посредника сформируется Deep Link и QR-код.</li>
         </ul>
 
@@ -106,8 +106,9 @@
 
             if (isAndroid) {
                 const match = ua.match(/Android\s([0-9\.]+)/);
+                let version = "не понял";
                 if (match) {
-                    const version = parseInt(match[1]);
+                    version = parseInt(match[1]);
                     if (version >= 12) {
                         if (a11block) a11block.classList.add('hidden');
                     } else if (version > 0) {
