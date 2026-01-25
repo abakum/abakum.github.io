@@ -81,13 +81,12 @@
             const links = document.querySelectorAll('#links-container a');
             const prefix = "intent://abakum.github.io/croc#QXBwIGluZm8KZGVmYXVsdApjcm9jLnNjaG9sbHouY29t#Intent;scheme=https;package=com.github.howeyc.crocgui;S.browser_fallback_url=";
             const suffix = ";end;";
+            const current = "v1.11.40";
             
             const setLinks = (tagName) => {
                 const path = `https://github.com/abakum/crocgui/releases/download/${tagName}/`;
                 links.forEach(link => {
                     const currentHref = link.getAttribute('href');
-                    
-                    // Проверяем, что ссылка ведет на .apk файл (в конце строки)
                     if (/\.apk$/.test(currentHref)) {
                         const file = currentHref.split('/').pop(); 
                         link.href = prefix + encodeURIComponent(path + file) + suffix;
@@ -95,16 +94,14 @@
                 });
             };
 
-            // Установка базовой версии
-            setLinks("v1.11.40");
+             setLinks(current);
 
-            // Попытка обновления до последней версии в 2026 году
             fetch('https://api.github.com/repos/abakum/crocgui/releases/latest')
                 .then(res => res.json())
                 .then(data => {
                     if (data.tag_name) setLinks(data.tag_name);
                 })
-                .catch(err => console.log("old"));
+                .catch(err => console.log("current"));
         })();
     </script>
 
