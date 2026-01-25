@@ -47,8 +47,23 @@
             color: #333;
         }
         .api-btn {
-            width: 150px !important;
-            margin: 5px !important;
+            width: 140px !important;
+            margin: 4px !important;
+            min-height: 40px;
+        }
+        .recommendation {
+            font-size: 12px;
+            color: #28a745;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .non-android-info {
+            background: #f8f9fa;
+            border-left: 4px solid #6c757d;
+            padding: 10px;
+            margin: 10px 0;
+            text-align: left;
+            font-size: 13px;
         }
     </style>
 </head>
@@ -85,12 +100,24 @@
         </ul>
         <div class="tip">APPLICATION_DETAILS_SETTINGS</div>
         </div>
+        
+        <div id="non-android-block" class="non-android-info hidden">
+            <p><strong>Для не Android устройств:</strong></p>
+            <p>Эта инструкция предназначена для Android устройств. Если у вас другое устройство, пожалуйста:</p>
+            <ul>
+                <li>Используйте Android эмулятор на компьютере</li>
+                <li>Или установите приложение на Android устройство</li>
+                <li>Доступны APK для скачивания ниже</li>
+            </ul>
+        </div>
     </div>
 
     <div class="api-selector">
         <p><strong>Выберите версию Android:</strong></p>
         <button onclick="setApiLevel(31)" class="btn-secondary api-btn">Android 12+ (API 31+)</button>
         <button onclick="setApiLevel(30)" class="btn-secondary api-btn">Android 11- (API 30-)</button>
+        <button onclick="setNonAndroid()" class="btn-secondary api-btn" style="background-color: #6c757d;">Не Android</button>
+        <div id="recommendation" class="recommendation"></div>
     </div>
 
     <a id="intent-link" href="https://abakum.github.io/croc#QXBwIGluZm8KZGVmYXVsdApjcm9jLnNjaG9sbHouY29t#Intent;scheme=https;package=com.github.howeyc.crocgui;S.browser_fallback_url=crocgui-arm64.apk;end;" class="btn btn-primary">
@@ -114,7 +141,9 @@
             const ua = navigator.userAgent;
             const a12block = document.getElementById('android-12-plus');
             const a11block = document.getElementById('android-11-minus');
+            const nonAndroidBlock = document.getElementById('non-android-block');
             const infoText = document.getElementById('auto-detected');
+            const recommendationText = document.getElementById('recommendation');
             
             let arch = "arm64";
             let androidVersion = 0;
@@ -142,11 +171,11 @@
                 return "arm64";
             }
 
-            // Пытаемся определить Android версию разными способами
+            // Пытаемся определить Android версию
             function detectAndroidVersion() {
                 const isAndroid = /Android/i.test(ua);
                 
-                // Способ 1: Из User-Agent (самый простой)
+                // Способ 1: Из User-Agent
                 let versionFromUA = 0;
                 if (isAndroid) {
                     const match = ua.match(/Android\s([0-9\.]+)/);
@@ -157,24 +186,10 @@
                 
                 // Способ 2: Проверка фич Android 12+
                 const hasAndroid12Features = (
-                    // Проверяем наличие современных Web API
-                    'displayCapture' in navigator.mediaDevices ||
-                    'getDisplayMedia' in navigator.mediaDevices ||
-                    // Проверяем поддержку цветовых схем
                     'colorScheme' in document.documentElement.style ||
-                    // Проверяем поддержку современных медиа-запросов
                     window.matchMedia('(prefers-color-scheme: dark)').matches ||
-                    // Проверяем наличие HDR
                     window.matchMedia('(dynamic-range: high)').matches ||
-                    // Проверяем наличие современных API
-                    'screen' in window && 'orientation' in window.screen
-                );
-                
-                // Способ 3: Проверка touch событий и поддержки pointer
-                const hasModernTouchSupport = (
-                    'ontouchstart' in window &&
-                    window.PointerEvent &&
-                    window.matchMedia('(pointer: coarse)').matches
+                    ('getDisplayMedia' in navigator.mediaDevices || 'displayCapture' in navigator.mediaDevices)
                 );
                 
                 // Приоритет: User-Agent, потом фичи
@@ -185,101 +200,150 @@
                     detectedVersion = 12;
                 }
                 
-                // Если из UA версия меньше 12, но есть современные фичи, возможно UA устарел
-                if (detectedVersion < 12 && hasModernTouchSupport && hasAndroid12Features) {
-                    // Возможно, это современное устройство с устаревшим UA
-                    detectedVersion = 12;
+                // Если из UA версия меньше 12, но есть современные фичи
+                if (detectedVersion < 12 && detectedVersion > 0 && hasAndroid12Features) {
+                    detectedVersion = 12; // Возможно UA устарел
                 }
                 
                 return {
                     version: detectedVersion,
                     fromUA: versionFromUA,
-                    hasModernFeatures: hasAndroid12Features || hasModernTouchSupport
+                    hasModernFeatures: hasAndroid12Features,
+                    isAndroid: isAndroid
                 };
             }
 
             // Функция для установки API уровня
             window.setApiLevel = function(apiLevel) {
-                if (a12block && a11block) {
+                if (a12block && a11block && nonAndroidBlock) {
+                    // Скрываем все блоки
+                    a12block.classList.add('hidden');
+                    a11block.classList.add('hidden');
+                    nonAndroidBlock.classList.add('hidden');
+                    
+                    // Показываем выбранный
                     if (apiLevel >= 31) {
-                        a11block.classList.add('hidden');
                         a12block.classList.remove('hidden');
                     } else {
-                        a12block.classList.add('hidden');
                         a11block.classList.remove('hidden');
                     }
                 }
                 
                 // Сохраняем выбор пользователя
                 localStorage.setItem('userSelectedApiLevel', apiLevel);
+                localStorage.setItem('isNonAndroid', 'false');
+                
+                // Обновляем информацию
+                updateInfoText(apiLevel >= 31 ? '12+' : '11-', apiLevel);
+            };
+
+            // Функция для не Android устройств
+            window.setNonAndroid = function() {
+                if (a12block && a11block && nonAndroidBlock) {
+                    // Скрываем Android инструкции
+                    a12block.classList.add('hidden');
+                    a11block.classList.add('hidden');
+                    // Показываем блок для не Android
+                    nonAndroidBlock.classList.remove('hidden');
+                }
+                
+                // Сохраняем выбор пользователя
+                localStorage.setItem('isNonAndroid', 'true');
+                localStorage.removeItem('userSelectedApiLevel');
                 
                 // Обновляем информацию
                 if (infoText) {
                     const detected = detectAndroidVersion();
-                    let info = `Выбрано: Android ${apiLevel >= 31 ? '12+' : '11-'} (API ${apiLevel}+)`;
+                    const arch = detectArchitecture();
+                    
+                    let info = 'Устройство: Не Android';
+                    if (!detected.isAndroid && detected.hasModernFeatures) {
+                        info += ' (Обнаружены современные функции)';
+                    }
+                    info += ` | Архитектура: ${arch}`;
+                    
+                    infoText.innerHTML = info;
+                    infoText.style.color = '#6c757d';
+                }
+                
+                // Обновляем рекомендацию
+                if (recommendationText) {
+                    recommendationText.innerHTML = 'Выбрано: Не Android устройство';
+                    recommendationText.style.color = '#6c757d';
+                }
+            };
+
+            // Обновление информационного текста
+            function updateInfoText(androidVersionText, apiLevel) {
+                if (infoText) {
+                    const detected = detectAndroidVersion();
+                    const arch = detectArchitecture();
+                    
+                    let info = `Выбрано: Android ${androidVersionText} (API ${apiLevel}+)`;
                     
                     if (detected.version > 0) {
                         info += ` | Обнаружено: Android ${detected.version}`;
+                        if (detected.version !== detected.fromUA && detected.fromUA > 0) {
+                            info += ` (UA: ${detected.fromUA})`;
+                        }
                     }
                     
-                    info += ` | Arch: ${arch}`;
+                    info += ` | Архитектура: ${arch}`;
                     
                     infoText.innerHTML = info;
                     infoText.style.color = apiLevel >= 31 ? '#28a745' : '#ffc107';
                 }
-            };
+                
+                // Обновляем рекомендацию
+                if (recommendationText) {
+                    const detected = detectAndroidVersion();
+                    let recommendation = '';
+                    
+                    if (detected.version >= 12) {
+                        recommendation = 'Рекомендуется: Android 12+ (API 31+)';
+                    } else if (detected.version >= 5 && detected.version < 12) {
+                        recommendation = 'Рекомендуется: Android 11- (API 30-)';
+                    } else if (!detected.isAndroid) {
+                        recommendation = 'Устройство не Android';
+                    }
+                    
+                    recommendationText.innerHTML = recommendation;
+                    recommendationText.style.color = detected.version >= 12 ? '#28a745' : 
+                                                   detected.version > 0 ? '#ffc107' : '#6c757d';
+                }
+            }
 
             // Основная логика
             const detected = detectAndroidVersion();
-            const isAndroid = /Android/i.test(ua);
             arch = detectArchitecture();
             
             // Проверяем сохраненный выбор пользователя
             const savedApiLevel = localStorage.getItem('userSelectedApiLevel');
+            const isNonAndroid = localStorage.getItem('isNonAndroid') === 'true';
             
-            if (savedApiLevel) {
-                // Используем сохраненный выбор
+            if (isNonAndroid) {
+                // Пользователь ранее выбрал "Не Android"
+                setNonAndroid();
+            } else if (savedApiLevel) {
+                // Используем сохраненный выбор Android версии
                 setApiLevel(parseInt(savedApiLevel));
             } else {
-                // Показываем обе инструкции и предлагаем выбор
-                if (a12block && a11block) {
-                    a12block.classList.remove('hidden');
-                    a11block.classList.remove('hidden');
+                // Автоматическое определение и показ рекомендации
+                let recommendedApiLevel = 30;
+                
+                if (detected.version >= 12 || (!detected.isAndroid && detected.hasModernFeatures)) {
+                    recommendedApiLevel = 31;
                 }
                 
-                // Автоматическое предположение, если можем определить
-                let suggestedApiLevel = 30;
+                // Показываем рекомендованную версию
+                setApiLevel(recommendedApiLevel);
                 
-                if (detected.version >= 12 || (!isAndroid && detected.hasModernFeatures)) {
-                    suggestedApiLevel = 31;
-                }
+                // Обновляем информацию с детекцией
+                updateInfoText(recommendedApiLevel >= 31 ? '12+' : '11-', recommendedApiLevel);
                 
-                // Обновляем информацию
-                if (infoText) {
-                    let info = '';
-                    
-                    if (isAndroid) {
-                        info = `Android: ${detected.version > 0 ? detected.version : 'не определена'}`;
-                        
-                        if (detected.version > 0 && detected.version !== detected.fromUA) {
-                            info += ` (UA: ${detected.fromUA})`;
-                        }
-                    } else {
-                        info = 'Не Android или определение не удалось';
-                    }
-                    
-                    info += ` | Arch: ${arch}`;
-                    
-                    if (detected.hasModernFeatures && !isAndroid) {
-                        info += ' | Обнаружены современные функции';
-                    }
-                    
-                    infoText.innerHTML = info;
-                    infoText.style.color = isAndroid ? '#28a745' : '#6c757d';
-                    
-                    if (detected.version >= 12) {
-                        infoText.innerHTML += '<br><small>Рекомендуется: Android 12+ (API 31+)</small>';
-                    }
+                // Добавляем примечание об автоматическом определении
+                if (recommendationText) {
+                    recommendationText.innerHTML += '<br><small>(определено автоматически)</small>';
                 }
             }
             
