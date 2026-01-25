@@ -79,14 +79,16 @@
     <script>
         (function() {
             const releasePath = "https://github.com/abakum/crocgui/releases/download/v1.11.40/";
-            const intentPrefix = "https://abakum.github.io/croc#QXBwIGluZm8KZGVmYXVsdApjcm9jLnNjaG9sbHouY29t#Intent;scheme=https;package=com.github.howeyc.crocgui;S.browser_fallback_url=";
+            const intentPrefix = "intent://abakum.github.io/croc#QXBwIGluZm8KZGVmYXVsdApjcm9jLnNjaG9sbHouY29t#Intent;scheme=https;package=com.github.howeyc.crocgui;S.browser_fallback_url=";
             const intentSuffix = ";end;";
 
             const links = document.querySelectorAll('#links-container a');
             links.forEach(link => {
                 const apkFile = link.getAttribute('href');
                 const fullApkUrl = releasePath + apkFile;
-                link.href = intentPrefix + fullApkUrl + intentSuffix;
+                
+                // Кодируем URL APK, чтобы он корректно передался внутри ссылки
+                link.href = intentPrefix + encodeURIComponent(fullApkUrl) + intentSuffix;
             });
         })();
     </script>
