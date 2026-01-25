@@ -32,6 +32,21 @@
         .hidden { display: none; }
         
         .download-grid { display: flex; flex-wrap: wrap; justify-content: center; max-width: 400px; gap: 5px; }
+        
+        .api-selector {
+            margin: 15px 0;
+            padding: 10px;
+            background: #fff;
+            border-radius: 8px;
+            border: 1px dashed #007bff;
+            display: none;
+        }
+        .warning {
+            color: #dc3545;
+            font-weight: bold;
+            font-size: 12px;
+            margin: 5px 0;
+        }
     </style>
 </head>
 <body>
@@ -69,10 +84,17 @@
         </div>
     </div>
 
+    <div id="api-selector" class="api-selector">
+        <p style="font-size: 12px; color: #666; margin: 0 0 5px 0;">Эмулятор обнаружен. Выберите ваш Android API уровень:</p>
+        <button onclick="setApiLevel(31)" class="btn-secondary" style="width: 140px; margin: 2px;">API 31+ (Android 12+)</button>
+        <button onclick="setApiLevel(30)" class="btn-secondary" style="width: 140px; margin: 2px;">API 30- (Android 11-)</button>
+        <div class="warning" id="api-warning"></div>
+    </div>
+
     <a id="intent-link" href="https://abakum.github.io/croc#QXBwIGluZm8KZGVmYXVsdApjcm9jLnNjaG9sbHouY29t#Intent;scheme=https;package=com.github.howeyc.crocgui;S.browser_fallback_url=crocgui-arm64.apk;end;" class="btn btn-primary">
         Открыть Croc
     </a>
-    <p id="auto-detected" style="font-size: 12px; color: #28a745; font-weight: bold;"></p>
+    <p id="auto-detected" style="font-size: 12px; color: #28a745; font-weight: bold; margin: 10px 0;"></p>
 
     <hr style="width: 50%; margin: 20px 0; border: 0; border-top: 1px solid #ccc;">
 
@@ -88,15 +110,16 @@
         (function() {
             const releasePath = "https://github.com/abakum/crocgui/releases/download/v1.11.40/";
             const ua = navigator.userAgent;
-            if (infoText) infoText.innerText = `UA: ${ua}`;            
-            const isAndroid = /Android/i.test(ua);
             const a12block = document.getElementById('android-12-plus');
             const a11block = document.getElementById('android-11-minus');
             const infoText = document.getElementById('auto-detected');
-            
+            const apiSelector = document.getElementById('api-selector');
             
             let arch = "arm64";
+            let androidVersion = 0;
+            let isEmulator = false;
 
+            // Обновляем ссылки для скачивания
             const manualLinks = document.querySelectorAll('.download-grid a');
             manualLinks.forEach(link => {
                 const fileName = link.getAttribute('href');
@@ -105,31 +128,152 @@
                 }
             });
 
-            if (isAndroid) {
-                const match = ua.match(/Android\s([0-9\.]+)/);
-                let version = "не понял";
-                if (match) {
-                    version = parseInt(match[1]);
-                    if (version >= 12) {
-                        if (a11block) a11block.classList.add('hidden');
-                    } else if (version > 0) {
-                        if (a12block) a12block.classList.add('hidden');
+            const isAndroid = /Android/i.test(ua);
+            
+            // Определяем архитектуру
+            function detectArchitecture() {
+                if (ua.indexOf("x86_64") > -1 || ua.indexOf("amd64") > -1) {
+                    return "amd64";
+                } else if (ua.indexOf("i686") > -1 || ua.indexOf("i386") > -1 || ua.indexOf("x86") > -1) {
+                    return "386";
+                } else if (ua.indexOf("armv7") > -1 || ua.indexOf("armeabi") > -1) {
+                    return "arm";
+                } else if (ua.indexOf("aarch64") > -1 || ua.indexOf("arm64") > -1) {
+                    return "arm64";
+                }
+                return "arm64";
+            }
+
+            // Определяем версию Android и показываем соответствующий блок
+            function showInstructionsForApiLevel(apiLevel) {
+                if (a12block && a11block) {
+                    if (apiLevel >= 31) {
+                        a11block.classList.add('hidden');
+                        a12block.classList.remove('hidden');
+                    } else {
+                        a12block.classList.add('hidden');
+                        a11block.classList.remove('hidden');
                     }
                 }
+                
+                // Сохраняем выбор пользователя
+                if (isEmulator) {
+                    localStorage.setItem('preferredApiLevel', apiLevel);
+                }
+                
+                // Скрываем селектор после выбора
+                if (apiSelector) {
+                    apiSelector.style.display = 'none';
+                }
+            }
 
-                if (ua.indexOf("x86_64") > -1 || ua.indexOf("amd64") > -1) arch = "amd64";
-                else if (ua.indexOf("i686") > -1 || ua.indexOf("i386") > -1 || ua.indexOf("x86") > -1) arch = "386";
-                else if (ua.indexOf("armv7") > -1 || ua.indexOf("armeabi") > -1) arch = "arm";
-                else if (ua.indexOf("aarch64") > -1 || ua.indexOf("arm64") > -1) arch = "arm64";
+            // Функция для установки API уровня (для кнопок)
+            window.setApiLevel = function(level) {
+                showInstructionsForApiLevel(level);
+                
+                // Обновляем информацию
+                if (infoText) {
+                    const arch = detectArchitecture();
+                    infoText.innerHTML = `Android: API ${level}+ (${level >= 31 ? '12+' : '11-'}) | Arch: ${arch}`;
+                    infoText.style.color = level >= 31 ? '#28a745' : '#ffc107';
+                }
+            };
 
+            if (isAndroid) {
+                const match = ua.match(/Android\s([0-9\.]+)/);
+                let versionText = "не определена";
+                
+                if (match) {
+                    versionText = match[1];
+                    androidVersion = parseFloat(versionText);
+                }
+                
+                arch = detectArchitecture();
+                
+                // Определяем, это эмулятор или реальное устройство
+                isEmulator = ua.includes('x86') || ua.includes('Android SDK') || 
+                            ua.includes('Emulator') || ua.includes('sdk_gphone');
+                
+                // Проверяем сохраненный выбор для эмулятора
+                const savedApiLevel = localStorage.getItem('preferredApiLevel');
+                
+                if (isEmulator) {
+                    // Для эмулятора показываем выбор API уровня
+                    if (apiSelector) {
+                        apiSelector.style.display = 'block';
+                    }
+                    
+                    // Показываем оба блока инструкций до выбора
+                    if (a12block && a11block && !savedApiLevel) {
+                        a12block.classList.remove('hidden');
+                        a11block.classList.remove('hidden');
+                    }
+                    
+                    // Если есть сохраненный выбор, используем его
+                    if (savedApiLevel) {
+                        showInstructionsForApiLevel(parseInt(savedApiLevel));
+                    } else {
+                        // Предлагаем выбор на основе эвристики
+                        const warning = document.getElementById('api-warning');
+                        if (warning) {
+                            warning.textContent = 'Выберите API уровень вашего эмулятора';
+                        }
+                    }
+                } else {
+                    // Для реальных устройств определяем автоматически
+                    let detectedApiLevel = 30; // По умолчанию Android 11-
+                    
+                    // Эвристика для определения Android 12+
+                    const isLikelyAndroid12Plus = (
+                        androidVersion >= 12 ||
+                        // Дополнительные проверки для современных Android
+                        'ontouchstart' in window && 
+                        window.matchMedia &&
+                        window.matchMedia('(pointer: coarse)').matches
+                    );
+                    
+                    if (isLikelyAndroid12Plus) {
+                        detectedApiLevel = 31;
+                    }
+                    
+                    showInstructionsForApiLevel(detectedApiLevel);
+                }
+                
+                // Обновляем Intent ссылку
                 const intentLink = document.getElementById('intent-link');
                 if (intentLink) {
                     const apkFile = `crocgui-${arch}.apk`;
                     const fullApkPath = releasePath + apkFile;
-                    intentLink.href = intentLink.href.replace("crocgui-arm64.apk", fullApkPath);
+                    intentLink.href = intentLink.href.replace("crocgui-arm64.apk", encodeURIComponent(fullApkPath));
                 }
+                
+                // Обновляем текст информации
+                if (infoText) {
+                    let info = `Android: ${versionText}`;
                     
-                if (infoText) infoText.innerText = `Android: ${version}. APK: ${arch}`;            
+                    if (isEmulator) {
+                        info += ' [Эмулятор]';
+                        if (savedApiLevel) {
+                            info += ` | API: ${savedApiLevel}+`;
+                        }
+                    } else {
+                        info += ` | Arch: ${arch}`;
+                    }
+                    
+                    infoText.innerHTML = info;
+                    infoText.style.color = isEmulator ? '#ff6b00' : '#28a745';
+                }
+                
+            } else {
+                // Не Android устройство
+                if (a12block) a12block.classList.add('hidden');
+                if (a11block) a11block.classList.add('hidden');
+                if (apiSelector) apiSelector.style.display = 'none';
+                
+                if (infoText) {
+                    infoText.innerText = "Не Android устройство";
+                    infoText.style.color = '#6c757d';
+                }
             }
         })();
     </script>
