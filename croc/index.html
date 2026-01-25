@@ -7,88 +7,58 @@
     <style>
         body {
             font-family: sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px 0;
-            background-color: #f4f4f9;
-            text-align: center;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; margin: 0; padding: 20px 0;
+            background-color: #f4f4f9; text-align: center;
         }
         .btn {
-            display: inline-block;
-            width: 280px;
-            padding: 15px;
-            margin: 10px;
-            font-size: 18px;
-            font-weight: bold;
-            color: #fff;
-            text-decoration: none;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: transform 0.1s;
+            display: inline-block; width: 280px; padding: 15px; margin: 8px;
+            font-size: 18px; font-weight: bold; color: #fff; text-decoration: none;
+            border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.1s;
         }
         .btn-primary { background-color: #007bff; }
-        .btn-secondary { background-color: #6c757d; font-size: 14px; }
+        .btn-secondary { background-color: #6c757d; font-size: 14px; width: 130px; padding: 10px; }
         .btn:active { transform: translateY(2px); }
-        p { color: #666; padding: 0 20px; max-width: 400px; line-height: 1.5; }
-
-        /* Стили для инструкции */
+        
         .settings-box {
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 12px;
-            padding: 15px;
-            margin: 20px auto;
-            max-width: 380px;
-            text-align: left;
-            font-size: 14px;
-            color: #333;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            background: #fff; border: 1px solid #ddd; border-radius: 12px;
+            padding: 15px; margin: 20px auto; max-width: 380px;
+            text-align: left; font-size: 14px; color: #333; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        .settings-box h3 {
-            margin: 0 0 10px 0;
-            font-size: 14px;
-            color: #007bff;
-        }
-        .settings-box ol {
-            padding-left: 20px;
-            margin: 0;
-        }
-        .settings-box li {
-            margin-bottom: 5px;
-        }
-        .tip {
-            font-size: 12px;
-            color: #888;
-            margin-top: 10px;
-            font-style: italic;
-        }
+        .settings-box h3 { margin: 15px 0 10px 0; font-size: 14px; color: #007bff; border-top: 1px dashed #eee; padding-top: 10px; }
+        .settings-box h3:first-of-type { border-top: none; padding-top: 0; }
+        .settings-box ul { padding-left: 20px; margin: 0; }
+        .tip { font-size: 11px; color: #888; margin-top: 5px; font-style: italic; text-transform: uppercase; }
+        .hidden { display: none; }
+        
+        .download-grid { display: flex; flex-wrap: wrap; justify-content: center; max-width: 400px; gap: 5px; }
     </style>
 </head>
 <body>
 
-    <p>Если Android Deep Link не сработал и Вы оказались здесь значит надо настроить открытие таких ссылок в Croc.</p>
+    <p>Если Android Deep Link не сработал, настройте открытие ссылок вручную:</p>
 
-    <!-- Блок инструкции -->
     <div class="settings-box">
         <ul>
             <li>На странице ➤ <strong>Дать / Send</strong> нажмите кнопку 🗐.</li>
             <li>Из Секрета и параметров Посредника сформируется Deep Link и QR-код.</li>
         </ul>
-        <div class="tip">APP_OPEN_BY_DEFAULT_SETTINGS</div>
-        <h3>На Андроиде 12+: </h3>
-        <ul>
-            <li>В диалоге <strong>Deep Link</strong> нажмите ⚙️ <strong>Открывать по умолчанию / Open by default</strong>.</li>
-            <li>Включите 🟢 <strong>Открывать поддерживаемые ссылки / Open supported links</strong>.</li>
-            <li>В меню ❯ <strong>Добавить ссылку</strong> отметьте 🟢 <strong>abakum.github.io</strong>
-                 и нажмите <strong>Добавить</strong>.</li>
-        </ul>
-        <div class="tip">APPLICATION_DETAILS_SETTINGS</div>
-        <h3>На Андроиде 11-: </h3>
-        <ul>
+
+        <div id="android-12-plus">
+            <h3>Android 12+ (API 31+):</h3>
+            <div class="tip">APP_OPEN_BY_DEFAULT_SETTINGS</div>
+            <ul>
+                <li>В диалоге <strong>Deep Link</strong> нажмите ⚙️ <strong>Открывать по умолчанию / Open by default</strong>.</li>
+                <li>Включите 🟢 <strong>Открывать поддерживаемые ссылки / Open supported links</strong>.</li>
+                <li>В меню ❯ <strong>Добавить ссылку</strong> отметьте 🟢 <strong>abakum.github.io</strong>
+                    и нажмите <strong>Добавить</strong>.</li>
+            </ul>
+        </div>
+
+        <div id="android-11-minus">
+            <h3>Android 11- (API 30-)</h3>
+            <div class="tip">APPLICATION_DETAILS_SETTINGS</div>
+            <ul>
             <li>В диалоге <strong>Deep Link</strong> нажмите ⚙️ <strong>О приложении / App info</strong>.</li>
             <li>В меню ⌵ <strong>Дополнительно / Advanced</strong>.</li>
             <li>Нажмите <strong>Открывать по умолчанию / Open by default</strong>.</li>
@@ -96,20 +66,78 @@
                  <strong>Открывать в этом приложении / Open in this app</strong>.</li>
             <li>В меню <strong>Поддерживаемые ссылки / Supported links</strong> увидите <strong>abakum.github.io</strong>.</li>
         </ul>
+        </div>
     </div>
 
-    <!-- Ссылка для открытия приложения с Fallback на APK -->
-    <a href="https://abakum.github.io/croc#QXBwIGluZm8KZGVmYXVsdApjcm9jLnNjaG9sbHouY29t#Intent;scheme=https;package=com.github.howeyc.crocgui;S.browser_fallback_url=https://github.com/abakum/crocgui/releases/download/v1.11.40/crocgui-arm64.apk;end;" class="btn btn-primary">
+    <!-- Основная кнопка с динамическим Fallback -->
+    <a id="intent-link" href="https://abakum.github.io/croc#QXBwIGluZm8KZGVmYXVsdApjcm9jLnNjaG9sbHouY29t#Intent;scheme=https;package=com.github.howeyc.crocgui;S.browser_fallback_url=https://github.com/abakum/crocgui/releases/download/v1.11.40/crocgui-arm64.apk;end;" class="btn btn-primary">
         Открыть Croc
     </a>
-    <div class="tip">Если приложение установлено, оно откроется. Если нет — начнется загрузка APK для arm64</div>
+    <p id="auto-detected" style="font-size: 12px; color: #28a745; font-weight: bold;"></p>
 
     <hr style="width: 50%; margin: 20px 0; border: 0; border-top: 1px solid #ccc;">
 
-    <!-- Прямая ссылка на скачивание -->
-    <a href="https://github.com/abakum/crocgui/releases/download/v1.11.40/crocgui-arm64.apk" class="btn btn-secondary">
-        Скачать APK для arm64
-    </a>
+    <p style="font-size: 14px; color: #666;">Скачать APK вручную:</p>
+    <div class="download-grid">
+        <a href="crocgui-arm64.apk" class="btn btn-secondary">arm64</a>
+        <a href="crocgui-arm.apk" class="btn btn-secondary">arm (v7)</a>
+        <a href="crocgui-amd64.apk" class="btn btn-secondary">amd64</a>
+        <a href="crocgui-386.apk" class="btn btn-secondary">386 (x86)</a>
+    </div>
+
+    <script>
+        (function() {
+            const ua = navigator.userAgent;
+            const isAndroid = /Android/i.test(ua);
+            const a12block = document.getElementById('android-12-plus');
+            const a11block = document.getElementById('android-11-minus');
+            const infoText = document.getElementById('auto-detected');
+            
+            // Базовый путь к вашему релизу v1.11.40
+            const releasePath = "https://github.com/abakum/crocgui/releases/download/v1.11.40/";
+            
+            let arch = "arm64"; // Архитектура по умолчанию
+
+            // 1. Обработка кнопок ручного скачивания (добавляем префикс релиза)
+            const manualLinks = document.querySelectorAll('.download-grid a');
+            manualLinks.forEach(link => {
+                const fileName = link.getAttribute('href');
+                if (fileName && !fileName.startsWith('http')) {
+                    link.href = releasePath + fileName;
+                }
+            });
+
+            if (isAndroid) {
+                // 2. Определение версии Android
+                const match = ua.match(/Android\s([0-9\.]+)/);
+                if (match) {
+                    const version = parseInt(match[1]);
+                    if (version >= 12) {
+                        if (a11block) a11block.classList.add('hidden');
+                    } else if (version > 0) {
+                        if (a12block) a12block.classList.add('hidden');
+                    }
+                }
+
+                // 3. Уточнение архитектуры для основной кнопки
+                if (ua.indexOf("x86_64") > -1 || ua.indexOf("amd64") > -1) arch = "amd64";
+                else if (ua.indexOf("i686") > -1 || ua.indexOf("i386") > -1 || ua.indexOf("x86") > -1) arch = "386";
+                else if (ua.indexOf("armv7") > -1 || ua.indexOf("armeabi") > -1) arch = "arm";
+                else if (ua.indexOf("aarch64") > -1 || ua.indexOf("arm64") > -1) arch = "arm64";
+
+                // 4. Обновление Intent-ссылки (заменяем только имя файла в fallback_url)
+                const intentLink = document.getElementById('intent-link');
+                if (intentLink) {
+                    const apkFile = `crocgui-${arch}.apk`;
+                    intentLink.href = intentLink.href.replace(/crocgui-arm64\.apk/, apkFile);
+                }
+                
+                if (infoText) infoText.innerText = `Определен Android. Оптимальный APK: ${arch}`;
+            } else {
+                if (infoText) infoText.innerText = "Система не определена (показаны все инструкции)";
+            }
+        })();
+    </script>
 
 </body>
 </html>
