@@ -60,6 +60,7 @@
             border-radius: 12px;
             cursor: pointer;
             transition: all 0.2s;
+            margin-bottom: 15px;
         }
 
         .scan-btn:hover,
@@ -74,6 +75,73 @@
             transform: none;
         }
 
+        .debug-section {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 20px;
+            border: 1px solid #333;
+            text-align: left;
+            display: none; /* Скрыто по умолчанию */
+        }
+
+        .debug-section.visible {
+            display: block;
+        }
+
+        .debug-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .debug-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #00a8ff;
+        }
+
+        .debug-toggle {
+            font-size: 12px;
+            color: #888;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .debug-content {
+            font-size: 12px;
+            color: #ccc;
+            line-height: 1.4;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #222;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+        }
+
+        .debug-info {
+            font-size: 11px;
+            color: #666;
+            margin-top: 8px;
+            line-height: 1.3;
+        }
+
+        .debug-checkbox {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        .debug-checkbox input {
+            margin-right: 8px;
+        }
+
         .info {
             font-size: 12px;
             color: #666;
@@ -86,7 +154,29 @@
     <div class="container">
         <div id="reader"></div>
         <div id="status">Ready to scan</div>
+        
+        <!-- Чекбокс для включения отладки -->
+        <div class="debug-checkbox">
+            <input type="checkbox" id="debugMode" onchange="toggleDebugMode()">
+            <label for="debugMode">Show debug info</label>
+        </div>
+        
         <button class="scan-btn" id="scanBtn" onclick="startScanning()">Scan QR Code</button>
+        
+        <!-- Секция отладки (изначально скрыта) -->
+        <div class="debug-section" id="debugSection">
+            <div class="debug-header">
+                <div class="debug-title">Debug Information</div>
+                <div class="debug-toggle" onclick="clearDebug()">Clear</div>
+            </div>
+            <div class="debug-content" id="debugContent">
+                <!-- Сюда будет добавляться отладочная информация -->
+            </div>
+            <div class="debug-info">
+                Last scan: <span id="lastScanTime">Never</span>
+            </div>
+        </div>
+        
         <div class="info">
             Scans QR codes and opens them in Croc GUI app.<br>
             Make sure app is installed from Google Play.
@@ -97,9 +187,70 @@
         const APP_PACKAGE = 'com.github.howeyc.crocgui';
         let scanner = null;
         let isScanning = false;
+        let debugEnabled = false;
+        let debugLog = [];
+
+        // DOM элементы
+        const debugSection = document.getElementById('debugSection');
+        const debugContent = document.getElementById('debugContent');
+        const lastScanTimeEl = document.getElementById('lastScanTime');
+        const debugCheckbox = document.getElementById('debugMode');
+
+        // Отладочные функции
+        function addDebugLog(message, type = 'info') {
+            if (!debugEnabled) return;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = {
+                time: timestamp,
+                message: message,
+                type: type
+            };
+            
+            debugLog.unshift(logEntry); // Добавляем в начало
+            if (debugLog.length > 20) debugLog.pop(); // Ограничиваем размер
+            
+            updateDebugDisplay();
+            
+            // Показываем секцию отладки если она скрыта
+            if (!debugSection.classList.contains('visible')) {
+                debugSection.classList.add('visible');
+            }
+        }
+
+        function updateDebugDisplay() {
+            if (!debugEnabled) return;
+            
+            let html = '';
+            debugLog.forEach(entry => {
+                const typeClass = entry.type === 'error' ? 'color: #ff6b6b;' : 
+                                entry.type === 'success' ? 'color: #51cf66;' : 
+                                'color: #4dabf7;';
+                html += `<div style="${typeClass} margin-bottom: 4px;">[${entry.time}] ${entry.message}</div>`;
+            });
+            
+            debugContent.innerHTML = html;
+        }
+
+        function toggleDebugMode() {
+            debugEnabled = debugCheckbox.checked;
+            if (debugEnabled) {
+                debugSection.classList.add('visible');
+                addDebugLog('Debug mode enabled');
+            } else {
+                debugSection.classList.remove('visible');
+            }
+        }
+
+        function clearDebug() {
+            debugLog = [];
+            updateDebugDisplay();
+            addDebugLog('Debug log cleared');
+        }
 
         function updateStatus(text) {
             document.getElementById('status').textContent = text;
+            addDebugLog(`Status: ${text}`, 'info');
         }
 
         function setButtonState(enabled, text) {
@@ -113,10 +264,12 @@
 
             updateStatus('Starting camera...');
             setButtonState(false, 'Starting...');
+            addDebugLog('Starting scanner...', 'info');
 
             // Initialize scanner if not already
             if (!scanner) {
                 scanner = new Html5Qrcode("reader");
+                addDebugLog('Scanner initialized', 'success');
             }
 
             const config = {
@@ -135,19 +288,38 @@
                 isScanning = true;
                 updateStatus('Point camera at QR code');
                 setButtonState(false, 'Scanning...');
+                addDebugLog('Scanner started successfully', 'success');
             }).catch(err => {
                 updateStatus('Error: ' + err.message);
                 setButtonState(true, 'Try Again');
+                addDebugLog(`Scanner error: ${err.message}`, 'error');
             });
         }
 
         function onScanSuccess(decodedText) {
+            const timestamp = new Date().toLocaleTimeString();
+            lastScanTimeEl.textContent = timestamp;
+            
+            // Показываем что отсканировали
+            addDebugLog(`Scanned: ${decodedText}`, 'success');
+            addDebugLog(`Text length: ${decodedText.length} chars`, 'info');
+            
+            // Дополнительная отладочная информация
+            if (debugEnabled) {
+                // Показываем Intent URL (урезанную версию для отладки)
+                const intentStart = `intent://abakum.github.io/croc#${decodedText.substring(0, 20)}${decodedText.length > 20 ? '...' : ''}`;
+                addDebugLog(`Intent URL: ${intentStart}`, 'info');
+            }
+
             // Stop scanning immediately after success
             if (scanner && isScanning) {
                 scanner.stop().then(() => {
                     isScanning = false;
                     setButtonState(true, 'Scan Again');
-                }).catch(() => {});
+                    addDebugLog('Scanner stopped', 'info');
+                }).catch(err => {
+                    addDebugLog(`Stop error: ${err}`, 'error');
+                });
             }
 
             updateStatus('Opening Croc GUI...');
@@ -163,23 +335,42 @@
                 `end`;
 
             // Redirect to Intent - Android will handle app opening or fallback to Play Store
-            window.location.href = intentUrl;
+            addDebugLog('Redirecting to Intent...', 'info');
+            setTimeout(() => {
+                window.location.href = intentUrl;
+            }, 100); // Небольшая задержка для отображения отладочной информации
         }
 
         function onScanFailure(error) {
-            // Ignore "not found" errors during normal scanning
+            // Игнорируем "не найден" ошибки при нормальном сканировании
             if (error && error.toString().includes('NotFoundException')) {
                 return;
             }
+            
+            addDebugLog(`Scan error: ${error}`, 'error');
             console.log('Scan error:', error);
         }
 
         // Auto-start scanning on page load for better UX
         document.addEventListener('DOMContentLoaded', () => {
+            // Загружаем настройку отладки из localStorage
+            const savedDebug = localStorage.getItem('croc_debug_enabled');
+            if (savedDebug === 'true') {
+                debugCheckbox.checked = true;
+                toggleDebugMode();
+            }
+            
+            addDebugLog('Page loaded', 'info');
+            
             // Small delay to ensure DOM is ready
             setTimeout(() => {
                 startScanning();
             }, 300);
+        });
+
+        // Сохраняем настройку отладки
+        debugCheckbox.addEventListener('change', () => {
+            localStorage.setItem('croc_debug_enabled', debugCheckbox.checked);
         });
     </script>
 </body>
