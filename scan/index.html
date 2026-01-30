@@ -43,17 +43,20 @@
     
      <div id="reader"></div>
      <div id="status">Starting camera...</div>
-     <div id="resultLink">
+     
+     <!-- Кнопка сканирования всегда видна -->
+     <div class="buttons">
+        <button onclick="scanAgain()" id="scanAgainBtn">Scan Again</button>
+     </div>
+     
+     <div id="resultLink" style="display:none;">
         <!-- Ссылка появится здесь после сканирования -->
-    </div>
-    
-    <div class="buttons" id="controlButtons" style="display:none;">
-        <button onclick="startScanning()">Scan Again</button>
-        <button onclick="stopScanning()">Stop Camera</button>
-    </div>
+     </div>
 
     <script>
         const APP_PACKAGE = 'com.github.howeyc.crocgui';
+        const TARGET_PREFIX = 'https://abakum.github.io/croc#';
+        
         const scanner = new Html5Qrcode("reader");
         let isScanning = false;
         let lastScannedUrl = '';
@@ -70,8 +73,13 @@
         function startScanning() {
             if (isScanning) return;
             
+            // Скрываем результат предыдущего сканирования
+            document.getElementById('resultLink').style.display = 'none';
+            document.getElementById('scanAgainBtn').style.display = 'none';
+            
             updateStatus("Starting camera...");
-            intentSent = false; 
+            intentSent = false;
+            lastScannedUrl = '';
             
             scanner.start(
                 { facingMode: "environment" },
@@ -84,10 +92,10 @@
                 onScanFailure
             ).then(() => {
                 isScanning = true;
-                updateStatus("Scanning... Point camera at QR code");
-                document.getElementById('controlButtons').style.display = 'block';
+                updateStatus("Scanning... Point camera at Croc QR code");
             }).catch(err => {
                 updateStatus("Camera error: " + err);
+                document.getElementById('scanAgainBtn').style.display = 'inline-block';
             });
         }
 
@@ -97,28 +105,35 @@
             scanner.stop().then(() => {
                 isScanning = false;
                 updateStatus("Camera stopped");
-                document.getElementById('controlButtons').style.display = 'none';
             });
         }
 
         function onScanSuccess(decodedText) {
+            // Проверяем, что QR код начинается с нужного префикса
+            if (!decodedText.startsWith(TARGET_PREFIX)) {
+                updateStatus("Not a Croc QR code. Looking for: " + TARGET_PREFIX);
+                return; // Продолжаем сканировать
+            }
+            
             if (intentSent) return;
             
             lastScannedUrl = decodedText;
             
             stopScanning();
-            
             intentSent = true;
             
+            // Показываем результат сканирования
             const resultDiv = document.getElementById('resultLink');
+            const cleanUrl = decodedText.substring(TARGET_PREFIX.length); // Убираем префикс
+            
             resultDiv.innerHTML = `
                 <strong>Scanned URL:</strong><br>
-                <a href="${decodedText}" id="resultLinkAnchor" target="_blank">
-                    ${decodedText.length > 80 ? decodedText.substring(0, 80) + '...' : decodedText}
+                <a href="${cleanUrl}" id="resultLinkAnchor" target="_blank">
+                    ${cleanUrl.length > 80 ? cleanUrl.substring(0, 80) + '...' : cleanUrl}
                 </a>
                 <br><br>
                 <div class="buttons">
-                    <button onclick="copyToClipboard('${decodedText.replace(/'/g, "\\'")}')">
+                    <button onclick="copyToClipboard('${cleanUrl.replace(/'/g, "\\'")}')">
                         Copy Link
                     </button>
                     <button onclick="sendIntent()">
@@ -128,9 +143,11 @@
                 <span id="copyStatus"></span>
             `;
             
-            updateStatus("✓ QR code scanned! Links ready below.");
+            resultDiv.style.display = 'block';
+            document.getElementById('scanAgainBtn').style.display = 'inline-block';
+            updateStatus("✓ Croc QR code scanned!");
             
-             sendIntent();
+            sendIntent();
         }
 
         function onScanFailure(error) {
@@ -144,11 +161,14 @@
             
             updateStatus("Sending Intent to app...");
             
-            let trimHTTPS = lastScannedUrl;
-    
+            // Извлекаем URL после префикса
+            const targetUrl = lastScannedUrl.substring(TARGET_PREFIX.length);
+            
+            let trimHTTPS = targetUrl;
             if (trimHTTPS.startsWith('https:')) {
                 trimHTTPS = trimHTTPS.substring(6);
             }
+            
             const intentUrl = 
                 `intent:${trimHTTPS}#Intent;` +
                 `scheme=https;` +
@@ -159,6 +179,10 @@
                 `end`;
             
             window.location.href = intentUrl;
+        }
+
+        function scanAgain() {
+            startScanning();
         }
 
         function copyToClipboard(text) {
