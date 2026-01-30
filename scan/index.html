@@ -44,13 +44,11 @@
      <div id="reader"></div>
      <div id="status">Starting camera...</div>
      
-     <!-- Кнопка сканирования всегда видна -->
      <div class="buttons">
         <button onclick="scanAgain()" id="scanAgainBtn">Scan Again</button>
      </div>
      
      <div id="resultLink" style="display:none;">
-        <!-- Ссылка появится здесь после сканирования -->
      </div>
 
     <script>
@@ -73,7 +71,6 @@
         function startScanning() {
             if (isScanning) return;
             
-            // Скрываем результат предыдущего сканирования
             document.getElementById('resultLink').style.display = 'none';
             document.getElementById('scanAgainBtn').style.display = 'none';
             
@@ -109,10 +106,9 @@
         }
 
         function onScanSuccess(decodedText) {
-            // Проверяем, что QR код начинается с нужного префикса
             if (!decodedText.startsWith(TARGET_PREFIX)) {
                 updateStatus("Not a Croc QR code. Looking for: " + TARGET_PREFIX);
-                return; // Продолжаем сканировать
+                return;
             }
             
             if (intentSent) return;
@@ -124,16 +120,15 @@
             
             // Показываем результат сканирования
             const resultDiv = document.getElementById('resultLink');
-            const cleanUrl = decodedText.substring(TARGET_PREFIX.length); // Убираем префикс
             
             resultDiv.innerHTML = `
                 <strong>Scanned URL:</strong><br>
-                <a href="${cleanUrl}" id="resultLinkAnchor" target="_blank">
-                    ${cleanUrl.length > 80 ? cleanUrl.substring(0, 80) + '...' : cleanUrl}
+                <a href="${decodedText}" id="resultLinkAnchor" target="_blank">
+                    ${decodedText.length > 80 ? decodedText.substring(0, 80) + '...' : decodedText}
                 </a>
                 <br><br>
                 <div class="buttons">
-                    <button onclick="copyToClipboard('${cleanUrl.replace(/'/g, "\\'")}')">
+                    <button onclick="copyToClipboard('${decodedText.replace(/'/g, "\\'")}')">
                         Copy Link
                     </button>
                     <button onclick="sendIntent()">
@@ -161,10 +156,7 @@
             
             updateStatus("Sending Intent to app...");
             
-            // Извлекаем URL после префикса
-            const targetUrl = lastScannedUrl.substring(TARGET_PREFIX.length);
-            
-            let trimHTTPS = targetUrl;
+            let trimHTTPS = lastScannedUrl;
             if (trimHTTPS.startsWith('https:')) {
                 trimHTTPS = trimHTTPS.substring(6);
             }
