@@ -245,7 +245,7 @@
             updateStatus("✓ Croc QR code scanned!");
             
             // sendIntent();
-            copyToClipboard('${decodedText}');
+            copyToClipboard(decodedText);
         }
 
         function onScanFailure(error) {
