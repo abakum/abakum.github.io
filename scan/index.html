@@ -36,33 +36,83 @@
             margin: 0 5px;
             cursor: pointer;
         }
+        #permissionMessage {
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        .granted { background: #e8f5e9; color: #2e7d32; }
+        .denied { background: #ffebee; color: #c62828; }
     </style>
 </head>
 <body>
     <h2>QR Scanner</h2>
     
-     <div id="reader"></div>
-     <div id="status">Starting camera...</div>
-     
-     <div class="buttons">
-        <button onclick="scanAgain()" id="scanAgainBtn">Scan Again</button>
-     </div>
-     
-     <div id="resultLink" style="display:none;">
-     </div>
+    <div id="reader"></div>
+    <div id="status">Checking camera permissions...</div>
+    
+    <div id="permissionMessage"></div>
+    
+    <div class="buttons">
+        <button onclick="startScanning()" id="startBtn" style="display:none;">Start Scanning</button>
+        <button onclick="scanAgain()" id="scanAgainBtn" style="display:none;">Scan Again</button>
+        <button onclick="resetPermissions()" id="resetBtn" style="display:none;">Reset Permissions</button>
+    </div>
+    
+    <div id="resultLink" style="display:none;"></div>
 
     <script>
         const APP_PACKAGE = 'com.github.howeyc.crocgui';
         const TARGET_PREFIX = 'https://abakum.github.io/croc#';
         
+        // Ключи для сохранения в браузере
+        const STORAGE_KEYS = {
+            CAMERA_PERMISSION: 'croc_scanner_camera_permission',
+            LAST_CAMERA: 'croc_scanner_last_camera'
+        };
+        
         const scanner = new Html5Qrcode("reader");
         let isScanning = false;
         let lastScannedUrl = '';
         let intentSent = false;
+        let cameraPermission = null; // 'granted', 'denied', или null
 
         window.onload = function() {
-            startScanning();
+            checkCameraPermission();
         };
+
+        // Проверяем сохраненное разрешение
+        function checkCameraPermission() {
+            const savedPermission = localStorage.getItem(STORAGE_KEYS.CAMERA_PERMISSION);
+            const permissionMessage = document.getElementById('permissionMessage');
+            
+            if (savedPermission === 'granted') {
+                cameraPermission = 'granted';
+                permissionMessage.className = 'granted';
+                permissionMessage.innerHTML = '✓ Camera permission remembered. Starting camera...';
+                permissionMessage.style.display = 'block';
+                
+                // Автоматически запускаем сканирование
+                setTimeout(() => startScanning(), 500);
+                
+            } else if (savedPermission === 'denied') {
+                cameraPermission = 'denied';
+                permissionMessage.className = 'denied';
+                permissionMessage.innerHTML = '⚠ Camera access was previously denied. Click "Start Scanning" to try again.';
+                permissionMessage.style.display = 'block';
+                
+                document.getElementById('startBtn').style.display = 'inline-block';
+                document.getElementById('resetBtn').style.display = 'inline-block';
+                updateStatus("Camera access denied. Click 'Start Scanning' to request access.");
+                
+            } else {
+                // Первый раз или не определено
+                cameraPermission = null;
+                document.getElementById('startBtn').style.display = 'inline-block';
+                updateStatus("Click 'Start Scanning' to begin");
+            }
+        }
 
         function updateStatus(text) {
             document.getElementById('status').textContent = text;
@@ -72,11 +122,15 @@
             if (isScanning) return;
             
             document.getElementById('resultLink').style.display = 'none';
+            document.getElementById('permissionMessage').style.display = 'none';
             document.getElementById('scanAgainBtn').style.display = 'none';
             
-            updateStatus("Starting camera...");
+            updateStatus("Requesting camera access...");
             intentSent = false;
             lastScannedUrl = '';
+            
+            // Пытаемся использовать сохраненную камеру
+            const lastCameraId = localStorage.getItem(STORAGE_KEYS.LAST_CAMERA);
             
             scanner.start(
                 { facingMode: "environment" },
@@ -89,10 +143,36 @@
                 onScanFailure
             ).then(() => {
                 isScanning = true;
-                updateStatus("Scanning... Point camera at Croc QR code");
-            }).catch(err => {
-                updateStatus("Camera error: " + err);
+                cameraPermission = 'granted';
+                
+                // Сохраняем успешное разрешение
+                localStorage.setItem(STORAGE_KEYS.CAMERA_PERMISSION, 'granted');
+                
+                // Показываем нужные кнопки
                 document.getElementById('scanAgainBtn').style.display = 'inline-block';
+                document.getElementById('startBtn').style.display = 'none';
+                document.getElementById('resetBtn').style.display = 'none';
+                
+                updateStatus("Scanning... Point camera at Croc QR code");
+                
+            }).catch(err => {
+                cameraPermission = 'denied';
+                
+                // Сохраняем отказ
+                localStorage.setItem(STORAGE_KEYS.CAMERA_PERMISSION, 'denied');
+                
+                // Показываем сообщение об ошибке
+                const permissionMessage = document.getElementById('permissionMessage');
+                permissionMessage.className = 'denied';
+                permissionMessage.innerHTML = `❌ Camera access denied: ${err.message || err}`;
+                permissionMessage.style.display = 'block';
+                
+                // Показываем кнопки для повторной попытки
+                document.getElementById('startBtn').style.display = 'inline-block';
+                document.getElementById('resetBtn').style.display = 'inline-block';
+                document.getElementById('scanAgainBtn').style.display = 'none';
+                
+                updateStatus("Camera access denied. You can reset permissions and try again.");
             });
         }
 
@@ -102,7 +182,29 @@
             scanner.stop().then(() => {
                 isScanning = false;
                 updateStatus("Camera stopped");
+                
+                // Сохраняем, что камера была остановлена
+                document.getElementById('startBtn').style.display = 'inline-block';
+                document.getElementById('scanAgainBtn').style.display = 'inline-block';
             });
+        }
+
+        // Сброс сохраненных разрешений
+        function resetPermissions() {
+            localStorage.removeItem(STORAGE_KEYS.CAMERA_PERMISSION);
+            localStorage.removeItem(STORAGE_KEYS.LAST_CAMERA);
+            
+            cameraPermission = null;
+            
+            // Скрываем сообщения
+            document.getElementById('permissionMessage').style.display = 'none';
+            
+            // Показываем кнопку старта
+            document.getElementById('startBtn').style.display = 'inline-block';
+            document.getElementById('resetBtn').style.display = 'none';
+            document.getElementById('scanAgainBtn').style.display = 'none';
+            
+            updateStatus("Permissions reset. Click 'Start Scanning' to begin.");
         }
 
         function onScanSuccess(decodedText) {
@@ -166,7 +268,7 @@
                 `scheme=https;` +
                 `package=${APP_PACKAGE};` +
                 `S.browser_fallback_url=${encodeURIComponent(
-                    `https://play.google.com/store/apps/details?id=${APP_PACKAGE}`
+                    `https://www.rustore.ru/catalog/app/${APP_PACKAGE}`
                 )};` +
                 `end`;
             
