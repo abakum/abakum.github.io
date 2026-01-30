@@ -16,11 +16,9 @@
             max-width: 500px;
             margin: 0 auto 20px;
         }
-        #scanBtn {
-            padding: 12px 24px;
-            font-size: 16px;
-            margin-bottom: 20px;
-            cursor: pointer;
+        #status {
+            margin: 10px 0;
+            color: #666;
         }
         #resultLink {
             word-break: break-all;
@@ -30,6 +28,14 @@
             max-width: 500px;
             margin: 0 auto;
         }
+        .buttons {
+            margin-top: 15px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 0 5px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -38,58 +44,127 @@
     <!-- 1) Окно камеры -->
     <div id="reader"></div>
     
-    <!-- 2) Кнопка Scan -->
-    <button id="scanBtn" onclick="startScanning()">Scan QR Code</button>
+    <!-- Статус -->
+    <div id="status">Starting camera...</div>
     
     <!-- 3) Результат декодирования как ссылка -->
     <div id="resultLink">
         <!-- Ссылка появится здесь после сканирования -->
     </div>
+    
+    <!-- Кнопки управления -->
+    <div class="buttons" id="controlButtons" style="display:none;">
+        <button onclick="startScanning()">Scan Again</button>
+        <button onclick="stopScanning()">Stop Camera</button>
+    </div>
 
     <script>
+        const APP_PACKAGE = 'com.github.howeyc.crocgui';
         const scanner = new Html5Qrcode("reader");
         let isScanning = false;
+        let lastScannedUrl = '';
+
+        // Автозапуск сканирования при загрузке страницы
+        window.onload = function() {
+            startScanning();
+        };
+
+        function updateStatus(text) {
+            document.getElementById('status').textContent = text;
+        }
 
         function startScanning() {
             if (isScanning) return;
             
+            updateStatus("Starting camera...");
+            
             scanner.start(
                 { facingMode: "environment" },
-                { fps: 10, qrbox: 250 },
+                { 
+                    fps: 10, 
+                    qrbox: 250,
+                    rememberLastUsedCamera: true
+                },
                 onScanSuccess,
                 onScanFailure
             ).then(() => {
                 isScanning = true;
-                document.getElementById('scanBtn').textContent = "Scanning...";
+                updateStatus("Scanning... Point camera at QR code");
+                document.getElementById('controlButtons').style.display = 'block';
             }).catch(err => {
-                alert("Camera error: " + err);
+                updateStatus("Camera error: " + err);
+            });
+        }
+
+        function stopScanning() {
+            if (!isScanning) return;
+            
+            scanner.stop().then(() => {
+                isScanning = false;
+                updateStatus("Camera stopped");
+                document.getElementById('controlButtons').style.display = 'none';
             });
         }
 
         function onScanSuccess(decodedText) {
-            // Останавливаем сканирование после успеха
-            scanner.stop().then(() => {
-                isScanning = false;
-                document.getElementById('scanBtn').textContent = "Scan Again";
-            });
+            lastScannedUrl = decodedText;
             
-            // Показываем результат как ссылку для ручного перехода
+            // 1. Сразу показываем результат как ссылку
             const resultDiv = document.getElementById('resultLink');
             resultDiv.innerHTML = `
-                <a href="${decodedText}" target="_blank">
-                    ${decodedText}
+                <strong>Scanned URL:</strong><br>
+                <a href="${decodedText}" id="resultLinkAnchor" target="_blank">
+                    ${decodedText.length > 80 ? decodedText.substring(0, 80) + '...' : decodedText}
                 </a>
                 <br><br>
-                <button onclick="copyToClipboard('${decodedText.replace(/'/g, "\\'")}')">
-                    Copy Link
-                </button>
+                <div class="buttons">
+                    <button onclick="copyToClipboard('${decodedText.replace(/'/g, "\\'")}')">
+                        Copy Link
+                    </button>
+                    <button onclick="sendIntent()">
+                        Open in App (Intent)
+                    </button>
+                </div>
                 <span id="copyStatus"></span>
             `;
+            
+            updateStatus("✓ QR code scanned! Links ready below.");
+            
+            // 2. Сразу отправляем Intent (автоматически)
+            sendIntent();
         }
 
         function onScanFailure(error) {
             // Игнорируем ошибки "код не найден"
-            console.log("Scan error (expected):", error);
+            if (error && !error.toString().includes('NotFoundException')) {
+                console.log("Scan error:", error);
+            }
+        }
+
+        function sendIntent() {
+            if (!lastScannedUrl) return;
+            
+            updateStatus("Sending Intent to app...");
+            
+            // Создаем Intent URL
+            const intentUrl = 
+                `intent://abakum.github.io/croc#${encodeURIComponent(lastScannedUrl)}#Intent;` +
+                `scheme=https;` +
+                `package=${APP_PACKAGE};` +
+                `S.browser_fallback_url=${encodeURIComponent(
+                    `https://play.google.com/store/apps/details?id=${APP_PACKAGE}`
+                )};` +
+                `end`;
+            
+            // Автоматически отправляем Intent
+            window.location.href = intentUrl;
+            
+            // Fallback через 2 секунды (на всякий случай)
+            setTimeout(() => {
+                if (!document.hidden) {
+                    updateStatus("App not found. Click 'Open in App' button to try again.");
+                }
+            }, 2000);
         }
 
         function copyToClipboard(text) {
