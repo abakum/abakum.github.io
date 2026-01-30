@@ -63,6 +63,7 @@
         const scanner = new Html5Qrcode("reader");
         let isScanning = false;
         let lastScannedUrl = '';
+        let intentSent = false; // Флаг, что Intent уже отправлен
 
         // Автозапуск сканирования при загрузке страницы
         window.onload = function() {
@@ -77,6 +78,7 @@
             if (isScanning) return;
             
             updateStatus("Starting camera...");
+            intentSent = false; // Сбрасываем флаг при новом запуске
             
             scanner.start(
                 { facingMode: "environment" },
@@ -107,9 +109,18 @@
         }
 
         function onScanSuccess(decodedText) {
+            // Если Intent уже был отправлен для этого сканирования - игнорируем
+            if (intentSent) return;
+            
             lastScannedUrl = decodedText;
             
-            // 1. Сразу показываем результат как ссылку
+            // 1. Останавливаем сканирование сразу после успеха
+            stopScanning();
+            
+            // 2. Помечаем, что Intent отправлен
+            intentSent = true;
+            
+            // 3. Показываем результат как ссылку
             const resultDiv = document.getElementById('resultLink');
             resultDiv.innerHTML = `
                 <strong>Scanned URL:</strong><br>
@@ -130,7 +141,7 @@
             
             updateStatus("✓ QR code scanned! Links ready below.");
             
-            // 2. Сразу отправляем Intent (автоматически)
+            // 4. Сразу отправляем Intent (один раз!)
             sendIntent();
         }
 
@@ -156,10 +167,10 @@
                 )};` +
                 `end`;
             
-            // Автоматически отправляем Intent
+            // Отправляем Intent (один раз)
             window.location.href = intentUrl;
             
-            // Fallback через 2 секунды (на всякий случай)
+            // Fallback через 2 секунды
             setTimeout(() => {
                 if (!document.hidden) {
                     updateStatus("App not found. Click 'Open in App' button to try again.");
