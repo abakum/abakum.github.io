@@ -65,8 +65,6 @@
     <script>
         const APP_PACKAGE = 'com.github.howeyc.crocgui';
         const TARGET_PREFIX = 'https://abakum.github.io/croc#';
-        
-        // Ключи для сохранения в браузере
         const STORAGE_KEYS = {
             CAMERA_PERMISSION: 'croc_scanner_camera_permission',
             LAST_CAMERA: 'croc_scanner_last_camera'
@@ -76,13 +74,13 @@
         let isScanning = false;
         let lastScannedUrl = '';
         let intentSent = false;
-        let cameraPermission = null; // 'granted', 'denied', или null
+        let cameraPermission = null;
+        let scanStatusTimeout = null;
 
         window.onload = function() {
             checkCameraPermission();
         };
 
-        // Проверяем сохраненное разрешение
         function checkCameraPermission() {
             const savedPermission = localStorage.getItem(STORAGE_KEYS.CAMERA_PERMISSION);
             const permissionMessage = document.getElementById('permissionMessage');
@@ -92,30 +90,41 @@
                 permissionMessage.className = 'granted';
                 permissionMessage.innerHTML = '✓ Camera permission remembered. Starting camera...';
                 permissionMessage.style.display = 'block';
-                
-                // Автоматически запускаем сканирование
                 setTimeout(() => startScanning(), 500);
-                
             } else if (savedPermission === 'denied') {
                 cameraPermission = 'denied';
                 permissionMessage.className = 'denied';
                 permissionMessage.innerHTML = '⚠ Camera access was previously denied. Click "Start Scanning" to try again.';
                 permissionMessage.style.display = 'block';
-                
                 document.getElementById('startBtn').style.display = 'inline-block';
                 document.getElementById('resetBtn').style.display = 'inline-block';
                 updateStatus("Camera access denied. Click 'Start Scanning' to request access.");
-                
             } else {
-                // Первый раз или не определено
                 cameraPermission = null;
                 document.getElementById('startBtn').style.display = 'inline-block';
                 updateStatus("Click 'Start Scanning' to begin");
             }
         }
 
-        function updateStatus(text) {
-            document.getElementById('status').textContent = text;
+        function updateStatus(text, temporary = false) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = text;
+            
+            if (temporary && scanStatusTimeout) {
+                clearTimeout(scanStatusTimeout);
+            }
+        }
+
+        function showTemporaryStatus(message, duration = 2000) {
+            const statusEl = document.getElementById('status');
+            const originalText = statusEl.textContent;
+            
+            updateStatus(message, true);
+            scanStatusTimeout = setTimeout(() => {
+                if (statusEl.textContent === message) {
+                    statusEl.textContent = originalText;
+                }
+            }, duration);
         }
 
         function startScanning() {
@@ -129,11 +138,21 @@
             intentSent = false;
             lastScannedUrl = '';
             
-            // Пытаемся использовать сохраненную камеру
+            // ПОЛУЧАЕМ СОХРАНЁННЫЙ ID КАМЕРЫ
             const lastCameraId = localStorage.getItem(STORAGE_KEYS.LAST_CAMERA);
             
+            // Формируем конфигурацию для запуска сканера
+            let scannerConfig;
+            if (lastCameraId) {
+                // Используем конкретную камеру по ID
+                scannerConfig = { deviceId: lastCameraId };
+            } else {
+                // Используем заднюю камеру по умолчанию
+                scannerConfig = { facingMode: "environment" };
+            }
+            
             scanner.start(
-                { facingMode: "environment" },
+                scannerConfig, // Используем нашу конфигурацию
                 { 
                     fps: 10, 
                     qrbox: 250,
@@ -153,7 +172,7 @@
                 document.getElementById('startBtn').style.display = 'none';
                 document.getElementById('resetBtn').style.display = 'none';
                 
-                updateStatus("Scanning... Point camera at Croc QR code");
+                updateStatus("Scanning... Point camera at QR code");
                 
             }).catch(err => {
                 cameraPermission = 'denied';
@@ -175,79 +194,83 @@
                 updateStatus("Camera access denied. You can reset permissions and try again.");
             });
         }
-
         function stopScanning() {
             if (!isScanning) return;
-            
             scanner.stop().then(() => {
                 isScanning = false;
-                updateStatus("Camera stopped");
-                
-                // Сохраняем, что камера была остановлена
                 document.getElementById('startBtn').style.display = 'inline-block';
                 document.getElementById('scanAgainBtn').style.display = 'inline-block';
+                updateStatus("Camera stopped. Click 'Scan Again' to resume.");
             });
         }
 
-        // Сброс сохраненных разрешений
         function resetPermissions() {
             localStorage.removeItem(STORAGE_KEYS.CAMERA_PERMISSION);
             localStorage.removeItem(STORAGE_KEYS.LAST_CAMERA);
-            
             cameraPermission = null;
-            
-            // Скрываем сообщения
             document.getElementById('permissionMessage').style.display = 'none';
-            
-            // Показываем кнопку старта
             document.getElementById('startBtn').style.display = 'inline-block';
             document.getElementById('resetBtn').style.display = 'none';
             document.getElementById('scanAgainBtn').style.display = 'none';
-            
             updateStatus("Permissions reset. Click 'Start Scanning' to begin.");
         }
 
         function onScanSuccess(decodedText) {
-            if (!decodedText.startsWith(TARGET_PREFIX)) {
-                updateStatus("Not a Croc QR code. Looking for: " + TARGET_PREFIX);
-                return;
-            }
+            // 1. ВСЕГДА копируем в буфер
+            copyToClipboard(decodedText);
             
-            if (intentSent) return;
-            
-            lastScannedUrl = decodedText;
-            
-            stopScanning();
-            intentSent = true;
-            
-            // Показываем результат сканирования
+            // 2. ВСЕГДА создаём resultDiv с кликабельной ссылкой
             const resultDiv = document.getElementById('resultLink');
-            
             resultDiv.innerHTML = `
                 <strong>Scanned URL:</strong><br>
                 <a href="${decodedText}" id="resultLinkAnchor" target="_blank">
                     ${decodedText.length > 80 ? decodedText.substring(0, 80) + '...' : decodedText}
                 </a>
                 <br><br>
-                <div class="buttons">
-                    <button onclick="copyToClipboard('${decodedText.replace(/'/g, "\\'")}')">
-                        Copy Link
-                    </button>
-                    <button onclick="sendIntent()">
-                        Open in App (Intent)
-                    </button>
+                <div class="buttons" id="dynamicButtons">
+                    <!-- Кнопки будут добавлены через JavaScript -->
                 </div>
-                <span id="copyStatus"></span>
+                <span id="copyStatus"></span>s
             `;
             
             resultDiv.style.display = 'block';
-            document.getElementById('scanAgainBtn').style.display = 'inline-block';
-            updateStatus("✓ Croc QR code scanned!");
+            updateStatus("✓ QR code scanned!");
             
-            copyToClipboard(decodedText);
-            sendIntent();
+            // 3. ВСЕГДА создаём кнопку "Copy Link" (для повторного копирования)
+            const buttonContainer = document.getElementById('dynamicButtons');
+            const copyBtn = document.createElement('button');
+            copyBtn.textContent = 'Copy Link';
+            copyBtn.onclick = function() { copyToClipboard(decodedText); };
+            buttonContainer.appendChild(copyBtn);
+            
+            // 4. Проверяем, является ли ссылка CrocGUI
+            const isCrocGUI = decodedText.startsWith(TARGET_PREFIX);
+            
+            if (isCrocGUI) {
+                // 5. ТОЛЬКО для CrocGUI: останавливаем сканирование и работаем с Intent
+                if (intentSent) return;
+                
+                lastScannedUrl = decodedText;
+                stopScanning();
+                intentSent = true;
+                
+                document.getElementById('scanAgainBtn').style.display = 'inline-block';
+                
+                // Добавляем кнопку "Open in App (Intent)"
+                const intentBtn = document.createElement('button');
+                intentBtn.textContent = 'Open in App (Intent)';
+                intentBtn.onclick = sendIntent;
+                buttonContainer.appendChild(intentBtn);
+                
+                // Автоматически отправляем Intent
+                sendIntent();
+                
+            } else {
+                // 6. Для НЕ-CrocGUI ссылок: не останавливаем сканирование, не создаём Intent
+                showTemporaryStatus(`✓ URL copied to clipboard`);
+                // Сканирование продолжается автоматически
+            }
         }
-
         function onScanFailure(error) {
             if (error && !error.toString().includes('NotFoundException')) {
                 console.log("Scan error:", error);
@@ -258,11 +281,7 @@
             if (!lastScannedUrl) return;
             
             updateStatus("Sending Intent to app...");
-            
-            let trimHTTPS = lastScannedUrl;
-            if (trimHTTPS.startsWith('https:')) {
-                trimHTTPS = trimHTTPS.substring(6);
-            }
+            let trimHTTPS = lastScannedUrl.startsWith('https:') ? lastScannedUrl.substring(6) : lastScannedUrl;
             
             const intentUrl = 
                 `intent:${trimHTTPS}#Intent;` +
@@ -282,10 +301,9 @@
 
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
-                document.getElementById('copyStatus').textContent = " ✓ Copied!";
-                setTimeout(() => {
-                    document.getElementById('copyStatus').textContent = "";
-                }, 2000);
+                console.log(`Copied to clipboard: ${text}`);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
             });
         }
     </script>
