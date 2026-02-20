@@ -65,6 +65,7 @@
     <script>
         const APP_PACKAGE = 'com.github.howeyc.crocgui';
         const TARGET_PREFIX = 'https://abakum.github.io/croc#';
+        
         const STORAGE_KEYS = {
             CAMERA_PERMISSION: 'croc_scanner_camera_permission',
             LAST_CAMERA: 'croc_scanner_last_camera'
@@ -138,21 +139,17 @@
             intentSent = false;
             lastScannedUrl = '';
             
-            // ПОЛУЧАЕМ СОХРАНЁННЫЙ ID КАМЕРЫ
             const lastCameraId = localStorage.getItem(STORAGE_KEYS.LAST_CAMERA);
             
-            // Формируем конфигурацию для запуска сканера
             let scannerConfig;
             if (lastCameraId) {
-                // Используем конкретную камеру по ID
                 scannerConfig = { deviceId: lastCameraId };
             } else {
-                // Используем заднюю камеру по умолчанию
                 scannerConfig = { facingMode: "environment" };
             }
             
             scanner.start(
-                scannerConfig, // Используем нашу конфигурацию
+                scannerConfig,
                 { 
                     fps: 10, 
                     qrbox: 250,
@@ -164,10 +161,8 @@
                 isScanning = true;
                 cameraPermission = 'granted';
                 
-                // Сохраняем успешное разрешение
                 localStorage.setItem(STORAGE_KEYS.CAMERA_PERMISSION, 'granted');
                 
-                // Показываем нужные кнопки
                 document.getElementById('scanAgainBtn').style.display = 'inline-block';
                 document.getElementById('startBtn').style.display = 'none';
                 document.getElementById('resetBtn').style.display = 'none';
@@ -177,16 +172,13 @@
             }).catch(err => {
                 cameraPermission = 'denied';
                 
-                // Сохраняем отказ
                 localStorage.setItem(STORAGE_KEYS.CAMERA_PERMISSION, 'denied');
                 
-                // Показываем сообщение об ошибке
                 const permissionMessage = document.getElementById('permissionMessage');
                 permissionMessage.className = 'denied';
                 permissionMessage.innerHTML = `❌ Camera access denied: ${err.message || err}`;
                 permissionMessage.style.display = 'block';
                 
-                // Показываем кнопки для повторной попытки
                 document.getElementById('startBtn').style.display = 'inline-block';
                 document.getElementById('resetBtn').style.display = 'inline-block';
                 document.getElementById('scanAgainBtn').style.display = 'none';
@@ -194,6 +186,7 @@
                 updateStatus("Camera access denied. You can reset permissions and try again.");
             });
         }
+        
         function stopScanning() {
             if (!isScanning) return;
             scanner.stop().then(() => {
@@ -215,11 +208,53 @@
             updateStatus("Permissions reset. Click 'Start Scanning' to begin.");
         }
 
+        function isCrocGUIUrl(url) {
+            // Ссылки с префиксом
+            if (url.startsWith(TARGET_PREFIX)) {
+                return true;
+            }
+            
+            // WebDAV схемы
+            const davSchemes = ['dav:', 'davs:', 'webdav:', 'webdavs:'];
+            for (const scheme of davSchemes) {
+                if (url.startsWith(scheme)) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        function createIntentUrl(url) {
+            // Для всех схем одинаково: убираем схему и указываем её отдельно
+            const colonIndex = url.indexOf(':');
+            if (colonIndex === -1) {
+                // На всякий случай если нет схемы
+                return `intent:${url}#Intent;` +
+                       `package=${APP_PACKAGE};` +
+                       `S.browser_fallback_url=${encodeURIComponent(
+                           `https://www.rustore.ru/catalog/app/${APP_PACKAGE}`
+                       )};` +
+                       `end`;
+            }
+            
+            const scheme = url.substring(0, colonIndex);
+            const withoutScheme = url.substring(colonIndex + 1);
+            
+            return `intent:${withoutScheme}#Intent;` +
+                   `scheme=${scheme};` +
+                   `package=${APP_PACKAGE};` +
+                   `S.browser_fallback_url=${encodeURIComponent(
+                       `https://www.rustore.ru/catalog/app/${APP_PACKAGE}`
+                   )};` +
+                   `end`;
+        }
+
         function onScanSuccess(decodedText) {
-            // 1. ВСЕГДА копируем в буфер
+            // Копируем в буфер
             copyToClipboard(decodedText);
             
-            // 2. ВСЕГДА создаём resultDiv с кликабельной ссылкой
+            // Показываем результат
             const resultDiv = document.getElementById('resultLink');
             resultDiv.innerHTML = `
                 <strong>Scanned URL:</strong><br>
@@ -228,7 +263,6 @@
                 </a>
                 <br><br>
                 <div class="buttons" id="dynamicButtons">
-                    <!-- Кнопки будут добавлены через JavaScript -->
                 </div>
                 <span id="copyStatus"></span>
             `;
@@ -236,18 +270,15 @@
             resultDiv.style.display = 'block';
             updateStatus("✓ QR code scanned!");
             
-            // 3. ВСЕГДА создаём кнопку "Copy Link" (для повторного копирования)
+            // Кнопка копирования
             const buttonContainer = document.getElementById('dynamicButtons');
             const copyBtn = document.createElement('button');
             copyBtn.textContent = 'Copy Link';
             copyBtn.onclick = function() { copyToClipboard(decodedText); };
             buttonContainer.appendChild(copyBtn);
             
-            // 4. Проверяем, является ли ссылка CrocGUI
-            const isCrocGUI = decodedText.startsWith(TARGET_PREFIX);
-            
-            if (isCrocGUI) {
-                // 5. ТОЛЬКО для CrocGUI: останавливаем сканирование и работаем с Intent
+            // Проверяем, относится ли к CrocGUI
+            if (isCrocGUIUrl(decodedText)) {
                 if (intentSent) return;
                 
                 lastScannedUrl = decodedText;
@@ -256,22 +287,21 @@
                 
                 document.getElementById('scanAgainBtn').style.display = 'inline-block';
                 
-                // Добавляем кнопку "Open in App (Intent)"
+                // Кнопка открытия в приложении
                 const intentBtn = document.createElement('button');
                 intentBtn.textContent = 'Open in App (Intent)';
                 intentBtn.onclick = sendIntent;
                 buttonContainer.appendChild(intentBtn);
                 
-                // Автоматически отправляем Intent
                 showTemporaryStatus(`✓ URL copied to clipboard`);
                 sendIntent();
                 
             } else {
-                // 6. Для НЕ-CrocGUI ссылок: не останавливаем сканирование, не создаём Intent
                 showTemporaryStatus(`✓ URL copied to clipboard`);
-                // Сканирование продолжается автоматически
+                // Сканирование продолжается
             }
         }
+        
         function onScanFailure(error) {
             if (error && !error.toString().includes('NotFoundException')) {
                 console.log("Scan error:", error);
@@ -282,17 +312,8 @@
             if (!lastScannedUrl) return;
             
             updateStatus("Sending Intent to app...");
-            let trimHTTPS = lastScannedUrl.startsWith('https:') ? lastScannedUrl.substring(6) : lastScannedUrl;
             
-            const intentUrl = 
-                `intent:${trimHTTPS}#Intent;` +
-                `scheme=https;` +
-                `package=${APP_PACKAGE};` +
-                `S.browser_fallback_url=${encodeURIComponent(
-                    `https://www.rustore.ru/catalog/app/${APP_PACKAGE}`
-                )};` +
-                `end`;
-            
+            const intentUrl = createIntentUrl(lastScannedUrl);
             window.location.href = intentUrl;
         }
 
