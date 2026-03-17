@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "com.github.howeyc.crocgui",
       "sha256_cert_fingerprints": [
-        "15:EA:33:2B:2B:0F:96:A2:FC:F1:CF:CB:77:D4:35:2C:F2:AE:5A:F6:4E:86:9E:9F:C5:16:27:AD:57:88:AD:5C"
+      "15:EA:33:2B:2B:0F:96:A2:FC:F1:CF:CB:77:D4:35:2C:F2:AE:5A:F6:4E:86:9E:9F:C5:16:27:AD:57:88:AD:5C",
+      "A2:BF:D0:E1:D2:77:0B:77:D4:01:29:5E:E4:12:8E:2B:28:7A:A7:21:99:06:48:D7:A4:B6:30:33:EF:1E:E1:63"
       ]
     }
   }
