@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CrocGUI - Запуск и Загрузка</title>
+    <title>crocson - Запуск и Загрузка</title>
     <style>
         body {
             font-family: sans-serif;
@@ -65,25 +65,25 @@
 
     <hr style="width: 50%; margin: 20px 0; border: 0; border-top: 1px solid #ccc;">
 
-    <p style="font-size: 14px; color: #666;">Открыть ⚙️ <strong>Deep Link</strong> если установлен Croc, а если не установлен то скачать APK для вашей архитектуры:</p>
+    <p style="font-size: 14px; color: #666;">Открыть ⚙️ <strong>Deep Link</strong> если установлен crocson, а если не установлен то скачать APK для вашей архитектуры:</p>
     
     <div class="download-grid" id="links-container">
         <!-- Кнопки формируются скриптом ниже для чистоты кода -->
-        <a href="crocgui-arm64.apk" class="btn btn-primary">arm64 (v8)</a>
-        <a href="crocgui-arm.apk" class="btn btn-primary">arm (v7)</a>
-        <a href="crocgui-amd64.apk" class="btn btn-primary">amd64 (x86_64)</a>
-        <a href="crocgui-386.apk" class="btn btn-primary">386 (x86)</a>
+        <a href="crocson-arm64.apk" class="btn btn-primary">arm64 (v8)</a>
+        <a href="crocson-arm.apk" class="btn btn-primary">arm (v7)</a>
+        <a href="crocson-amd64.apk" class="btn btn-primary">amd64 (x86_64)</a>
+        <a href="crocson-386.apk" class="btn btn-primary">386 (x86)</a>
     </div>
 
     <script>
         (function() {
             const links = document.querySelectorAll('#links-container a');
-            const prefix = "intent://abakum.github.io/croc#QXBwIGluZm8KZGVmYXVsdApjcm9jLnNjaG9sbHouY29t#Intent;scheme=https;package=com.github.howeyc.crocgui;S.browser_fallback_url=";
+            const prefix = "intent://abakum.github.io/croc#QXBwIGluZm8KZGVmYXVsdApjcm9jLnNjaG9sbHouY29t#Intent;scheme=https;package=com.github.abakum.crocson;S.browser_fallback_url=";
             const suffix = ";end;";
             const current = "v1.11.54";
             
             const setLinks = (tagName) => {
-                const path = `https://github.com/abakum/crocgui/releases/download/${tagName}/`;
+                const path = `https://github.com/abakum/crocson/releases/download/${tagName}/`;
                 links.forEach(link => {
                     const currentHref = link.getAttribute('href');
                     if (/\.apk$/.test(currentHref)) {
@@ -95,7 +95,7 @@
 
              setLinks(current);
 
-            fetch('https://api.github.com/repos/abakum/crocgui/releases/latest')
+            fetch('https://api.github.com/repos/abakum/crocson/releases/latest')
                 .then(res => res.json())
                 .then(data => {
                     if (data.tag_name) setLinks(data.tag_name);

@@ -1,4 +1,4 @@
-name: Update CrocGUI Version in HTML
+name: Update crocson Version in HTML
 
 on:
   workflow_dispatch:
@@ -23,7 +23,7 @@ jobs:
         id: get_release
         uses: octokit/request-action@v2.x
         with:
-          route: GET /repos/abakum/crocgui/releases/latest
+          route: GET /repos/abakum/crocson/releases/latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -99,7 +99,7 @@ jobs:
           git add croc/index.html
           
           # Create commit with descriptive message
-          COMMIT_MESSAGE="Update CrocGUI version to ${{ steps.extract_data.outputs.NEW_VERSION }}"
+          COMMIT_MESSAGE="Update crocson version to ${{ steps.extract_data.outputs.NEW_VERSION }}"
           echo "Creating commit: $COMMIT_MESSAGE"
           
           git commit -m "$COMMIT_MESSAGE"
@@ -108,4 +108,4 @@ jobs:
           echo "Pushing changes to repository..."
           git push origin main
           
-          echo "✅ Successfully updated CrocGUI version from ${{ steps.extract_data.outputs.CURRENT_VERSION }} to ${{ steps.extract_data.outputs.NEW_VERSION }}"
+          echo "✅ Successfully updated crocson version from ${{ steps.extract_data.outputs.CURRENT_VERSION }} to ${{ steps.extract_data.outputs.NEW_VERSION }}"

@@ -63,7 +63,7 @@
     <div id="resultLink" style="display:none;"></div>
 
     <script>
-        const APP_PACKAGE = 'com.github.howeyc.crocgui';
+        const APP_PACKAGE = 'com.github.abakum.crocson';
         const TARGET_PREFIX = 'https://abakum.github.io/croc#';
         
         const STORAGE_KEYS = {
@@ -208,7 +208,7 @@
             updateStatus("Permissions reset. Click 'Start Scanning' to begin.");
         }
 
-        function isCrocGUIUrl(url) {
+        function isCrocsonUrl(url) {
             // Ссылки с префиксом
             if (url.startsWith(TARGET_PREFIX)) {
                 return true;
@@ -278,7 +278,7 @@
             buttonContainer.appendChild(copyBtn);
             
             // Проверяем, относится ли к CrocGUI
-            if (isCrocGUIUrl(decodedText)) {
+            if (isCrocsonUrl(decodedText)) {
                 if (intentSent) return;
                 
                 lastScannedUrl = decodedText;
