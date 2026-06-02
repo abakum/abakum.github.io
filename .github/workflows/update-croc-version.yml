@@ -18,35 +18,17 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      # Step 2: Get latest release info via GitHub API (using Octokit)
-      - name: Get latest release info via GitHub API
-        id: get_release
-        uses: octokit/request-action@v2.x
-        with:
-          route: GET /repos/abakum/crocson/releases/latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Step 3: Extract version from API response
       - name: Extract version
         id: extract_data
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Save API response to a temporary file
-          echo '${{ steps.get_release.outputs.data }}' > release.json
-          
-          # Install jq for JSON parsing
-          sudo apt-get update
-          sudo apt-get install -y jq
-          
-          # Extract version (tag_name includes 'v' prefix, e.g., 'v1.11.47')
-          NEW_VERSION=$(jq -r '.tag_name' release.json)
+          NEW_VERSION=$(gh api repos/abakum/crocson/releases/latest --jq '.tag_name')
           echo "Latest version from GitHub: $NEW_VERSION"
-          
-          # Extract current version from croc/index.html
+
           CURRENT_VERSION=$(grep -oP 'const current = "\K[^"]+' croc/index.html 2>/dev/null || echo "")
           echo "Current version in HTML: $CURRENT_VERSION"
-          
-          # Check if versions match
+
           if [[ "$NEW_VERSION" == "$CURRENT_VERSION" ]]; then
             echo "Version is already up to date"
             echo "NEEDS_UPDATE=false" >> "$GITHUB_OUTPUT"
@@ -54,8 +36,7 @@ jobs:
             echo "Version needs to be updated"
             echo "NEEDS_UPDATE=true" >> "$GITHUB_OUTPUT"
           fi
-          
-          # Save versions for subsequent steps
+
           echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "CURRENT_VERSION=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
 
