@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>crocson — Privacy Policy</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; margin: 0; padding: 20px 0;
+            background-color: #f4f4f9; color: #333;
+        }
+        a { color: #007bff; }
+        .policy {
+            background: #fff; border: 1px solid #ddd; border-radius: 12px;
+            padding: 25px 30px; margin: 20px auto; max-width: 720px;
+            width: calc(100% - 40px); text-align: left;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); line-height: 1.6;
+        }
+        .policy h1 { margin: 0 0 5px 0; font-size: 26px; color: #007bff; }
+        .policy .meta { font-size: 13px; color: #888; margin-bottom: 20px; }
+        .policy h2 { margin: 24px 0 8px 0; font-size: 18px; color: #222; }
+        .policy p { margin: 8px 0; }
+        .policy ul { padding-left: 22px; margin: 8px 0; }
+        .back { display: inline-block; margin: 0 0 10px 0; font-size: 14px; text-decoration: none; }
+    </style>
+</head>
+<body>
+
+    <article class="policy">
+        <a href="index.html" class="back">← Back to crocson</a>
+
+        <h1>crocson — Privacy Policy</h1>
+        <div class="meta">
+            Effective date: June 17, 2026 · Last updated: June 17, 2026<br>
+            Applies to: the crocson Android application (package <code>com.github.abakum.crocson</code>)
+        </div>
+
+        <h2>Introduction</h2>
+        <p>
+            This Privacy Policy describes how the crocson application handles user information.
+            crocson is an Android client for the <em>croc</em> tool, which lets two devices
+            transfer files directly with each other. We are committed to your privacy, and this
+            policy explains, in plain language, that crocson does not collect, store, or transmit
+            any of your personal information.
+        </p>
+
+        <h2>Data Collection</h2>
+        <p>
+            crocson does <strong>not collect</strong> any personal or usage data. The app does not
+            gather your name, email address, phone number, device identifiers, location, contacts,
+            or any other information about you. No analytics, crash reporting, or telemetry of any
+            kind is built into crocson.
+        </p>
+
+        <h2>Data Storage</h2>
+        <p>
+            crocson does <strong>not store</strong> user data. Files that you send or receive exist
+            only for the duration of an active transfer session and remain on your device under your
+            control. The app does not create or maintain any persistent store of personal
+            information.
+        </p>
+
+        <h2>Data Transmission</h2>
+        <p>
+            crocson does <strong>not transmit</strong> your information to the developer or to any
+            third party. When you send or receive files, the data flows directly between the sender
+            and the receiver (peer-to-peer, as provided by <em>croc</em>); it does not pass through
+            the developer's servers, and it never traverses any server in unencrypted form, so it
+            is not visible to the developer.
+        </p>
+        <p>
+            All transfers are end-to-end encrypted. The sender and receiver derive a shared secret
+            key using a PAKE (Password-Authenticated Key Exchange) handshake, and the file contents
+            are encrypted with that key before anything is sent. If a relay is ever used to route
+            the connection, it only forwards already-encrypted bytes and cannot decrypt or inspect
+            your data.
+        </p>
+        <p>
+            Users remain in full control of their security: they choose their own shared secret
+            (the code phrase) and can select the cryptographic curve used for the key exchange,
+            including <code>P-256</code>, <code>P-384</code>, <code>P-521</code>, <code>siec</code>,
+            and <code>Curve25519</code>. No secret or key choice is ever transmitted to or stored by
+            the developer.
+        </p>
+
+        <h2>Third-Party Services</h2>
+        <p>
+            crocson does not integrate advertising SDKs, analytics, trackers, or any third-party
+            code that would access user data. There are no embedded services that could observe
+            your activity or collect information about you.
+        </p>
+
+        <h2>Data Subject Rights</h2>
+        <p>
+            Because crocson does not collect, store, or process any personal data, there is no
+            personal data about you to access, correct, delete, restrict, or port. Consequently, no
+            rights under data-protection laws (such as the GDPR) arise in connection with this app.
+            If you nonetheless believe that crocson has handled any data improperly, you may contact
+            us through the channel listed below.
+        </p>
+
+        <h2>Children</h2>
+        <p>
+            crocson is not directed specifically at children under the age of 13, and no data is
+            collected from anyone, regardless of age.
+        </p>
+
+        <h2>Changes to This Policy</h2>
+        <p>
+            We may update this Privacy Policy from time to time. Any changes will be published on
+            this page together with a revised "Last updated" date. We encourage you to revisit this
+            page periodically to stay informed.
+        </p>
+
+        <h2>Contact</h2>
+        <p>
+            If you have any questions about this Privacy Policy, please open an issue at
+            <a href="https://github.com/abakum/crocson/issues">github.com/abakum/crocson/issues</a>.
+        </p>
+    </article>
+
+</body>
+</html>
