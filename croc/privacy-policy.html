@@ -30,13 +30,12 @@
         .lang-bar input { cursor: pointer; }
         .lang-bar code { font-size: 12px; color: #666; }
 
-        .lang-block { display: none; margin: 8px 0; }
-        .lang-block .badge {
-            display: inline-block; font-size: 10px; letter-spacing: 0.5px;
-            color: #888; background: #eef1f6; border-radius: 4px; padding: 1px 6px;
-            margin-bottom: 3px; text-transform: lowercase;
-        }
-        .lang-block p { margin: 4px 0; }
+        /* Headings: one line, inline per-language spans */
+        .i18n-line span[data-lang] { display: none; }
+        .i18n-line span[data-lang] + span[data-lang]::before { content: " · "; color: #999; }
+
+        /* Paragraphs / meta: block per-language */
+        .lang-block { display: none; }
         .lang-block + .lang-block { margin-top: 4px; }
     </style>
 </head>
@@ -53,154 +52,176 @@
             <label><input type="checkbox" value="ru-RU"> <code>ru-RU</code></label>
         </div>
 
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><h1>crocson — Privacy Policy</h1></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><h1>crocson — Gizlilik Politikası</h1></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><h1>crocson — プライバシーポリシー</h1></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><h1>crocson — 隐私政策</h1></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><h1>crocson — Политика конфиденциальности</h1></div>
+        <h1 class="i18n-line">
+            <span data-lang="en-US">crocson — Privacy Policy</span>
+            <span data-lang="tr-TR">crocson — Gizlilik Politikası</span>
+            <span data-lang="ja-JP">crocson — プライバシーポリシー</span>
+            <span data-lang="zh-CN">crocson — 隐私政策</span>
+            <span data-lang="ru-RU">crocson — Политика конфиденциальности</span>
+        </h1>
 
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><div class="meta">
+        <div class="lang-block" data-lang="en-US"><div class="meta">
             Effective date: June 17, 2026 · Last updated: June 17, 2026<br>
             Applies to: the crocson Android application (package <code>com.github.abakum.crocson</code>)
         </div></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><div class="meta">
+        <div class="lang-block" data-lang="tr-TR"><div class="meta">
             Yürürlük tarihi: 17 Haziran 2026 · Son güncelleme: 17 Haziran 2026<br>
             Şunlar için geçerlidir: crocson Android uygulaması (paket <code>com.github.abakum.crocson</code>)
         </div></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><div class="meta">
+        <div class="lang-block" data-lang="ja-JP"><div class="meta">
             発効日：2026年6月17日 · 最終更新：2026年6月17日<br>
             適用対象：crocson Android アプリケーション（パッケージ <code>com.github.abakum.crocson</code>）
         </div></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><div class="meta">
+        <div class="lang-block" data-lang="zh-CN"><div class="meta">
             生效日期：2026年6月17日 · 最后更新：2026年6月17日<br>
             适用范围：crocson Android 应用程序（包名 <code>com.github.abakum.crocson</code>）
         </div></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><div class="meta">
+        <div class="lang-block" data-lang="ru-RU"><div class="meta">
             Дата вступления в силу: 17 июня 2026 г. · Последнее обновление: 17 июня 2026 г.<br>
             Применимо к: Android-приложению crocson (пакет <code>com.github.abakum.crocson</code>)
         </div></div>
 
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><h2>Introduction</h2></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><h2>Giriş</h2></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><h2>はじめに</h2></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><h2>简介</h2></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><h2>Введение</h2></div>
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><p>This Privacy Policy describes how the crocson application handles user information. crocson is an Android client for the <em>croc</em> tool, which lets two devices transfer files directly with each other. We are committed to your privacy, and this policy explains, in plain language, that crocson does not collect, store, or transmit any of your personal information.</p></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><p>Bu Gizlilik Politikası, crocson uygulamasının kullanıcı bilgilerini nasıl ele aldığını açıklar. crocson, iki cihazın birbirleriyle doğrudan dosya aktarmasına olanak tanıyan <em>croc</em> aracı için bir Android istemcisidir. Gizliliğinize bağlıyız ve bu politika, açık bir dille, crocson'un kişisel bilgilerinizden hiçbirini toplamadığını, saklamadığını veya iletmediğini açıklar.</p></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><p>本プライバシーポリシーは、crocson アプリケーションがユーザー情報をどのように取り扱うかを説明します。crocson は、2 台のデバイス間で直接ファイルを転送できる <em>croc</em> ツールの Android クライアントです。当社はお客様のプライバシーを尊重しており、本ポリシーは、crocson がお客様の個人情報を収集、保存、送信しないことを平易な言葉で説明します。</p></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><p>本隐私政策说明了 crocson 应用如何处理用户信息。crocson 是 <em>croc</em> 工具的 Android 客户端，可让两台设备彼此直接传输文件。我们重视您的隐私，本政策用通俗易懂的语言说明：crocson 不会收集、存储或传输您的任何个人信息。</p></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><p>Настоящая Политика конфиденциальности описывает, как приложение crocson обрабатывает пользовательскую информацию. crocson — это Android-клиент для инструмента <em>croc</em>, позволяющий двум устройствам передавать файлы напрямую друг другу. Мы заботимся о вашей конфиденциальности, и эта политика простыми словами разъясняет, что crocson не собирает, не хранит и не передаёт никакую вашу личную информацию.</p></div>
+        <h2 class="i18n-line">
+            <span data-lang="en-US">Introduction</span>
+            <span data-lang="tr-TR">Giriş</span>
+            <span data-lang="ja-JP">はじめに</span>
+            <span data-lang="zh-CN">简介</span>
+            <span data-lang="ru-RU">Введение</span>
+        </h2>
+        <div class="lang-block" data-lang="en-US"><p>This Privacy Policy describes how the crocson application handles user information. crocson is an Android client for the <em>croc</em> tool, which lets two devices transfer files directly with each other. We are committed to your privacy, and this policy explains, in plain language, that crocson does not collect, store, or transmit any of your personal information.</p></div>
+        <div class="lang-block" data-lang="tr-TR"><p>Bu Gizlilik Politikası, crocson uygulamasının kullanıcı bilgilerini nasıl ele aldığını açıklar. crocson, iki cihazın birbirleriyle doğrudan dosya aktarmasına olanak tanıyan <em>croc</em> aracı için bir Android istemcisidir. Gizliliğinize bağlıyız ve bu politika, açık bir dille, crocson'un kişisel bilgilerinizden hiçbirini toplamadığını, saklamadığını veya iletmediğini açıklar.</p></div>
+        <div class="lang-block" data-lang="ja-JP"><p>本プライバシーポリシーは、crocson アプリケーションがユーザー情報をどのように取り扱うかを説明します。crocson は、2 台のデバイス間で直接ファイルを転送できる <em>croc</em> ツールの Android クライアントです。当社はお客様のプライバシーを尊重しており、本ポリシーは、crocson がお客様の個人情報を収集、保存、送信しないことを平易な言葉で説明します。</p></div>
+        <div class="lang-block" data-lang="zh-CN"><p>本隐私政策说明了 crocson 应用如何处理用户信息。crocson 是 <em>croc</em> 工具的 Android 客户端，可让两台设备彼此直接传输文件。我们重视您的隐私，本政策用通俗易懂的语言说明：crocson 不会收集、存储或传输您的任何个人信息。</p></div>
+        <div class="lang-block" data-lang="ru-RU"><p>Настоящая Политика конфиденциальности описывает, как приложение crocson обрабатывает пользовательскую информацию. crocson — это Android-клиент для инструмента <em>croc</em>, позволяющий двум устройствам передавать файлы напрямую друг другу. Мы заботимся о вашей конфиденциальности, и эта политика простыми словами разъясняет, что crocson не собирает, не хранит и не передаёт никакую вашу личную информацию.</p></div>
 
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><h2>Data Collection</h2></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><h2>Veri Toplama</h2></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><h2>データ収集</h2></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><h2>数据收集</h2></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><h2>Сбор данных</h2></div>
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><p>crocson does <strong>not collect</strong> any personal or usage data. The app does not gather your name, email address, phone number, device identifiers, location, contacts, or any other information about you. No analytics, crash reporting, or telemetry of any kind is built into crocson.</p></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><p>crocson hiçbir kişisel veya kullanım verisi <strong>toplamaz</strong>. Uygulama adınızı, e-posta adresinizi, telefon numaranızı, cihaz tanımlayıcılarınızı, konumunuzu, kişilerinizi veya hakkınızdaki başka hiçbir bilgiyi derlemez. crocson içinde hiçbir tür analiz, çökme raporlaması veya telemetri yer almaz.</p></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><p>crocson は個人データまたは使用データを<strong>収集しません</strong>。本アプリは、お名前、メールアドレス、電話番号、デバイス識別子、位置情報、連絡先など、お客様に関するいかなる情報も収集しません。crocson には、アナリティクス、クラッシュ報告、その他のテレメトリは一切組み込まれていません。</p></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><p>crocson <strong>不收集</strong>任何个人或使用数据。本应用不会收集您的姓名、电子邮件地址、电话号码、设备标识符、位置、联系人或关于您的任何其他信息。crocson 不内置任何形式的分析、崩溃报告或遥测功能。</p></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><p>crocson <strong>не собирает</strong> никакие личные данные или данные об использовании. Приложение не собирает ваше имя, адрес электронной почты, номер телефона, идентификаторы устройства, местоположение, контакты или любую другую информацию о вас. В crocson не встроено никакой аналитики, отчётности о сбоях или телеметрии.</p></div>
+        <h2 class="i18n-line">
+            <span data-lang="en-US">Data Collection</span>
+            <span data-lang="tr-TR">Veri Toplama</span>
+            <span data-lang="ja-JP">データ収集</span>
+            <span data-lang="zh-CN">数据收集</span>
+            <span data-lang="ru-RU">Сбор данных</span>
+        </h2>
+        <div class="lang-block" data-lang="en-US"><p>crocson does <strong>not collect</strong> any personal or usage data. The app does not gather your name, email address, phone number, device identifiers, location, contacts, or any other information about you. No analytics, crash reporting, or telemetry of any kind is built into crocson.</p></div>
+        <div class="lang-block" data-lang="tr-TR"><p>crocson hiçbir kişisel veya kullanım verisi <strong>toplamaz</strong>. Uygulama adınızı, e-posta adresinizi, telefon numaranızı, cihaz tanımlayıcılarınızı, konumunuzu, kişilerinizi veya hakkınızdaki başka hiçbir bilgiyi derlemez. crocson içinde hiçbir tür analiz, çökme raporlaması veya telemetri yer almaz.</p></div>
+        <div class="lang-block" data-lang="ja-JP"><p>crocson は個人データまたは使用データを<strong>収集しません</strong>。本アプリは、お名前、メールアドレス、電話番号、デバイス識別子、位置情報、連絡先など、お客様に関するいかなる情報も収集しません。crocson には、アナリティクス、クラッシュ報告、その他のテレメトリは一切組み込まれていません。</p></div>
+        <div class="lang-block" data-lang="zh-CN"><p>crocson <strong>不收集</strong>任何个人或使用数据。本应用不会收集您的姓名、电子邮件地址、电话号码、设备标识符、位置、联系人或关于您的任何其他信息。crocson 不内置任何形式的分析、崩溃报告或遥测功能。</p></div>
+        <div class="lang-block" data-lang="ru-RU"><p>crocson <strong>не собирает</strong> никакие личные данные или данные об использовании. Приложение не собирает ваше имя, адрес электронной почты, номер телефона, идентификаторы устройства, местоположение, контакты или любую другую информацию о вас. В crocson не встроено никакой аналитики, отчётности о сбоях или телеметрии.</p></div>
 
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><h2>Data Storage</h2></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><h2>Veri Saklama</h2></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><h2>データ保存</h2></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><h2>数据存储</h2></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><h2>Хранение данных</h2></div>
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><p>crocson does <strong>not store</strong> user data. Files that you send or receive exist only for the duration of an active transfer session and remain on your device under your control. The app does not create or maintain any persistent store of personal information.</p></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><p>crocson kullanıcı verilerini <strong>saklamaz</strong>. Gönderdiğiniz veya aldığınız dosyalar yalnızca etkin bir aktarım oturumu süresince var olur ve cihazınızda denetiminiz altında kalır. Uygulama, kişisel bilgilere dair kalıcı hiçbir depolama oluşturmaz veya sürdürmez.</p></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><p>crocson はユーザーデータを<strong>保存しません</strong>。送受信するファイルは、アクティブな転送セッション中のみ存在し、お客様の管理下でデバイス上に置かれます。本アプリは、個人情報の永続的な保存領域を作成も維持もしません。</p></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><p>crocson <strong>不存储</strong>用户数据。您发送或接收的文件仅在活动的传输会话期间存在，并保留在您的设备上由您掌控。本应用不会创建或维护任何持久化的个人信息存储。</p></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><p>crocson <strong>не хранит</strong> пользовательские данные. Файлы, которые вы отправляете или получаете, существуют только в течение активного сеанса передачи и остаются на вашем устройстве под вашим контролем. Приложение не создаёт и не поддерживает никакого постоянного хранилища личной информации.</p></div>
+        <h2 class="i18n-line">
+            <span data-lang="en-US">Data Storage</span>
+            <span data-lang="tr-TR">Veri Saklama</span>
+            <span data-lang="ja-JP">データ保存</span>
+            <span data-lang="zh-CN">数据存储</span>
+            <span data-lang="ru-RU">Хранение данных</span>
+        </h2>
+        <div class="lang-block" data-lang="en-US"><p>crocson does <strong>not store</strong> user data. Files that you send or receive exist only for the duration of an active transfer session and remain on your device under your control. The app does not create or maintain any persistent store of personal information.</p></div>
+        <div class="lang-block" data-lang="tr-TR"><p>crocson kullanıcı verilerini <strong>saklamaz</strong>. Gönderdiğiniz veya aldığınız dosyalar yalnızca etkin bir aktarım oturumu süresince var olur ve cihazınızda denetiminiz altında kalır. Uygulama, kişisel bilgilere dair kalıcı hiçbir depolama oluşturmaz veya sürdürmez.</p></div>
+        <div class="lang-block" data-lang="ja-JP"><p>crocson はユーザーデータを<strong>保存しません</strong>。送受信するファイルは、アクティブな転送セッション中のみ存在し、お客様の管理下でデバイス上に置かれます。本アプリは、個人情報の永続的な保存領域を作成も維持もしません。</p></div>
+        <div class="lang-block" data-lang="zh-CN"><p>crocson <strong>不存储</strong>用户数据。您发送或接收的文件仅在活动的传输会话期间存在，并保留在您的设备上由您掌控。本应用不会创建或维护任何持久化的个人信息存储。</p></div>
+        <div class="lang-block" data-lang="ru-RU"><p>crocson <strong>не хранит</strong> пользовательские данные. Файлы, которые вы отправляете или получаете, существуют только в течение активного сеанса передачи и остаются на вашем устройстве под вашим контролем. Приложение не создаёт и не поддерживает никакого постоянного хранилища личной информации.</p></div>
 
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><h2>Data Transmission</h2></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><h2>Veri İletimi</h2></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><h2>データ送信</h2></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><h2>数据传输</h2></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><h2>Передача данных</h2></div>
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><p>crocson does <strong>not transmit</strong> your information to the developer or to any third party. When you send or receive files, the data flows directly between the sender and the receiver (peer-to-peer, as provided by <em>croc</em>); it does not pass through the developer's servers, and it never traverses any server in unencrypted form, so it is not visible to the developer.</p></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><p>crocson bilgilerinizi geliştiriciye veya herhangi bir üçüncü tarafa <strong>iletmez</strong>. Dosya gönderdiğinizde veya aldığınızda veriler doğrudan gönderen ile alıcı arasında akar (<em>croc</em> tarafından sağlandığı şekliyle uçtan uca); geliştiricinin sunucularından geçmez ve hiçbir sunucudan şifresiz biçimde geçmediği için geliştirici tarafından görülemez.</p></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><p>crocson はお客様の情報を開発者や第三者に<strong>送信しません</strong>。ファイルを送受信する際、データは送信者と受信者の間で直接やり取りされます（<em>croc</em> によるピアツーピア）。開発者のサーバーを経由せず、いかなるサーバーも暗号化されていない形で通過することはないため、開発者から内容を見ることはできません。</p></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><p>crocson <strong>不会</strong>将您的信息<strong>传输</strong>给开发者或任何第三方。当您发送或接收文件时，数据直接在发送方与接收方之间流动（由 <em>croc</em> 提供的点对点方式）；它不会经过开发者的服务器，也绝不会以未加密形式经过任何服务器，因此开发者无法看到其内容。</p></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><p>crocson <strong>не передаёт</strong> вашу информацию разработчику или каким-либо третьим лицам. При отправке или получении файлов данные передаются напрямую между отправителем и получателем (однорангово, как обеспечивает <em>croc</em>); они не проходят через серверы разработчика и никогда не пересекают серверы в незашифрованном виде, поэтому недоступны разработчику.</p></div>
+        <h2 class="i18n-line">
+            <span data-lang="en-US">Data Transmission</span>
+            <span data-lang="tr-TR">Veri İletimi</span>
+            <span data-lang="ja-JP">データ送信</span>
+            <span data-lang="zh-CN">数据传输</span>
+            <span data-lang="ru-RU">Передача данных</span>
+        </h2>
+        <div class="lang-block" data-lang="en-US"><p>crocson does <strong>not transmit</strong> your information to the developer or to any third party. When you send or receive files, the data flows directly between the sender and the receiver (peer-to-peer, as provided by <em>croc</em>); it does not pass through the developer's servers, and it never traverses any server in unencrypted form, so it is not visible to the developer.</p></div>
+        <div class="lang-block" data-lang="tr-TR"><p>crocson bilgilerinizi geliştiriciye veya herhangi bir üçüncü tarafa <strong>iletmez</strong>. Dosya gönderdiğinizde veya aldığınızda veriler doğrudan gönderen ile alıcı arasında akar (<em>croc</em> tarafından sağlandığı şekliyle uçtan uca); geliştiricinin sunucularından geçmez ve hiçbir sunucudan şifresiz biçimde geçmediği için geliştirici tarafından görülemez.</p></div>
+        <div class="lang-block" data-lang="ja-JP"><p>crocson はお客様の情報を開発者や第三者に<strong>送信しません</strong>。ファイルを送受信する際、データは送信者と受信者の間で直接やり取りされます（<em>croc</em> によるピアツーピア）。開発者のサーバーを経由せず、いかなるサーバーも暗号化されていない形で通過することはないため、開発者から内容を見ることはできません。</p></div>
+        <div class="lang-block" data-lang="zh-CN"><p>crocson <strong>不会</strong>将您的信息<strong>传输</strong>给开发者或任何第三方。当您发送或接收文件时，数据直接在发送方与接收方之间流动（由 <em>croc</em> 提供的点对点方式）；它不会经过开发者的服务器，也绝不会以未加密形式经过任何服务器，因此开发者无法看到其内容。</p></div>
+        <div class="lang-block" data-lang="ru-RU"><p>crocson <strong>не передаёт</strong> вашу информацию разработчику или каким-либо третьим лицам. При отправке или получении файлов данные передаются напрямую между отправителем и получателем (однорангово, как обеспечивает <em>croc</em>); они не проходят через серверы разработчика и никогда не пересекают серверы в незашифрованном виде, поэтому недоступны разработчику.</p></div>
 
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><p>All transfers are end-to-end encrypted. The sender and receiver derive a shared secret key using a PAKE (Password-Authenticated Key Exchange) handshake, and the file contents are encrypted with that key before anything is sent. If a relay is ever used to route the connection, it only forwards already-encrypted bytes and cannot decrypt or inspect your data.</p></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><p>Tüm aktarımlar uçtan uca şifrelidir. Gönderen ve alıcı, bir PAKE (Parola Doğrulamalı Anahtar Değişimi) el sıkışmasıyla paylaşılan bir gizli anahtar türetir ve dosya içerikleri herhangi bir şey gönderilmeden önce bu anahtarla şifrelenir. Bağlantıyı yönlendirmek için bir aktarıcı kullanılırsa, yalnızca zaten şifrelenmiş baytları iletir ve verilerin şifresini çözemez veya inceleyemez.</p></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><p>すべての転送はエンドツーエンドで暗号化されます。送信者と受信者は PAKE（パスワード認証鍵交換）ハンドシェイクを用いて共有秘密鍵を導出し、ファイルの内容は何かを送信する前にその鍵で暗号化されます。接続の経路としてリレーが使用される場合でも、既に暗号化されたバイト列のみを転送し、データを復号・検査することはできません。</p></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><p>所有传输均为端到端加密。发送方与接收方通过 PAKE（密码认证密钥交换）握手派生出共享密钥，文件内容在任何数据发送之前即用该密钥加密。即使使用中继来路由连接，它也仅转发已加密的字节，无法解密或查看您的数据。</p></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><p>Все передачи шифруются сквозным образом. Отправитель и получатель выводят общий секретный ключ с помощью рукопожатия PAKE (Password-Authenticated Key Exchange), а содержимое файлов шифруется этим ключом до отправки. Если для маршрутизации соединения используется релейный сервер, он лишь перенаправляет уже зашифрованные байты и не может расшифровать или просмотреть ваши данные.</p></div>
+        <div class="lang-block" data-lang="en-US"><p>All transfers are end-to-end encrypted. The sender and receiver derive a shared secret key using a PAKE (Password-Authenticated Key Exchange) handshake, and the file contents are encrypted with that key before anything is sent. If a relay is ever used to route the connection, it only forwards already-encrypted bytes and cannot decrypt or inspect your data.</p></div>
+        <div class="lang-block" data-lang="tr-TR"><p>Tüm aktarımlar uçtan uca şifrelidir. Gönderen ve alıcı, bir PAKE (Parola Doğrulamalı Anahtar Değişimi) el sıkışmasıyla paylaşılan bir gizli anahtar türetir ve dosya içerikleri herhangi bir şey gönderilmeden önce bu anahtarla şifrelenir. Bağlantıyı yönlendirmek için bir aktarıcı kullanılırsa, yalnızca zaten şifrelenmiş baytları iletir ve verilerin şifresini çözemez veya inceleyemez.</p></div>
+        <div class="lang-block" data-lang="ja-JP"><p>すべての転送はエンドツーエンドで暗号化されます。送信者と受信者は PAKE（パスワード認証鍵交換）ハンドシェイクを用いて共有秘密鍵を導出し、ファイルの内容は何かを送信する前にその鍵で暗号化されます。接続の経路としてリレーが使用される場合でも、既に暗号化されたバイト列のみを転送し、データを復号・検査することはできません。</p></div>
+        <div class="lang-block" data-lang="zh-CN"><p>所有传输均为端到端加密。发送方与接收方通过 PAKE（密码认证密钥交换）握手派生出共享密钥，文件内容在任何数据发送之前即用该密钥加密。即使使用中继来路由连接，它也仅转发已加密的字节，无法解密或查看您的数据。</p></div>
+        <div class="lang-block" data-lang="ru-RU"><p>Все передачи шифруются сквозным образом. Отправитель и получатель выводят общий секретный ключ с помощью рукопожатия PAKE (Password-Authenticated Key Exchange), а содержимое файлов шифруется этим ключом до отправки. Если для маршрутизации соединения используется релейный сервер, он лишь перенаправляет уже зашифрованные байты и не может расшифровать или просмотреть ваши данные.</p></div>
 
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><p>Users remain in full control of their security: they choose their own shared secret (the code phrase) and can select the cryptographic curve used for the key exchange, including <code>P-256</code>, <code>P-384</code>, <code>P-521</code>, <code>siec</code>, and <code>Curve25519</code>. No secret or key choice is ever transmitted to or stored by the developer.</p></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><p>Kullanıcılar güvenlikleri üzerinde tam denetime sahiptir: kendi paylaşılan gizli anahtarlarını (kod ifadesini) seçerler ve anahtar değişimi için kullanılan kriptografik eğriyi (<code>P-256</code>, <code>P-384</code>, <code>P-521</code>, <code>siec</code> ve <code>Curve25519</code> dahil) belirleyebilirler. Hiçbir gizli anahtar veya anahtar seçimi geliştiriciye iletilmez veya tarafından saklanmaz.</p></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><p>ユーザーは自らのセキュリティを完全に管理できます。共有秘密（コードフレーズ）を自ら選択し、鍵交換に使用する暗号曲線として <code>P-256</code>、<code>P-384</code>、<code>P-521</code>、<code>siec</code>、<code>Curve25519</code> などを選択できます。いかなる秘密や鍵の選択も開発者に送信されたり、開発者によって保存されたりすることはありません。</p></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><p>用户始终对自己的安全性拥有完全控制权：他们自行选择共享密钥（即代码短语），并可选择用于密钥交换的加密曲线，包括 <code>P-256</code>、<code>P-384</code>、<code>P-521</code>、<code>siec</code> 和 <code>Curve25519</code>。任何密钥或曲线选择都不会被传输给开发者或由其存储。</p></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><p>Пользователи полностью контролируют свою безопасность: они сами выбирают общий секрет (кодовую фразу) и могут выбрать криптографическую кривую для обмена ключами, включая <code>P-256</code>, <code>P-384</code>, <code>P-521</code>, <code>siec</code> и <code>Curve25519</code>. Никакой секрет или выбор ключа никогда не передаётся разработчику и не хранится им.</p></div>
+        <div class="lang-block" data-lang="en-US"><p>Users remain in full control of their security: they choose their own shared secret (the code phrase) and can select the cryptographic curve used for the key exchange, including <code>P-256</code>, <code>P-384</code>, <code>P-521</code>, <code>siec</code>, and <code>Curve25519</code>. No secret or key choice is ever transmitted to or stored by the developer.</p></div>
+        <div class="lang-block" data-lang="tr-TR"><p>Kullanıcılar güvenlikleri üzerinde tam denetime sahiptir: kendi paylaşılan gizli anahtarlarını (kod ifadesini) seçerler ve anahtar değişimi için kullanılan kriptografik eğriyi (<code>P-256</code>, <code>P-384</code>, <code>P-521</code>, <code>siec</code> ve <code>Curve25519</code> dahil) belirleyebilirler. Hiçbir gizli anahtar veya anahtar seçimi geliştiriciye iletilmez veya tarafından saklanmaz.</p></div>
+        <div class="lang-block" data-lang="ja-JP"><p>ユーザーは自らのセキュリティを完全に管理できます。共有秘密（コードフレーズ）を自ら選択し、鍵交換に使用する暗号曲線として <code>P-256</code>、<code>P-384</code>、<code>P-521</code>、<code>siec</code>、<code>Curve25519</code> などを選択できます。いかなる秘密や鍵の選択も開発者に送信されたり、開発者によって保存されたりすることはありません。</p></div>
+        <div class="lang-block" data-lang="zh-CN"><p>用户始终对自己的安全性拥有完全控制权：他们自行选择共享密钥（即代码短语），并可选择用于密钥交换的加密曲线，包括 <code>P-256</code>、<code>P-384</code>、<code>P-521</code>、<code>siec</code> 和 <code>Curve25519</code>。任何密钥或曲线选择都不会被传输给开发者或由其存储。</p></div>
+        <div class="lang-block" data-lang="ru-RU"><p>Пользователи полностью контролируют свою безопасность: они сами выбирают общий секрет (кодовую фразу) и могут выбрать криптографическую кривую для обмена ключами, включая <code>P-256</code>, <code>P-384</code>, <code>P-521</code>, <code>siec</code> и <code>Curve25519</code>. Никакой секрет или выбор ключа никогда не передаётся разработчику и не хранится им.</p></div>
 
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><h2>Third-Party Services</h2></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><h2>Üçüncü Taraf Hizmetleri</h2></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><h2>サードパーティサービス</h2></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><h2>第三方服务</h2></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><h2>Сторонние сервисы</h2></div>
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><p>crocson does not integrate advertising SDKs, analytics, trackers, or any third-party code that would access user data. There are no embedded services that could observe your activity or collect information about you.</p></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><p>crocson, kullanıcı verilerine erişecek reklam SDK'ları, analizler, izleyiciler veya herhangi bir üçüncü taraf kodunu entegre etmez. Etkinliğinizi izleyebilecek veya hakkınızda bilgi toplayabilecek gömülü hizmet yoktur.</p></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><p>crocson は、ユーザーデータにアクセスする広告 SDK、アナリティクス、トラッカー、その他の第三者コードを組み込みません。お客様のアクティビティを監視したり情報を収集したりする組み込みサービスは一切ありません。</p></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><p>crocson 不集成任何会访问用户数据的广告 SDK、分析、跟踪器或任何第三方代码。不存在任何可监视您的活动或收集您信息的内嵌服务。</p></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><p>crocson не интегрирует рекламные SDK, аналитику, трекеры или любой сторонний код, который мог бы получать доступ к пользовательским данным. В приложении нет встроенных сервисов, способных отслеживать вашу активность или собирать о вас информацию.</p></div>
+        <h2 class="i18n-line">
+            <span data-lang="en-US">Third-Party Services</span>
+            <span data-lang="tr-TR">Üçüncü Taraf Hizmetleri</span>
+            <span data-lang="ja-JP">サードパーティサービス</span>
+            <span data-lang="zh-CN">第三方服务</span>
+            <span data-lang="ru-RU">Сторонние сервисы</span>
+        </h2>
+        <div class="lang-block" data-lang="en-US"><p>crocson does not integrate advertising SDKs, analytics, trackers, or any third-party code that would access user data. There are no embedded services that could observe your activity or collect information about you.</p></div>
+        <div class="lang-block" data-lang="tr-TR"><p>crocson, kullanıcı verilerine erişecek reklam SDK'ları, analizler, izleyiciler veya herhangi bir üçüncü taraf kodunu entegre etmez. Etkinliğinizi izleyebilecek veya hakkınızda bilgi toplayabilecek gömülü hizmet yoktur.</p></div>
+        <div class="lang-block" data-lang="ja-JP"><p>crocson は、ユーザーデータにアクセスする広告 SDK、アナリティクス、トラッカー、その他の第三者コードを組み込みません。お客様のアクティビティを監視したり情報を収集したりする組み込みサービスは一切ありません。</p></div>
+        <div class="lang-block" data-lang="zh-CN"><p>crocson 不集成任何会访问用户数据的广告 SDK、分析、跟踪器或任何第三方代码。不存在任何可监视您的活动或收集您信息的内嵌服务。</p></div>
+        <div class="lang-block" data-lang="ru-RU"><p>crocson не интегрирует рекламные SDK, аналитику, трекеры или любой сторонний код, который мог бы получать доступ к пользовательским данным. В приложении нет встроенных сервисов, способных отслеживать вашу активность или собирать о вас информацию.</p></div>
 
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><h2>Data Subject Rights</h2></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><h2>Veri Sahibi Hakları</h2></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><h2>データ主体の権利</h2></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><h2>数据主体权利</h2></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><h2>Права субъекта данных</h2></div>
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><p>Because crocson does not collect, store, or process any personal data, there is no personal data about you to access, correct, delete, restrict, or port. Consequently, no rights under data-protection laws (such as the GDPR) arise in connection with this app. If you nonetheless believe that crocson has handled any data improperly, you may contact us through the channel listed below.</p></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><p>crocson hiçbir kişisel veriyi toplamadığı, saklamadığı veya işlemediği için, erişilecek, düzeltilecek, silinecek, kısıtlanacak veya aktarılacak kişisel veriniz yoktur. Sonuç olarak, bu uygulamayla bağlantılı olarak veri koruma yasaları (ör. GDPR) kapsamında hiçbir hak doğmaz. Yine de crocson'un herhangi bir veriyi uygun şekilde ele aldığına inanıyorsanız, aşağıda listelenen kanaldan bizimle iletişime geçebilirsiniz.</p></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><p>crocson は個人データを収集・保存・処理しないため、アクセス、訂正、削除、制限、または移植の対象となるお客様の個人データは存在しません。したがって、本アプリに関連してデータ保護法（GDPR など）に基づく権利は発生しません。それでも crocson がデータを不適切に取り扱ったと考えられる場合は、以下に記載の窓口までご連絡ください。</p></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><p>由于 crocson 不收集、不存储、不处理任何个人数据，因此不存在可供您访问、更正、删除、限制或转移的个人信息。因此，与该应用相关的数据保护法（如 GDPR）所规定的权利不会产生。即便如此，如果您认为 crocson 不当处理了任何数据，也可通过下方列出的渠道与我们联系。</p></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><p>Поскольку crocson не собирает, не хранит и не обрабатывает никакие личные данные, ваших личных данных, к которым можно было бы получить доступ, исправить, удалить, ограничить или перенести, не существует. Следовательно, в связи с этим приложением не возникает никаких прав по законам о защите данных (например, GDPR). Тем не менее, если вы считаете, что crocson неправильно обработал какие-либо данные, вы можете связаться с нами через канал, указанный ниже.</p></div>
+        <h2 class="i18n-line">
+            <span data-lang="en-US">Data Subject Rights</span>
+            <span data-lang="tr-TR">Veri Sahibi Hakları</span>
+            <span data-lang="ja-JP">データ主体の権利</span>
+            <span data-lang="zh-CN">数据主体权利</span>
+            <span data-lang="ru-RU">Права субъекта данных</span>
+        </h2>
+        <div class="lang-block" data-lang="en-US"><p>Because crocson does not collect, store, or process any personal data, there is no personal data about you to access, correct, delete, restrict, or port. Consequently, no rights under data-protection laws (such as the GDPR) arise in connection with this app. If you nonetheless believe that crocson has handled any data improperly, you may contact us through the channel listed below.</p></div>
+        <div class="lang-block" data-lang="tr-TR"><p>crocson hiçbir kişisel veriyi toplamadığı, saklamadığı veya işlemediği için, erişilecek, düzeltilecek, silinecek, kısıtlanacak veya aktarılacak kişisel veriniz yoktur. Sonuç olarak, bu uygulamayla bağlantılı olarak veri koruma yasaları (ör. GDPR) kapsamında hiçbir hak doğmaz. Yine de crocson'un herhangi bir veriyi uygun şekilde ele aldığına inanıyorsanız, aşağıda listelenen kanaldan bizimle iletişime geçebilirsiniz.</p></div>
+        <div class="lang-block" data-lang="ja-JP"><p>crocson は個人データを収集・保存・処理しないため、アクセス、訂正、削除、制限、または移植の対象となるお客様の個人データは存在しません。したがって、本アプリに関連してデータ保護法（GDPR など）に基づく権利は発生しません。それでも crocson がデータを不適切に取り扱ったと考えられる場合は、以下に記載の窓口までご連絡ください。</p></div>
+        <div class="lang-block" data-lang="zh-CN"><p>由于 crocson 不收集、不存储、不处理任何个人数据，因此不存在可供您访问、更正、删除、限制或转移的个人信息。因此，与该应用相关的数据保护法（如 GDPR）所规定的权利不会产生。即便如此，如果您认为 crocson 不当处理了任何数据，也可通过下方列出的渠道与我们联系。</p></div>
+        <div class="lang-block" data-lang="ru-RU"><p>Поскольку crocson не собирает, не хранит и не обрабатывает никакие личные данные, ваших личных данных, к которым можно было бы получить доступ, исправить, удалить, ограничить или перенести, не существует. Следовательно, в связи с этим приложением не возникает никаких прав по законам о защите данных (например, GDPR). Тем не менее, если вы считаете, что crocson неправильно обработал какие-либо данные, вы можете связаться с нами через канал, указанный ниже.</p></div>
 
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><h2>Children</h2></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><h2>Çocuklar</h2></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><h2>児童</h2></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><h2>儿童</h2></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><h2>Дети</h2></div>
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><p>crocson is not directed specifically at children under the age of 13, and no data is collected from anyone, regardless of age.</p></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><p>crocson özellikle 13 yaşın altındaki çocuklara yönelik değildir ve yaştan bağımsız olarak hiç kimseden veri toplanmaz.</p></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><p>crocson は特に 13 歳未満の児童を対象としたものではなく、年齢にかかわらず、誰からもデータを収集しません。</p></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><p>crocson 并非专门面向 13 岁以下的儿童，且不会从任何人处收集数据，无论年龄大小。</p></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><p>crocson не предназначен специально для детей младше 13 лет, и никакие данные не собираются ни от кого, независимо от возраста.</p></div>
+        <h2 class="i18n-line">
+            <span data-lang="en-US">Children</span>
+            <span data-lang="tr-TR">Çocuklar</span>
+            <span data-lang="ja-JP">児童</span>
+            <span data-lang="zh-CN">儿童</span>
+            <span data-lang="ru-RU">Дети</span>
+        </h2>
+        <div class="lang-block" data-lang="en-US"><p>crocson is not directed specifically at children under the age of 13, and no data is collected from anyone, regardless of age.</p></div>
+        <div class="lang-block" data-lang="tr-TR"><p>crocson özellikle 13 yaşın altındaki çocuklara yönelik değildir ve yaştan bağımsız olarak hiç kimseden veri toplanmaz.</p></div>
+        <div class="lang-block" data-lang="ja-JP"><p>crocson は特に 13 歳未満の児童を対象としたものではなく、年齢にかかわらず、誰からもデータを収集しません。</p></div>
+        <div class="lang-block" data-lang="zh-CN"><p>crocson 并非专门面向 13 岁以下的儿童，且不会从任何人处收集数据，无论年龄大小。</p></div>
+        <div class="lang-block" data-lang="ru-RU"><p>crocson не предназначен специально для детей младше 13 лет, и никакие данные не собираются ни от кого, независимо от возраста.</p></div>
 
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><h2>Changes to This Policy</h2></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><h2>Bu Politikadaki Değişiklikler</h2></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><h2>本ポリシーの変更</h2></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><h2>本政策的变更</h2></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><h2>Изменения в настоящей Политике</h2></div>
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><p>We may update this Privacy Policy from time to time. Any changes will be published on this page together with a revised "Last updated" date. We encourage you to revisit this page periodically to stay informed.</p></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><p>Bu Gizlilik Politikasını zaman zaman güncelleyebiliriz. Tüm değişiklikler, revize edilmiş bir "Son güncelleme" tarihiyle birlikte bu sayfada yayımlanacaktır. Bilgili kalmanız için bu sayfayı düzenli olarak yeniden ziyaret etmenizi öneririz.</p></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><p>当社は本プライバシーポリシーを随時更新することがあります。変更がある場合は、改訂された「最終更新」日とともに本ページに掲載されます。最新情報を把握するため、定期的に本ページをご確認ください。</p></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><p>我们可能不时更新本隐私政策。任何更改都将连同修订后的"最后更新"日期一起发布在本页面上。我们建议您定期回访本页面以保持知情。</p></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><p>Мы можем периодически обновлять настоящую Политику конфиденциальности. Любые изменения будут публиковаться на этой странице вместе с обновлённой датой «Последнее обновление». Мы рекомендуем периодически возвращаться к этой странице, чтобы быть в курсе.</p></div>
+        <h2 class="i18n-line">
+            <span data-lang="en-US">Changes to This Policy</span>
+            <span data-lang="tr-TR">Bu Politikadaki Değişiklikler</span>
+            <span data-lang="ja-JP">本ポリシーの変更</span>
+            <span data-lang="zh-CN">本政策的变更</span>
+            <span data-lang="ru-RU">Изменения в настоящей Политике</span>
+        </h2>
+        <div class="lang-block" data-lang="en-US"><p>We may update this Privacy Policy from time to time. Any changes will be published on this page together with a revised "Last updated" date. We encourage you to revisit this page periodically to stay informed.</p></div>
+        <div class="lang-block" data-lang="tr-TR"><p>Bu Gizlilik Politikasını zaman zaman güncelleyebiliriz. Tüm değişiklikler, revize edilmiş bir "Son güncelleme" tarihiyle birlikte bu sayfada yayımlanacaktır. Bilgili kalmanız için bu sayfayı düzenli olarak yeniden ziyaret etmenizi öneririz.</p></div>
+        <div class="lang-block" data-lang="ja-JP"><p>当社は本プライバシーポリシーを随時更新することがあります。変更がある場合は、改訂された「最終更新」日とともに本ページに掲載されます。最新情報を把握するため、定期的に本ページをご確認ください。</p></div>
+        <div class="lang-block" data-lang="zh-CN"><p>我们可能不时更新本隐私政策。任何更改都将连同修订后的“最后更新”日期一起发布在本页面上。我们建议您定期回访本页面以保持知情。</p></div>
+        <div class="lang-block" data-lang="ru-RU"><p>Мы можем периодически обновлять настоящую Политику конфиденциальности. Любые изменения будут публиковаться на этой странице вместе с обновлённой датой «Последнее обновление». Мы рекомендуем периодически возвращаться к этой странице, чтобы быть в курсе.</p></div>
 
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><h2>Author</h2></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><h2>Yazar</h2></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><h2>作者</h2></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><h2>作者</h2></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><h2>Автор</h2></div>
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><p>Author of crocson: <strong>Konstantin Abakumov</strong>.</p></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><p>crocson'un yazarı: <strong>Konstantin Abakumov</strong>.</p></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><p>crocson の作者: <strong>Konstantin Abakumov</strong>。</p></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><p>crocson 的作者：<strong>Konstantin Abakumov</strong>。</p></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><p>Автор crocson: <strong>Konstantin Abakumov</strong>.</p></div>
+        <h2 class="i18n-line">
+            <span data-lang="en-US">Author</span>
+            <span data-lang="tr-TR">Yazar</span>
+            <span data-lang="ja-JP">作者</span>
+            <span data-lang="zh-CN">作者</span>
+            <span data-lang="ru-RU">Автор</span>
+        </h2>
+        <div class="lang-block" data-lang="en-US"><p>Author of crocson: <strong>Konstantin Abakumov</strong>.</p></div>
+        <div class="lang-block" data-lang="tr-TR"><p>crocson'un yazarı: <strong>Konstantin Abakumov</strong>.</p></div>
+        <div class="lang-block" data-lang="ja-JP"><p>crocson の作者: <strong>Konstantin Abakumov</strong>。</p></div>
+        <div class="lang-block" data-lang="zh-CN"><p>crocson 的作者：<strong>Konstantin Abakumov</strong>。</p></div>
+        <div class="lang-block" data-lang="ru-RU"><p>Автор crocson: <strong>Konstantin Abakumov</strong>.</p></div>
 
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><h2>Contact</h2></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><h2>İletişim</h2></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><h2>お問い合わせ</h2></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><h2>联系方式</h2></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><h2>Контакты</h2></div>
-        <div class="lang-block" data-lang="en-US"><span class="badge">en-US</span><p>If you have any questions about this Privacy Policy, please open an issue at <a href="https://github.com/abakum/crocson/issues">github.com/abakum/crocson/issues</a>.</p></div>
-        <div class="lang-block" data-lang="tr-TR"><span class="badge">tr-TR</span><p>Bu Gizlilik Politikası hakkında herhangi bir sorunuz varsa, lütfen <a href="https://github.com/abakum/crocson/issues">github.com/abakum/crocson/issues</a> adresinde bir sorun açın.</p></div>
-        <div class="lang-block" data-lang="ja-JP"><span class="badge">ja-JP</span><p>本プライバシーポリシーについてご質問がある場合は、<a href="https://github.com/abakum/crocson/issues">github.com/abakum/crocson/issues</a> で Issue を立ててください。</p></div>
-        <div class="lang-block" data-lang="zh-CN"><span class="badge">zh-CN</span><p>如果您对本隐私政策有任何疑问，请在 <a href="https://github.com/abakum/crocson/issues">github.com/abakum/crocson/issues</a> 提交一个 issue。</p></div>
-        <div class="lang-block" data-lang="ru-RU"><span class="badge">ru-RU</span><p>Если у вас есть вопросы по настоящей Политике конфиденциальности, пожалуйста, откройте issue на <a href="https://github.com/abakum/crocson/issues">github.com/abakum/crocson/issues</a>.</p></div>
+        <h2 class="i18n-line">
+            <span data-lang="en-US">Contact</span>
+            <span data-lang="tr-TR">İletişim</span>
+            <span data-lang="ja-JP">お問い合わせ</span>
+            <span data-lang="zh-CN">联系方式</span>
+            <span data-lang="ru-RU">Контакты</span>
+        </h2>
+        <div class="lang-block" data-lang="en-US"><p>If you have any questions about this Privacy Policy, please open an issue at <a href="https://github.com/abakum/crocson/issues">github.com/abakum/crocson/issues</a>.</p></div>
+        <div class="lang-block" data-lang="tr-TR"><p>Bu Gizlilik Politikası hakkında herhangi bir sorunuz varsa, lütfen <a href="https://github.com/abakum/crocson/issues">github.com/abakum/crocson/issues</a> adresinde bir sorun açın.</p></div>
+        <div class="lang-block" data-lang="ja-JP"><p>本プライバシーポリシーについてご質問がある場合は、<a href="https://github.com/abakum/crocson/issues">github.com/abakum/crocson/issues</a> で Issue を立ててください。</p></div>
+        <div class="lang-block" data-lang="zh-CN"><p>如果您对本隐私政策有任何疑问，请在 <a href="https://github.com/abakum/crocson/issues">github.com/abakum/crocson/issues</a> 提交一个 issue。</p></div>
+        <div class="lang-block" data-lang="ru-RU"><p>Если у вас есть вопросы по настоящей Политике конфиденциальности, пожалуйста, откройте issue на <a href="https://github.com/abakum/crocson/issues">github.com/abakum/crocson/issues</a>.</p></div>
     </article>
 
     <script>
@@ -235,7 +256,8 @@
             function applyVisibility() {
                 var visible = selectedSet();
                 var css = visible.map(function (lang) {
-                    return '.lang-block[data-lang="' + lang + '"] { display: block; }';
+                    return '.lang-block[data-lang="' + lang + '"] { display: block; }\n' +
+                           '.i18n-line span[data-lang="' + lang + '"] { display: inline; }';
                 }).join('\n');
                 document.getElementById('langStyle').textContent = css;
             }
