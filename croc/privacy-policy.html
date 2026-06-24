@@ -266,7 +266,22 @@
             styleEl.id = 'langStyle';
             document.head.appendChild(styleEl);
 
-            var states = loadStates();
+            // ?lang=<code> (e.g. ru-RU) shows only that language and takes
+            // priority over the saved checkbox selection. Falls back to
+            // localStorage/DEFAULTS when absent or unknown.
+            var urlLang = null;
+            try { urlLang = new URLSearchParams(location.search).get('lang'); } catch (e) {}
+            var known = urlLang && checkboxes.some(function (cb) { return cb.value === urlLang; });
+
+            var states;
+            if (known) {
+                // Show only the requested language; do not overwrite the
+                // saved selection (direct visitors keep their own choice).
+                states = {};
+                checkboxes.forEach(function (cb) { states[cb.value] = (cb.value === urlLang); });
+            } else {
+                states = loadStates();
+            }
             checkboxes.forEach(function (cb) { cb.checked = !!states[cb.value]; });
             applyVisibility();
 
