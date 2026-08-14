@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Lunar Returns</title>
+    <script src="qr/qrcode.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 12px;
+            background: #f9f9f9;
+        }
+        h1 { font-size: 1.4em; }
+        h2 { font-size: 1.1em; margin-bottom: 6px; }
+        section {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        button {
+            font: inherit;
+            padding: 4px 10px;
+            border: 1px solid #bbb;
+            border-radius: 6px;
+            background: #f0f0f0;
+            cursor: pointer;
+        }
+        button:hover { background: #e0e0e0; }
+        button.primary { background: #d73a49; color: #fff; border-color: #d73a49; }
+        button.primary:hover { background: #b62f3c; }
+        input[type="text"], input[type="date"] {
+            font: inherit;
+            padding: 4px 6px;
+            border: 1px solid #bbb;
+            border-radius: 6px;
+        }
+        #list div.row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 6px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        #list div.row:hover { background: #f0f0f0; }
+        #list div.row.selected { background: #e8f5e9; }
+        #list span.n { flex: 1; }
+        #list span.d { color: #555; }
+        #resultText {
+            width: 100%;
+            box-sizing: border-box;
+            font: inherit;
+            white-space: pre;
+        }
+        .qr img, .qr svg { max-width: 100%; height: auto; }
+        #status { color: #555; min-height: 1.2em; }
+        #status.error { color: #c62828; }
+        #cloud { display: none; }
+        .btnrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    </style>
+</head>
+<body>
+    <h1>🌙 Lunar Returns</h1>
+    <p>Совпадения предстоящих дней рождения с первым днём рождения:
+день недели, фаза луны, зодиак, восточный календарь.</p>
+
+    <section id="authSec">
+        <div class="btnrow">
+            <button id="loginBtn" onclick="loginYandex()">Войти через Яндекс</button>
+            <span id="loginInfo"></span>
+        </div>
+    </section>
+
+    <section>
+        <h2>База данных</h2>
+        <div class="btnrow">
+            Имя <input type="text" id="fName" maxlength="64" placeholder="Имя">
+            День рождения <input type="date" id="fDate">
+            <button id="addBtn" class="primary" onclick="submitRecord()">Добавить</button>
+        </div>
+        <div id="list"></div>
+        <div class="btnrow">
+            <button onclick="showDbQr()">Показать базу как QR</button>
+            <button onclick="pasteDb()">Вставить базу из буфера</button>
+        </div>
+        <div id="dbQr" class="qr"></div>
+    </section>
+
+    <section id="resultSec" style="display:none;">
+        <h2 id="resultTitle"></h2>
+        <textarea id="resultText" rows="12" readonly></textarea>
+        <div class="qr" id="resultQr"></div>
+        <div class="btnrow">
+            <button onclick="copyResult()">Копировать текст</button>
+        </div>
+    </section>
+
+    <section id="cloud">
+        <h2>Облако Yandex Object Storage (бакет lunarreturns)</h2>
+        <div class="btnrow">
+            <button onclick="cloudPut()">Сохранить базу в облако</button>
+            <button onclick="cloudGet()">Загрузить базу из облака</button>
+        </div>
+    </section>
+
+    <p id="status"></p>
+
+<script>
+const YANDEX_CLIENT_ID = "";
+const FUNCTION_URL = "";
+const DB_KEY = "lunarreturns.db";
+const QR_MAX_BYTES = 2953;
+const SPACE = "\u2003\u2006";
+
+qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+
+let db = [];
+let selectedIdx = -1;
+let editingIdx = -1;
+let yandexToken = "";
+
+function moonNew(date) {
+    const epoch = 2444238.5;
+    const elonge = 278.833540, elongp = 282.596403, eccent = 0.016718;
+    const mmlong = 64.975464, mmlongp = 349.383063;
+    const fixangle = a => a - 360 * Math.floor(a / 360);
+    const deg2rad = d => d * Math.PI / 180;
+    const rad2deg = r => r * 180 / Math.PI;
+    const kepler = (m, ecc) => {
+        const epsilon = 0.000001;
+        m = deg2rad(m);
+        let e = m;
+        let delta = e - ecc * Math.sin(e) - m;
+        e -= delta / (1 - ecc * Math.cos(e));
+        while (Math.abs(delta) > epsilon) {
+            delta = e - ecc * Math.sin(e) - m;
+            e -= delta / (1 - ecc * Math.cos(e));
+        }
+        return e;
+    };
+    const unix = Math.floor(date.getTime() / 1000);
+    const pdata = unix / 86400 + 2440587.5;
+    const day = pdata - epoch;
+    const n = fixangle((360 / 365.2422) * day);
+    const m = fixangle(n + elonge - elongp);
+    let ec = kepler(m, eccent);
+    ec = Math.sqrt((1 + eccent) / (1 - eccent)) * Math.tan(ec / 2);
+    ec = 2 * rad2deg(Math.atan(ec));
+    const lambdasun = fixangle(ec + elongp);
+    const ml = fixangle(13.1763966 * day + mmlong);
+    const mm = fixangle(ml - 0.1114041 * day - mmlongp);
+    const ev = 1.2739 * Math.sin(deg2rad(2 * (ml - lambdasun) - mm));
+    const ae = 0.1858 * Math.sin(deg2rad(m));
+    const a3 = 0.37 * Math.sin(deg2rad(m));
+    const mmP = mm + ev - ae - a3;
+    const mec = 6.2886 * Math.sin(deg2rad(mmP));
+    const a4 = 0.214 * Math.sin(deg2rad(2 * mmP));
+    const lP = ml + ev + mec - ae + a4;
+    const v = 0.6583 * Math.sin(deg2rad(2 * (lP - lambdasun)));
+    const lPP = lP + v;
+    const moonAge = lPP - lambdasun;
+    return { phase: fixangle(moonAge) / 360, longitude: lPP };
+}
+
+const PHASE_ICON = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘", "🌑"];
+const PHASE_RU = ["Новолуние", "Молодая луна", "Первая четверть", "Прибывающая луна", "Полнолуние", "Убывающая луна", "Последняя четверть", "Старая луна", "Новолуние"];
+const phaseInt = m => Math.floor((m.phase + 0.0625) * 8);
+const phaseName = (m, ru) => (ru ? PHASE_RU : PHASE_ICON)[phaseInt(m)];
+
+const MAXLONG = [33.18, 51.16, 93.44, 119.48, 135.30, 173.34, 224.17, 242.57, 271.26, 302.49, 311.72, 348.58];
+const MZODIAC_ICON = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"];
+const MZODIAC_RU = ["овен", "телец", "близнецы", "рак", "лев", "дева", "весы", "скорпион", "стрелец", "козерог", "водолей", "рыбы"];
+function moonZodiacInt(m) {
+    for (let i = 0; i < MAXLONG.length; i++) {
+        if (m.longitude < MAXLONG[i]) return i;
+    }
+    return 0;
+}
+const moonZodiacName = (m, ru) => (ru ? MZODIAC_RU : MZODIAC_ICON)[moonZodiacInt(m)];
+
+const ZODIAC_ICON = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"];
+const ZODIAC_RU = ["Овен", "Телец", "Близнецы", "Рак", "Лев", "Дева", "Весы", "Скорпион", "Стрелец", "Козерог", "Водолей", "Рыбы"];
+function sunZodiacInts(date) {
+    const mo = date.getMonth() + 1, d = date.getDate();
+    const A = 0, T = 1, G = 2, C = 3, L = 4, V = 5, Li = 6, S = 7, Sg = 8, Cp = 9, Aq = 10, P = 11;
+    switch (mo) {
+        case 1: return d < 20 ? [Cp] : d === 20 ? [Cp, Aq] : [Aq];
+        case 2: return d < 18 ? [Aq] : d === 18 ? [Aq, P] : [P];
+        case 3: return d < 20 ? [P] : d === 20 ? [P, A] : [A];
+        case 4: return d < 19 ? [A] : d === 19 ? [A, T] : [T];
+        case 5: return d < 20 ? [T] : d === 20 ? [T, G] : [G];
+        case 6: return d < 21 ? [G] : d === 21 ? [G, C] : [C];
+        case 7: return d < 22 ? [C] : d === 22 ? [C, L] : [L];
+        case 8: return d < 22 ? [L] : d === 22 ? [L, V] : [V];
+        case 9: return d < 22 ? [V] : d === 22 ? [V, Li] : [Li];
+        case 10: return d < 23 ? [Li] : d === 23 ? [Li, S] : [S];
+        case 11: return d < 22 ? [S] : d === 22 ? [S, Sg] : [Sg];
+        case 12: return d < 21 ? [Sg] : d === 21 ? [Sg, Cp] : [Cp];
+    }
+    return [P];
+}
+const sunZodiacNames = (date, ru) => sunZodiacInts(date).map(i => (ru ? ZODIAC_RU : ZODIAC_ICON)[i]);
+
+const CZODIAC_ICON = ["🐒", "🐓", "🐕", "🐖", "🐀", "🐂", "🐅", "🐇", "🐉", "🐍", "🐎", "🐐"];
+const CZODIAC_RU = ["Обезьяна", "Петух", "Собака", "Свинья", "Крыса", "Бык", "Тигр", "Кролик", "Дракон", "Змея", "Лошадь", "Коза"];
+const chineseZodiacName = (date, ru) => (ru ? CZODIAC_RU : CZODIAC_ICON)[date.getFullYear() % 12];
+
+const WD_RU = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
+function wdLocale(t) {
+    let iso = t.getDay();
+    const s = WD_RU[iso];
+    if (iso === 0) iso = 7;
+    const icon = String.fromCharCode(0x30 + iso) + "\uFE0F\u20E3";
+    return [icon, s];
+}
+
+const hashTag = s => "#" + s.toLowerCase().replace(/ /g, "_");
+
+const addYears = (t, i) => new Date(t.getFullYear() + i, t.getMonth(), t.getDate());
+
+function la(t) {
+    const [w0, wh] = wdLocale(t);
+    const m0 = moonNew(t);
+    const p0 = phaseName(m0, false);
+    const z0 = moonZodiacName(m0, false);
+    const s0 = sunZodiacNames(t, false)[0];
+    const v0 = chineseZodiacName(t, false);
+    const sq = z0 === s0 ? "²" : "";
+    const yl = "г";
+    const f = new Date().getFullYear() - t.getFullYear();
+    const years = [];
+    years.push(
+        s0 + hashTag(sunZodiacNames(t, true)[0]) + "\n" +
+        w0 + hashTag(wh) + "\n" +
+        p0 + hashTag(phaseName(m0, true)) + "\n" +
+        z0 + hashTag(moonZodiacName(m0, true)) + "_\n" +
+        v0 + hashTag(chineseZodiacName(t, true)) + "\n" +
+        "#" + t.getFullYear() + yl + " " + w0 + p0 + z0 + sq + v0
+    );
+    let fc = 0;
+    for (let i = 1; fc < 1; i++) {
+        const bd = addYears(t, i);
+        const m = moonNew(bd);
+        let c = 0;
+        let [w] = wdLocale(bd);
+        if (w0 === w) c++; else w = SPACE;
+        let p = phaseName(m, false);
+        if (p0 === p) c++; else p = SPACE;
+        let z = moonZodiacName(m, false);
+        if (z0 === z) c++; else z = SPACE;
+        let v = chineseZodiacName(bd, false);
+        if (v0 === v) c++; else v = "";
+        if (i >= f && c > 0 || c > 1 && i < 90) {
+            years.push("#" + bd.getFullYear() + yl + " " + w + p + z + v);
+            if (i > f && c > 0) fc++;
+        }
+        if (i > 500) break;
+    }
+    return years;
+}
+
+function status(msg, isError) {
+    const el = document.getElementById("status");
+    el.textContent = msg;
+    el.className = isError ? "error" : "";
+}
+
+function loadDb() {
+    try {
+        const raw = localStorage.getItem(DB_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) db = parsed.filter(validRecord);
+        }
+    } catch (e) { }
+}
+
+function validRecord(r) {
+    return r && typeof r.n === "string" && r.n.trim() !== "" &&
+        typeof r.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.d);
+}
+
+function saveDb() {
+    const json = JSON.stringify(db);
+    if (byteLen(json) > QR_MAX_BYTES) {
+        status("База слишком велика для QR (" + byteLen(json) + " > " + QR_MAX_BYTES + " байт)", true);
+        return false;
+    }
+    localStorage.setItem(DB_KEY, json);
+    return true;
+}
+
+function byteLen(s) {
+    return new TextEncoder().encode(s).length;
+}
+
+function renderList() {
+    const list = document.getElementById("list");
+    list.innerHTML = "";
+    db.forEach((r, i) => {
+        const row = document.createElement("div");
+        row.className = "row" + (i === selectedIdx ? " selected" : "");
+        const n = document.createElement("span");
+        n.className = "n";
+        n.textContent = r.n;
+        const d = document.createElement("span");
+        d.className = "d";
+        d.textContent = r.d;
+        const edit = document.createElement("button");
+        edit.textContent = "Изменить";
+        edit.onclick = e => { e.stopPropagation(); startEdit(i); };
+        const del = document.createElement("button");
+        del.textContent = "Удалить";
+        del.onclick = e => { e.stopPropagation(); removeRecord(i); };
+        row.append(n, d, edit, del);
+        row.onclick = () => selectRecord(i);
+        list.appendChild(row);
+    });
+}
+
+function submitRecord() {
+    const n = document.getElementById("fName").value.trim();
+    const d = document.getElementById("fDate").value;
+    if (!n || !/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+        status("Укажите имя и дату рождения", true);
+        return;
+    }
+    if (editingIdx >= 0) {
+        const old = db[editingIdx];
+        db[editingIdx] = { n, d };
+        if (!saveDb()) { db[editingIdx] = old; return; }
+        cancelEdit();
+    } else {
+        db.push({ n, d });
+        if (!saveDb()) { db.pop(); return; }
+    }
+    document.getElementById("fName").value = "";
+    document.getElementById("fDate").value = "";
+    status("Записей: " + db.length + ", размер " + byteLen(JSON.stringify(db)) + "/" + QR_MAX_BYTES + " байт");
+    renderList();
+}
+
+function startEdit(i) {
+    editingIdx = i;
+    document.getElementById("fName").value = db[i].n;
+    document.getElementById("fDate").value = db[i].d;
+    document.getElementById("addBtn").textContent = "Сохранить";
+}
+
+function cancelEdit() {
+    editingIdx = -1;
+    document.getElementById("addBtn").textContent = "Добавить";
+    document.getElementById("fName").value = "";
+    document.getElementById("fDate").value = "";
+}
+
+function removeRecord(i) {
+    if (!confirm("Удалить " + db[i].n + " " + db[i].d + "?")) return;
+    db.splice(i, 1);
+    if (!saveDb()) { renderList(); return; }
+    if (selectedIdx === i) { selectedIdx = -1; hideResult(); }
+    if (selectedIdx > i) selectedIdx--;
+    if (editingIdx === i) cancelEdit();
+    renderList();
+    status("Удалено. Записей: " + db.length);
+}
+
+function selectRecord(i) {
+    selectedIdx = i;
+    renderList();
+    const r = db[i];
+    const [y, mo, d] = r.d.split("-").map(Number);
+    const t = new Date(y, mo - 1, d);
+    const text = r.n + " " + r.d + "\n" + la(t).join("\n");
+    document.getElementById("resultTitle").textContent = r.n;
+    document.getElementById("resultText").value = text;
+    showQr(document.getElementById("resultQr"), text);
+    document.getElementById("resultSec").style.display = "block";
+}
+
+function hideResult() {
+    document.getElementById("resultSec").style.display = "none";
+}
+
+function showQr(el, text) {
+    try {
+        const qr = qrcode(0, "L");
+        qr.addData(text);
+        qr.make();
+        el.innerHTML = qr.createSvgTag(4, 8);
+    } catch (e) {
+        el.innerHTML = "";
+        status("Не удалось создать QR: " + e.message, true);
+    }
+}
+
+function copyResult() {
+    copyText(document.getElementById("resultText").value);
+}
+
+function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+            () => status("Скопировано в буфер обмена"),
+            () => fallbackCopy(text));
+    } else {
+        fallbackCopy(text);
+    }
+}
+
+function fallbackCopy(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+        document.execCommand("copy");
+        status("Скопировано в буфер обмена");
+    } catch (e) {
+        status("Не удалось скопировать", true);
+    }
+    document.body.removeChild(ta);
+}
+
+function showDbQr() {
+    const json = JSON.stringify(db);
+    if (db.length === 0) {
+        status("База пуста", true);
+        return;
+    }
+    showQr(document.getElementById("dbQr"), json);
+    status("QR базы: " + byteLen(json) + "/" + QR_MAX_BYTES + " байт, записей: " + db.length);
+}
+
+function pasteDb() {
+    if (!navigator.clipboard || !navigator.clipboard.readText) {
+        status("Буфер обмена недоступен в этом браузере", true);
+        return;
+    }
+    navigator.clipboard.readText().then(text => {
+        let incoming;
+        try {
+            incoming = JSON.parse(text);
+        } catch (e) {
+            status("В буфере не JSON база данных", true);
+            return;
+        }
+        if (!Array.isArray(incoming) || !incoming.every(validRecord)) {
+            status("Неверный формат базы", true);
+            return;
+        }
+        const replace = confirm("OK — заменить текущую базу (" + incoming.length + " зап.), Отмена — объединить");
+        const merged = replace ? incoming : db.concat(incoming).filter((r, i, a) =>
+            a.findIndex(x => x.n === r.n && x.d === r.d) === i);
+        const backup = db;
+        db = merged;
+        if (!saveDb()) { db = backup; return; }
+        selectedIdx = -1;
+        hideResult();
+        renderList();
+        status("Записей: " + db.length + ", размер " + byteLen(JSON.stringify(db)) + "/" + QR_MAX_BYTES + " байт");
+    }, () => status("Не удалось прочитать буфер обмена", true));
+}
+
+function loginYandex() {
+    if (!YANDEX_CLIENT_ID) {
+        status("YANDEX_CLIENT_ID не задан — зарегистрируйте приложение, см. README.md", true);
+        return;
+    }
+    const redirect = location.origin + location.pathname;
+    location = "https://oauth.yandex.ru/authorize?response_type=token&client_id="
+        + encodeURIComponent(YANDEX_CLIENT_ID)
+        + "&redirect_uri=" + encodeURIComponent(redirect);
+}
+
+function checkOAuthHash() {
+    const m = location.hash.match(/access_token=([^&]+)/);
+    if (!m) return;
+    yandexToken = decodeURIComponent(m[1]);
+    history.replaceState(null, "", location.pathname);
+    document.getElementById("cloud").style.display = "block";
+    document.getElementById("loginBtn").style.display = "none";
+    document.getElementById("loginInfo").textContent = "✓ Вход выполнен";
+    status("Вход через Яндекс выполнен");
+}
+
+function cloudPresign(action) {
+    if (!FUNCTION_URL) {
+        status("FUNCTION_URL не задан — разверните функцию, см. README.md", true);
+        return Promise.reject();
+    }
+    if (!yandexToken) {
+        status("Сначала войдите через Яндекс", true);
+        return Promise.reject();
+    }
+    return fetch(FUNCTION_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: yandexToken, action })
+    }).then(resp => {
+        if (!resp.ok) throw new Error("функция вернула " + resp.status);
+        return resp.json();
+    }).then(data => {
+        if (!data.url) throw new Error("функция не вернула url");
+        return data.url;
+    });
+}
+
+function cloudPut() {
+    cloudPresign("put").then(url =>
+        fetch(url, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(db)
+        })
+    ).then(resp => {
+        if (!resp.ok) throw new Error("S3 вернул " + resp.status);
+        status("База сохранена в облако (users/{uid}/db.json)");
+    }).catch(e => status("Ошибка сохранения: " + e.message, true));
+}
+
+function cloudGet() {
+    cloudPresign("get").then(url => fetch(url)).then(resp => {
+        if (!resp.ok) throw new Error("S3 вернул " + resp.status);
+        return resp.text();
+    }).then(text => {
+        let incoming;
+        try {
+            incoming = JSON.parse(text);
+        } catch (e) {
+            throw new Error("в облаке не JSON");
+        }
+        if (!Array.isArray(incoming) || !incoming.every(validRecord)) {
+            throw new Error("неверный формат базы в облаке");
+        }
+        const replace = confirm("OK — заменить текущую базу (" + incoming.length + " зап.), Отмена — объединить");
+        const merged = replace ? incoming : db.concat(incoming).filter((r, i, a) =>
+            a.findIndex(x => x.n === r.n && x.d === r.d) === i);
+        const backup = db;
+        db = merged;
+        if (!saveDb()) { db = backup; return; }
+        selectedIdx = -1;
+        hideResult();
+        renderList();
+        status("База загружена из облака. Записей: " + db.length);
+    }).catch(e => status("Ошибка загрузки: " + e.message, true));
+}
+
+loadDb();
+renderList();
+checkOAuthHash();
+</script>
+</body>
+</html>
