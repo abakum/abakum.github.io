@@ -79,9 +79,12 @@
     <section>
         <h2>База данных</h2>
         <div class="btnrow">
-            Имя <input type="text" id="fName" maxlength="64" placeholder="Имя">
-            День рождения <input type="date" id="fDate">
-            Час <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:4em;">
+            Имя <input type="text" id="fName" maxlength="64" placeholder="Имя" style="flex:1 1 8em;">
+            <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
+                День рождения <input type="date" id="fDate">
+                Час <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:4em;">
+                Мин <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:4em;">
+            </span>
             <button id="addBtn" class="primary" onclick="submitRecord()">Добавить</button>
         </div>
         <div id="list"></div>
@@ -222,7 +225,7 @@ function wdLocale(t) {
 
 const hashTag = s => "#" + s.toLowerCase().replace(/ /g, "_");
 
-const addYears = (t, i) => new Date(t.getFullYear() + i, t.getMonth(), t.getDate(), t.getHours(), 0, 0);
+const addYears = (t, i) => new Date(t.getFullYear() + i, t.getMonth(), t.getDate(), t.getHours(), t.getMinutes(), 0);
 
 function la(t) {
     const [w0, wh] = wdLocale(t);
@@ -284,7 +287,8 @@ function loadDb() {
 function validRecord(r) {
     if (!(r && typeof r.n === "string" && r.n.trim() !== "" &&
         typeof r.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.d))) return false;
-    return !("h" in r) || (Number.isInteger(r.h) && r.h >= 0 && r.h <= 23);
+    if ("h" in r && !(Number.isInteger(r.h) && r.h >= 0 && r.h <= 23)) return false;
+    return !("m" in r) || (Number.isInteger(r.m) && r.m >= 0 && r.m <= 59);
 }
 
 function saveDb() {
@@ -312,7 +316,7 @@ function renderList() {
         n.textContent = r.n;
         const d = document.createElement("span");
         d.className = "d";
-        d.textContent = r.d + (Number.isInteger(r.h) ? " " + String(r.h).padStart(2, "0") + ":00" : "");
+        d.textContent = r.d + (hasTime(r) ? " " + timeLabel(r) : "");
         const edit = document.createElement("button");
         edit.textContent = "Изменить";
         edit.onclick = e => { e.stopPropagation(); startEdit(i); };
@@ -325,27 +329,30 @@ function renderList() {
     });
 }
 
-function readHour() {
-    const v = document.getElementById("fHour").value.trim();
+function readNum(id, max) {
+    const v = document.getElementById(id).value.trim();
     if (v === "") return undefined;
-    const h = Number(v);
-    if (!Number.isInteger(h) || h < 0 || h > 23) return null;
-    return h;
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 0 || n > max) return null;
+    return n;
 }
 
 function submitRecord() {
     const n = document.getElementById("fName").value.trim();
     const d = document.getElementById("fDate").value;
-    const h = readHour();
+    const h = readNum("fHour", 23);
+    const m = readNum("fMin", 59);
     if (!n || !/^\d{4}-\d{2}-\d{2}$/.test(d)) {
         status("Укажите имя и дату рождения", true);
         return;
     }
-    if (h === null) {
-        status("Час — целое от 0 до 23 (или пусто = 12)", true);
+    if (h === null || m === null) {
+        status("Час — целое 0–23, минуты — 0–59 (или пусто: 12:00)", true);
         return;
     }
-    const rec = h === undefined ? { n, d } : { n, d, h };
+    const rec = { n, d };
+    if (h !== undefined) rec.h = h;
+    if (m !== undefined) rec.m = m;
     if (editingIdx >= 0) {
         const old = db[editingIdx];
         db[editingIdx] = rec;
@@ -366,6 +373,7 @@ function startEdit(i) {
     document.getElementById("fName").value = db[i].n;
     document.getElementById("fDate").value = db[i].d;
     document.getElementById("fHour").value = "h" in db[i] ? db[i].h : "";
+    document.getElementById("fMin").value = "m" in db[i] ? db[i].m : "";
     document.getElementById("addBtn").textContent = "Сохранить";
 }
 
@@ -375,6 +383,7 @@ function cancelEdit() {
     document.getElementById("fName").value = "";
     document.getElementById("fDate").value = "";
     document.getElementById("fHour").value = "";
+    document.getElementById("fMin").value = "";
 }
 
 function removeRecord(i) {
@@ -388,15 +397,25 @@ function removeRecord(i) {
     status("Удалено. Записей: " + db.length);
 }
 
+function hasTime(r) {
+    return Number.isInteger(r.h) || Number.isInteger(r.m);
+}
+
+function timeLabel(r) {
+    const h = String(Number.isInteger(r.h) ? r.h : 12).padStart(2, "0");
+    const m = String(Number.isInteger(r.m) ? r.m : 0).padStart(2, "0");
+    return h + ":" + m;
+}
+
 function selectRecord(i) {
     selectedIdx = i;
     renderList();
     const r = db[i];
     const [y, mo, d] = r.d.split("-").map(Number);
     const h = Number.isInteger(r.h) ? r.h : 12;
-    const t = new Date(y, mo - 1, d, h, 0, 0);
-    const head = r.n + " " + r.d + (Number.isInteger(r.h) ? " " + String(r.h).padStart(2, "0") + ":00" : "");
-    const text = head + "\n" + la(t).join("\n");
+    const m = Number.isInteger(r.m) ? r.m : 0;
+    const t = new Date(y, mo - 1, d, h, m, 0);
+    const text = r.n + " " + r.d + (hasTime(r) ? " " + timeLabel(r) : "") + "\n" + la(t).join("\n");
     document.getElementById("resultTitle").textContent = r.n;
     document.getElementById("resultText").value = text;
     showQr(document.getElementById("resultQr"), text);
