@@ -81,6 +81,7 @@
         <div class="btnrow">
             Имя <input type="text" id="fName" maxlength="64" placeholder="Имя">
             День рождения <input type="date" id="fDate">
+            Час <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:4em;">
             <button id="addBtn" class="primary" onclick="submitRecord()">Добавить</button>
         </div>
         <div id="list"></div>
@@ -221,7 +222,7 @@ function wdLocale(t) {
 
 const hashTag = s => "#" + s.toLowerCase().replace(/ /g, "_");
 
-const addYears = (t, i) => new Date(t.getFullYear() + i, t.getMonth(), t.getDate());
+const addYears = (t, i) => new Date(t.getFullYear() + i, t.getMonth(), t.getDate(), t.getHours(), 0, 0);
 
 function la(t) {
     const [w0, wh] = wdLocale(t);
@@ -281,8 +282,9 @@ function loadDb() {
 }
 
 function validRecord(r) {
-    return r && typeof r.n === "string" && r.n.trim() !== "" &&
-        typeof r.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.d);
+    if (!(r && typeof r.n === "string" && r.n.trim() !== "" &&
+        typeof r.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.d))) return false;
+    return !("h" in r) || (Number.isInteger(r.h) && r.h >= 0 && r.h <= 23);
 }
 
 function saveDb() {
@@ -310,7 +312,7 @@ function renderList() {
         n.textContent = r.n;
         const d = document.createElement("span");
         d.className = "d";
-        d.textContent = r.d;
+        d.textContent = r.d + (Number.isInteger(r.h) ? " " + String(r.h).padStart(2, "0") + ":00" : "");
         const edit = document.createElement("button");
         edit.textContent = "Изменить";
         edit.onclick = e => { e.stopPropagation(); startEdit(i); };
@@ -323,20 +325,34 @@ function renderList() {
     });
 }
 
+function readHour() {
+    const v = document.getElementById("fHour").value.trim();
+    if (v === "") return undefined;
+    const h = Number(v);
+    if (!Number.isInteger(h) || h < 0 || h > 23) return null;
+    return h;
+}
+
 function submitRecord() {
     const n = document.getElementById("fName").value.trim();
     const d = document.getElementById("fDate").value;
+    const h = readHour();
     if (!n || !/^\d{4}-\d{2}-\d{2}$/.test(d)) {
         status("Укажите имя и дату рождения", true);
         return;
     }
+    if (h === null) {
+        status("Час — целое от 0 до 23 (или пусто = 12)", true);
+        return;
+    }
+    const rec = h === undefined ? { n, d } : { n, d, h };
     if (editingIdx >= 0) {
         const old = db[editingIdx];
-        db[editingIdx] = { n, d };
+        db[editingIdx] = rec;
         if (!saveDb()) { db[editingIdx] = old; return; }
         cancelEdit();
     } else {
-        db.push({ n, d });
+        db.push(rec);
         if (!saveDb()) { db.pop(); return; }
     }
     document.getElementById("fName").value = "";
@@ -349,6 +365,7 @@ function startEdit(i) {
     editingIdx = i;
     document.getElementById("fName").value = db[i].n;
     document.getElementById("fDate").value = db[i].d;
+    document.getElementById("fHour").value = "h" in db[i] ? db[i].h : "";
     document.getElementById("addBtn").textContent = "Сохранить";
 }
 
@@ -357,6 +374,7 @@ function cancelEdit() {
     document.getElementById("addBtn").textContent = "Добавить";
     document.getElementById("fName").value = "";
     document.getElementById("fDate").value = "";
+    document.getElementById("fHour").value = "";
 }
 
 function removeRecord(i) {
@@ -375,8 +393,10 @@ function selectRecord(i) {
     renderList();
     const r = db[i];
     const [y, mo, d] = r.d.split("-").map(Number);
-    const t = new Date(y, mo - 1, d);
-    const text = r.n + " " + r.d + "\n" + la(t).join("\n");
+    const h = Number.isInteger(r.h) ? r.h : 12;
+    const t = new Date(y, mo - 1, d, h, 0, 0);
+    const head = r.n + " " + r.d + (Number.isInteger(r.h) ? " " + String(r.h).padStart(2, "0") + ":00" : "");
+    const text = head + "\n" + la(t).join("\n");
     document.getElementById("resultTitle").textContent = r.n;
     document.getElementById("resultText").value = text;
     showQr(document.getElementById("resultQr"), text);
