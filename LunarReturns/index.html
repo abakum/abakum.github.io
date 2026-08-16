@@ -81,7 +81,6 @@
         <div id="list"></div>
         <div class="btnrow">
             <button id="loginBtn" onclick="loginYandex()" title="Войти через Яндекс">🔑</button>
-            <span id="loginInfo"></span>
             <button id="cloudPutBtn" onclick="cloudPut()" title="Сохранить базу в облако" style="display:none;">📤</button>
             <button id="cloudGetBtn" onclick="cloudGet()" title="Загрузить базу из облака" style="display:none;">📥</button>
             <button onclick="pasteDb()" title="Вставить базу из буфера">📋</button>
@@ -104,7 +103,7 @@
 
 <script>
 const YANDEX_CLIENT_ID = "6abbc1008e0b40a4910c287ed145e86b";
-const FUNCTION_URL = "";
+const FUNCTION_URL = "https://functions.yandexcloud.net/d4erotuod7vp1l2k59in";
 const DB_KEY = "lunarreturns.db";
 const QR_MAX_BYTES = 2953;
 const SPACE = "\u2003\u2006";
@@ -555,10 +554,9 @@ function checkOAuthHash() {
     document.getElementById("cloudPutBtn").style.display = "";
     document.getElementById("cloudGetBtn").style.display = "";
     const lb = document.getElementById("loginBtn");
-    lb.textContent = "🚪";
+    lb.textContent = "🔒";
     lb.title = "Выйти";
     lb.onclick = logoutYandex;
-    document.getElementById("loginInfo").textContent = "✓ Вход выполнен";
     status("Вход через Яндекс выполнен");
 }
 
@@ -566,7 +564,6 @@ function logoutYandex() {
     yandexToken = "";
     document.getElementById("cloudPutBtn").style.display = "none";
     document.getElementById("cloudGetBtn").style.display = "none";
-    document.getElementById("loginInfo").textContent = "";
     const lb = document.getElementById("loginBtn");
     lb.textContent = "🔑";
     lb.title = "Войти через Яндекс";
