@@ -589,13 +589,13 @@ function cloudPresign(action) {
         return resp.json();
     }).then(data => {
         if (!data.url) throw new Error("функция не вернула url");
-        return data.url;
+        return data;
     });
 }
 
 function cloudPut() {
-    cloudPresign("put").then(url =>
-        fetch(url, {
+    cloudPresign("put").then(data =>
+        fetch(data.url, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(db)
@@ -609,17 +609,32 @@ function cloudPut() {
 }
 
 function cloudGet() {
-    cloudPresign("get").then(url => fetch(url)).then(resp => {
+    let presignBirthday = null;
+    cloudPresign("get").then(data => {
+        presignBirthday = data.birthday || null;
+        return fetch(data.url);
+    }).then(resp => {
+        if (resp.status === 404) return null;
         if (!resp.ok) return resp.text().then(t => {
             throw new Error("S3 вернул " + resp.status + ": " + t.slice(0, 200));
         });
         return resp.text();
     }).then(text => {
         let incoming;
-        try {
-            incoming = JSON.parse(text);
-        } catch (e) {
-            throw new Error("в облаке не JSON");
+        let seeded = false;
+        if (text === null) {
+            if (presignBirthday && /^\d{4}-\d{2}-\d{2}$/.test(presignBirthday)) {
+                incoming = [{ n: "Я", d: presignBirthday }];
+            } else {
+                incoming = [{ n: "Ада", d: "1815-12-10" }];
+                seeded = true;
+            }
+        } else {
+            try {
+                incoming = JSON.parse(text);
+            } catch (e) {
+                throw new Error("в облаке не JSON");
+            }
         }
         if (!Array.isArray(incoming) || !incoming.every(validRecord)) {
             throw new Error("неверный формат базы в облаке");
@@ -629,13 +644,17 @@ function cloudGet() {
             a.findIndex(x => x.n === r.n && x.d === r.d) === i);
         const backup = db;
         db = merged;
-        adaSeeded = false;
+        adaSeeded = seeded;
         if (!saveDb()) { db = backup; return; }
         selectedIdx = -1;
         hideResult();
         renderList();
         refreshDbQr();
-        status("База загружена из облака. Записей: " + db.length);
+        status(text === null
+            ? (seeded
+                ? "В облаке пусто и дата рождения в аккаунте не указана — заготовка: Ада"
+                : "В облаке пусто — загружена дата рождения из аккаунта Яндекса")
+            : "База загружена из облака. Записей: " + db.length);
     }).catch(e => status("Ошибка загрузки: " + e.message, true));
 }
 
