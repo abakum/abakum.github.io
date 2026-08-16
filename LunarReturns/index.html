@@ -24,7 +24,8 @@
         }
         button {
             font: inherit;
-            padding: 4px 10px;
+            font-size: 1.3em;
+            padding: 6px 10px;
             border: 1px solid #bbb;
             border-radius: 6px;
             background: #f0f0f0;
@@ -58,10 +59,9 @@
             white-space: pre;
         }
         .qr img, .qr svg { max-width: 100%; height: auto; }
-        #status { color: #555; min-height: 1.2em; }
+        #status { color: #555; min-height: 1.2em; overflow-wrap: anywhere; }
         #status.error { color: #c62828; }
-        #cloud { display: none; }
-        .btnrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+        .btnrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
     </style>
 </head>
 <body>
@@ -69,28 +69,25 @@
     <p>Совпадения предстоящих дней рождения с первым днём рождения:
 день недели, фаза луны, зодиак, восточный календарь.</p>
 
-    <section id="authSec">
-        <div class="btnrow">
-            <button id="loginBtn" onclick="loginYandex()">Войти через Яндекс</button>
-            <span id="loginInfo"></span>
-        </div>
-    </section>
-
     <section>
-        <h2>База данных</h2>
         <div class="btnrow">
-            Имя <input type="text" id="fName" maxlength="64" placeholder="Имя" style="flex:1 1 8em;">
+            <input type="text" id="fName" maxlength="64" placeholder="Имя" style="flex:1 1 8em;">
             <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
-                День рождения <input type="date" id="fDate">
-                Час <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:4em;">
-                Мин <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:4em;">
+                <input type="date" id="fDate" style="width:9em;">
+                <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:3em;">
+                <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:3em;">
             </span>
-            <button id="addBtn" class="primary" onclick="submitRecord()">Добавить</button>
+            <button id="addBtn" class="primary" onclick="submitRecord()" title="Добавить">➕</button>
         </div>
         <div id="list"></div>
         <div class="btnrow">
-            <button onclick="showDbQr()">Показать базу как QR</button>
-            <button onclick="pasteDb()">Вставить базу из буфера</button>
+            <button id="loginBtn" onclick="loginYandex()" title="Войти через Яндекс">🔑</button>
+            <span id="loginInfo"></span>
+            <button id="cloudPutBtn" onclick="cloudPut()" title="Сохранить базу в облако" style="display:none;">📤</button>
+            <button id="cloudGetBtn" onclick="cloudGet()" title="Загрузить базу из облака" style="display:none;">📥</button>
+            <button onclick="pasteDb()" title="Вставить базу из буфера">📋</button>
+            <button onclick="showDbQr()" title="Показать базу как QR">⛶</button>
+            <button onclick="copyDb()" title="Скопировать базу">⮻</button>
         </div>
         <div id="dbQr" class="qr"></div>
     </section>
@@ -98,18 +95,10 @@
     <section id="resultSec" style="display:none;">
         <h2 id="resultTitle"></h2>
         <textarea id="resultText" rows="12" readonly></textarea>
+        <div class="btnrow">
+            <button onclick="copyResult()" title="Копировать текст">⮻</button>
+        </div>
         <div class="qr" id="resultQr"></div>
-        <div class="btnrow">
-            <button onclick="copyResult()">Копировать текст</button>
-        </div>
-    </section>
-
-    <section id="cloud">
-        <h2>Облако Yandex Object Storage (бакет lunarreturns)</h2>
-        <div class="btnrow">
-            <button onclick="cloudPut()">Сохранить базу в облако</button>
-            <button onclick="cloudGet()">Загрузить базу из облака</button>
-        </div>
     </section>
 
     <p id="status"></p>
@@ -124,6 +113,7 @@ const SPACE = "\u2003\u2006";
 qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
 
 let db = [];
+let adaSeeded = false;
 let selectedIdx = -1;
 let editingIdx = -1;
 let yandexToken = "";
@@ -282,6 +272,11 @@ function loadDb() {
             if (Array.isArray(parsed)) db = parsed.filter(validRecord);
         }
     } catch (e) { }
+    if (db.length === 0) {
+        db = [{ n: "Ада", d: "1815-12-10" }];
+        adaSeeded = true;
+        localStorage.setItem(DB_KEY, JSON.stringify(db));
+    }
 }
 
 function validRecord(r) {
@@ -305,6 +300,13 @@ function byteLen(s) {
     return new TextEncoder().encode(s).length;
 }
 
+function refreshDbQr() {
+    const el = document.getElementById("dbQr");
+    if (!el.innerHTML) return;
+    if (db.length === 0) { el.innerHTML = ""; return; }
+    showQr(el, JSON.stringify(db));
+}
+
 function renderList() {
     const list = document.getElementById("list");
     list.innerHTML = "";
@@ -318,10 +320,12 @@ function renderList() {
         d.className = "d";
         d.textContent = r.d + (hasTime(r) ? " " + timeLabel(r) : "");
         const edit = document.createElement("button");
-        edit.textContent = "Изменить";
+        edit.textContent = "✏️";
+        edit.title = "Изменить";
         edit.onclick = e => { e.stopPropagation(); startEdit(i); };
         const del = document.createElement("button");
-        del.textContent = "Удалить";
+        del.textContent = "❌";
+        del.title = "Удалить";
         del.onclick = e => { e.stopPropagation(); removeRecord(i); };
         row.append(n, d, edit, del);
         row.onclick = () => selectRecord(i);
@@ -359,6 +363,10 @@ function submitRecord() {
         if (!saveDb()) { db[editingIdx] = old; return; }
         cancelEdit();
     } else {
+        if (adaSeeded) {
+            adaSeeded = false;
+            db = [];
+        }
         db.push(rec);
         if (!saveDb()) { db.pop(); return; }
     }
@@ -366,6 +374,7 @@ function submitRecord() {
     document.getElementById("fDate").value = "";
     status("Записей: " + db.length + ", размер " + byteLen(JSON.stringify(db)) + "/" + QR_MAX_BYTES + " байт");
     renderList();
+    refreshDbQr();
 }
 
 function startEdit(i) {
@@ -374,12 +383,16 @@ function startEdit(i) {
     document.getElementById("fDate").value = db[i].d;
     document.getElementById("fHour").value = "h" in db[i] ? db[i].h : "";
     document.getElementById("fMin").value = "m" in db[i] ? db[i].m : "";
-    document.getElementById("addBtn").textContent = "Сохранить";
+    const addBtn = document.getElementById("addBtn");
+    addBtn.textContent = "💾";
+    addBtn.title = "Сохранить";
 }
 
 function cancelEdit() {
     editingIdx = -1;
-    document.getElementById("addBtn").textContent = "Добавить";
+    const addBtn = document.getElementById("addBtn");
+    addBtn.textContent = "➕";
+    addBtn.title = "Добавить";
     document.getElementById("fName").value = "";
     document.getElementById("fDate").value = "";
     document.getElementById("fHour").value = "";
@@ -389,11 +402,13 @@ function cancelEdit() {
 function removeRecord(i) {
     if (!confirm("Удалить " + db[i].n + " " + db[i].d + "?")) return;
     db.splice(i, 1);
-    if (!saveDb()) { renderList(); return; }
+    if (db.length === 0) adaSeeded = false;
+    if (!saveDb()) { renderList(); refreshDbQr(); return; }
     if (selectedIdx === i) { selectedIdx = -1; hideResult(); }
     if (selectedIdx > i) selectedIdx--;
     if (editingIdx === i) cancelEdit();
     renderList();
+    refreshDbQr();
     status("Удалено. Записей: " + db.length);
 }
 
@@ -418,6 +433,7 @@ function selectRecord(i) {
     const text = r.n + " " + r.d + (hasTime(r) ? " " + timeLabel(r) : "") + "\n" + la(t).join("\n");
     document.getElementById("resultTitle").textContent = r.n;
     document.getElementById("resultText").value = text;
+    document.getElementById("resultText").rows = text.split("\n").length;
     showQr(document.getElementById("resultQr"), text);
     document.getElementById("resultSec").style.display = "block";
 }
@@ -440,6 +456,14 @@ function showQr(el, text) {
 
 function copyResult() {
     copyText(document.getElementById("resultText").value);
+}
+
+function copyDb() {
+    if (db.length === 0) {
+        status("База пуста", true);
+        return;
+    }
+    copyText(JSON.stringify(db));
 }
 
 function copyText(text) {
@@ -467,12 +491,17 @@ function fallbackCopy(text) {
 }
 
 function showDbQr() {
+    const el = document.getElementById("dbQr");
+    if (el.innerHTML) {
+        el.innerHTML = "";
+        return;
+    }
     const json = JSON.stringify(db);
     if (db.length === 0) {
         status("База пуста", true);
         return;
     }
-    showQr(document.getElementById("dbQr"), json);
+    showQr(el, json);
     status("QR базы: " + byteLen(json) + "/" + QR_MAX_BYTES + " байт, записей: " + db.length);
 }
 
@@ -498,10 +527,12 @@ function pasteDb() {
             a.findIndex(x => x.n === r.n && x.d === r.d) === i);
         const backup = db;
         db = merged;
+        adaSeeded = false;
         if (!saveDb()) { db = backup; return; }
         selectedIdx = -1;
         hideResult();
         renderList();
+        refreshDbQr();
         status("Записей: " + db.length + ", размер " + byteLen(JSON.stringify(db)) + "/" + QR_MAX_BYTES + " байт");
     }, () => status("Не удалось прочитать буфер обмена", true));
 }
@@ -522,10 +553,26 @@ function checkOAuthHash() {
     if (!m) return;
     yandexToken = decodeURIComponent(m[1]);
     history.replaceState(null, "", location.pathname);
-    document.getElementById("cloud").style.display = "block";
-    document.getElementById("loginBtn").style.display = "none";
+    document.getElementById("cloudPutBtn").style.display = "";
+    document.getElementById("cloudGetBtn").style.display = "";
+    const lb = document.getElementById("loginBtn");
+    lb.textContent = "🚪";
+    lb.title = "Выйти";
+    lb.onclick = logoutYandex;
     document.getElementById("loginInfo").textContent = "✓ Вход выполнен";
     status("Вход через Яндекс выполнен");
+}
+
+function logoutYandex() {
+    yandexToken = "";
+    document.getElementById("cloudPutBtn").style.display = "none";
+    document.getElementById("cloudGetBtn").style.display = "none";
+    document.getElementById("loginInfo").textContent = "";
+    const lb = document.getElementById("loginBtn");
+    lb.textContent = "🔑";
+    lb.title = "Войти через Яндекс";
+    lb.onclick = loginYandex;
+    status("Вы вышли из аккаунта");
 }
 
 function cloudPresign(action) {
@@ -582,10 +629,12 @@ function cloudGet() {
             a.findIndex(x => x.n === r.n && x.d === r.d) === i);
         const backup = db;
         db = merged;
+        adaSeeded = false;
         if (!saveDb()) { db = backup; return; }
         selectedIdx = -1;
         hideResult();
         renderList();
+        refreshDbQr();
         status("База загружена из облака. Записей: " + db.length);
     }).catch(e => status("Ошибка загрузки: " + e.message, true));
 }
