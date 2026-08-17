@@ -604,7 +604,7 @@ function cloudPut() {
         if (!resp.ok) return resp.text().then(t => {
             throw new Error("S3 вернул " + resp.status + ": " + t.slice(0, 200));
         });
-        status("База сохранена в облако (users/{uid}/db.json)");
+        status("База сохранена в облако. Записей: " + db.length);
     }).catch(e => status("Ошибка сохранения: " + e.message, true));
 }
 
