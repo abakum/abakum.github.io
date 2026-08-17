@@ -107,6 +107,7 @@ const FUNCTION_URL = "https://functions.yandexcloud.net/d4erotuod7vp1l2k59in";
 const DB_KEY = "lunarreturns.db";
 const QR_MAX_BYTES = 2953;
 const SPACE = "\u2003\u2006";
+const TZ_MS = 3 * 3600 * 1000;
 
 qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
 
@@ -135,7 +136,7 @@ function moonNew(date) {
         }
         return e;
     };
-    const unix = Math.floor(date.getTime() / 1000);
+    const unix = Math.floor((date.getTime() - TZ_MS) / 1000);
     const pdata = unix / 86400 + 2440587.5;
     const day = pdata - epoch;
     const n = fixangle((360 / 365.2422) * day);
@@ -159,40 +160,31 @@ function moonNew(date) {
     return { phase: fixangle(moonAge) / 360, longitude: lPP };
 }
 
-const PHASE_ICON = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘", "🌑"];
-const PHASE_RU = ["Новолуние", "Молодая луна", "Первая четверть", "Прибывающая луна", "Полнолуние", "Убывающая луна", "Последняя четверть", "Старая луна", "Новолуние"];
-const PHASE_POINT_W = 0.5 / 29.53;
+const PHASE_ICON = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"];
+const PHASE_RU = ["Новолуние", "Молодая луна", "Первая четверть", "Прибывающая луна", "Полнолуние", "Убывающая луна", "Последняя четверть", "Старая луна"];
 function phaseInt(m) {
-    const p = m.phase;
-    const dist = c => Math.min(Math.abs(p - c), 1 - Math.abs(p - c));
-    if (dist(0) < PHASE_POINT_W) return 0;
-    if (dist(0.25) < PHASE_POINT_W) return 2;
-    if (dist(0.5) < PHASE_POINT_W) return 4;
-    if (dist(0.75) < PHASE_POINT_W) return 6;
-    return p < 0.25 ? 1 : p < 0.5 ? 3 : p < 0.75 ? 5 : 7;
+    return Math.floor(m.phase * 8) % 8;
 }
 const phaseName = (m, ru) => (ru ? PHASE_RU : PHASE_ICON)[phaseInt(m)];
-const PHASE_MATCH_W = 1 / 16;
-const phaseMatch = (a, b) => {
-    const d = Math.abs(a.phase - b.phase) % 1;
-    return Math.min(d, 1 - d) < PHASE_MATCH_W;
-};
+const phaseMatch = (a, b) => phaseInt(a) === phaseInt(b);
 
-const MAXLONG = [33.18, 51.16, 93.44, 119.48, 135.30, 173.34, 224.17, 242.57, 271.26, 302.49, 311.72, 348.58];
 const MZODIAC_ICON = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"];
 const MZODIAC_RU = ["овен", "телец", "близнецы", "рак", "лев", "дева", "весы", "скорпион", "стрелец", "козерог", "водолей", "рыбы"];
+const ZODIAC_BORDER_W = 1.5;
+const norm360 = a => a - 360 * Math.floor(a / 360);
 function moonZodiacInt(m) {
-    for (let i = 0; i < MAXLONG.length; i++) {
-        if (m.longitude < MAXLONG[i]) return i;
-    }
-    return 0;
+    return Math.floor(norm360(m.longitude) / 30) % 12;
+}
+function moonZodiacBorderDist(m) {
+    const b = norm360(m.longitude) % 30;
+    return Math.min(b, 30 - b);
 }
 const moonZodiacName = (m, ru) => (ru ? MZODIAC_RU : MZODIAC_ICON)[moonZodiacInt(m)];
 
 const ZODIAC_ICON = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"];
 const ZODIAC_RU = ["Овен", "Телец", "Близнецы", "Рак", "Лев", "Дева", "Весы", "Скорпион", "Стрелец", "Козерог", "Водолей", "Рыбы"];
 function sunZodiacInts(date) {
-    const mo = date.getMonth() + 1, d = date.getDate();
+    const mo = date.getUTCMonth() + 1, d = date.getUTCDate();
     const A = 0, T = 1, G = 2, C = 3, L = 4, V = 5, Li = 6, S = 7, Sg = 8, Cp = 9, Aq = 10, P = 11;
     switch (mo) {
         case 1: return d < 20 ? [Cp] : d === 20 ? [Cp, Aq] : [Aq];
@@ -214,11 +206,11 @@ const sunZodiacNames = (date, ru) => sunZodiacInts(date).map(i => (ru ? ZODIAC_R
 
 const CZODIAC_ICON = ["🐒", "🐓", "🐕", "🐖", "🐀", "🐂", "🐅", "🐇", "🐉", "🐍", "🐎", "🐐"];
 const CZODIAC_RU = ["Обезьяна", "Петух", "Собака", "Свинья", "Крыса", "Бык", "Тигр", "Кролик", "Дракон", "Змея", "Лошадь", "Коза"];
-const chineseZodiacName = (date, ru) => (ru ? CZODIAC_RU : CZODIAC_ICON)[date.getFullYear() % 12];
+const chineseZodiacName = (date, ru) => (ru ? CZODIAC_RU : CZODIAC_ICON)[date.getUTCFullYear() % 12];
 
 const WD_RU = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
 function wdLocale(t) {
-    let iso = t.getDay();
+    let iso = t.getUTCDay();
     const s = WD_RU[iso];
     if (iso === 0) iso = 7;
     const icon = String.fromCharCode(0x30 + iso) + "\uFE0F\u20E3";
@@ -227,18 +219,19 @@ function wdLocale(t) {
 
 const hashTag = s => "#" + s.toLowerCase().replace(/ /g, "_");
 
-const addYears = (t, i) => new Date(t.getFullYear() + i, t.getMonth(), t.getDate(), t.getHours(), t.getMinutes(), 0);
+const addYears = (t, i) => new Date(Date.UTC(t.getUTCFullYear() + i, t.getUTCMonth(), t.getUTCDate(), t.getUTCHours(), t.getUTCMinutes(), 0));
 
 function la(t) {
     const [w0, wh] = wdLocale(t);
     const m0 = moonNew(t);
     const p0 = phaseName(m0, false);
     const z0 = moonZodiacName(m0, false);
+    const z0Sure = moonZodiacBorderDist(m0) >= ZODIAC_BORDER_W;
     const s0 = sunZodiacNames(t, false)[0];
     const v0 = chineseZodiacName(t, false);
     const sq = z0 === s0 ? "²" : "";
     const yl = "г";
-    const f = new Date().getFullYear() - t.getFullYear();
+    const f = new Date().getFullYear() - t.getUTCFullYear();
     const years = [];
     years.push(
         s0 + hashTag(sunZodiacNames(t, true)[0]) + "\n" +
@@ -246,7 +239,7 @@ function la(t) {
         p0 + hashTag(phaseName(m0, true)) + "\n" +
         z0 + hashTag(moonZodiacName(m0, true)) + "_\n" +
         v0 + hashTag(chineseZodiacName(t, true)) + "\n" +
-        "#" + t.getFullYear() + yl + " " + w0 + p0 + z0 + sq + v0
+        "#" + t.getUTCFullYear() + yl + " " + w0 + p0 + z0 + sq + v0
     );
     let fc = 0;
     for (let i = 1; fc < 1; i++) {
@@ -258,11 +251,11 @@ function la(t) {
         let p = SPACE;
         if (phaseMatch(m0, m)) { c++; p = p0; }
         let z = moonZodiacName(m, false);
-        if (z0 === z) c++; else z = SPACE;
+        if (z0Sure && moonZodiacBorderDist(m) >= ZODIAC_BORDER_W && z0 === z) c++; else z = SPACE;
         let v = chineseZodiacName(bd, false);
         if (v0 === v) c++; else v = "";
         if (i >= f && c > 0 || c > 1 && i < 90) {
-            years.push("#" + bd.getFullYear() + yl + " " + w + p + z + v);
+            years.push("#" + bd.getUTCFullYear() + yl + " " + w + p + z + v);
             if (i > f && c > 0) fc++;
         }
         if (i > 500) break;
@@ -441,7 +434,7 @@ function selectRecord(i) {
     const [y, mo, d] = r.d.split("-").map(Number);
     const h = Number.isInteger(r.h) ? r.h : 12;
     const m = Number.isInteger(r.m) ? r.m : 0;
-    const t = new Date(y, mo - 1, d, h, m, 0);
+    const t = new Date(Date.UTC(y, mo - 1, d, h, m, 0));
     const text = r.n + " " + r.d + (hasTime(r) ? " " + timeLabel(r) : "") + "\n" + la(t).join("\n");
     document.getElementById("resultTitle").textContent = r.n;
     document.getElementById("resultText").value = text;
