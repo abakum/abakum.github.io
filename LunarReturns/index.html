@@ -161,8 +161,22 @@ function moonNew(date) {
 
 const PHASE_ICON = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘", "🌑"];
 const PHASE_RU = ["Новолуние", "Молодая луна", "Первая четверть", "Прибывающая луна", "Полнолуние", "Убывающая луна", "Последняя четверть", "Старая луна", "Новолуние"];
-const phaseInt = m => Math.floor((m.phase + 0.0625) * 8);
+const PHASE_POINT_W = 0.5 / 29.53;
+function phaseInt(m) {
+    const p = m.phase;
+    const dist = c => Math.min(Math.abs(p - c), 1 - Math.abs(p - c));
+    if (dist(0) < PHASE_POINT_W) return 0;
+    if (dist(0.25) < PHASE_POINT_W) return 2;
+    if (dist(0.5) < PHASE_POINT_W) return 4;
+    if (dist(0.75) < PHASE_POINT_W) return 6;
+    return p < 0.25 ? 1 : p < 0.5 ? 3 : p < 0.75 ? 5 : 7;
+}
 const phaseName = (m, ru) => (ru ? PHASE_RU : PHASE_ICON)[phaseInt(m)];
+const PHASE_MATCH_W = 1 / 16;
+const phaseMatch = (a, b) => {
+    const d = Math.abs(a.phase - b.phase) % 1;
+    return Math.min(d, 1 - d) < PHASE_MATCH_W;
+};
 
 const MAXLONG = [33.18, 51.16, 93.44, 119.48, 135.30, 173.34, 224.17, 242.57, 271.26, 302.49, 311.72, 348.58];
 const MZODIAC_ICON = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"];
@@ -241,8 +255,8 @@ function la(t) {
         let c = 0;
         let [w] = wdLocale(bd);
         if (w0 === w) c++; else w = SPACE;
-        let p = phaseName(m, false);
-        if (p0 === p) c++; else p = SPACE;
+        let p = SPACE;
+        if (phaseMatch(m0, m)) { c++; p = p0; }
         let z = moonZodiacName(m, false);
         if (z0 === z) c++; else z = SPACE;
         let v = chineseZodiacName(bd, false);
