@@ -253,33 +253,33 @@ const hashTag = s => "#" + s.toLowerCase().replace(/ /g, "_");
 
 const addYears = (t, i) => new Date(Date.UTC(t.getUTCFullYear() + i, t.getUTCMonth(), t.getUTCDate(), t.getUTCHours(), t.getUTCMinutes(), 0));
 
-function la(t) {
-    const [w0, wh] = wdLocale(t);
-    const m0 = moonNew(t);
-    const n0 = tithiInt(m0);
-    const mMid = moonNew(tithiMid(t, n0));
+function la(birth) {
+    const tMid = tithiMid(birth, tithiInt(moonNew(birth)));
+    const mMid = moonNew(tMid);
+    const n0 = tithiInt(mMid);
     const p0 = phaseName(mMid, false);
     const z0 = moonZodiacName(mMid, false);
     const z0Sure = moonZodiacBorderDist(mMid) >= ZODIAC_BORDER_W;
-    const s0 = sunZodiacNames(t, false)[0];
-    const v0 = chineseZodiacName(t, false);
+    const [w0, wh] = wdLocale(birth);
+    const s0 = sunZodiacNames(birth, false)[0];
+    const v0 = chineseZodiacName(birth, false);
     const sq = z0 === s0 ? "²" : "";
     const yl = "г";
-    const f = new Date().getFullYear() - t.getUTCFullYear();
+    const f = new Date().getFullYear() - birth.getUTCFullYear();
     const years = [];
     years.push(
-        s0 + hashTag(sunZodiacNames(t, true)[0]) + "\n" +
+        s0 + hashTag(sunZodiacNames(birth, true)[0]) + "\n" +
+        v0 + hashTag(chineseZodiacName(birth, true)) + "\n" +
         w0 + hashTag(wh) + "\n" +
-        hashTag(tithiName(n0)) + "\n" +
-        p0 + hashTag(phaseName(mMid, true)) + "\n" +
         z0 + hashTag(moonZodiacName(mMid, true)) + "_\n" +
-        v0 + hashTag(chineseZodiacName(t, true)) + "\n" +
-        "#" + t.getUTCFullYear() + yl + " " + w0 + p0 + z0 + sq + v0
+        p0 + hashTag(phaseName(mMid, true)) + "\n" +
+        String(n0).padStart(2, "0") + hashTag(tithiName(n0)) + "\n" +
+        "#" + birth.getUTCFullYear() + yl + " " + w0 + p0 + z0 + sq + v0
     );
     let fc = 0;
     for (let i = 1; fc < 1; i++) {
-        const bd = addYears(t, i);
-        const m = moonNew(bd);
+        const bd = addYears(birth, i);
+        const m = moonNew(addYears(tMid, i));
         let c = 0;
         let [w] = wdLocale(bd);
         if (w0 === w) c++; else w = SPACE;
@@ -480,7 +480,7 @@ function renderCitySelect() {
     sel.innerHTML = "";
     const def = document.createElement("option");
     def.value = "";
-    def.textContent = "Город рождения — или время уже московское";
+    def.textContent = "Город рождения — или время уже МСК";
     sel.appendChild(def);
     const groups = {};
     for (const c in CITY_ZONE) {
