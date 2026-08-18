@@ -178,7 +178,27 @@ function phaseInt(m) {
     return Math.floor(m.phase * 8) % 8;
 }
 const phaseName = (m, ru) => (ru ? PHASE_RU : PHASE_ICON)[phaseInt(m)];
-const phaseMatch = (a, b) => phaseInt(a) === phaseInt(b);
+
+const tithiInt = m => Math.floor(m.phase * 30) + 1;
+const TITHI_BASE = ["пратипада", "двитья", "трития", "чатуртхи", "панчами", "шаштхи",
+    "саптами", "аштами", "навами", "дашами", "экадаши", "двадаши", "трайодаши", "чатурдаши"];
+const tithiName = n => n === 15 ? "пурнима" : n === 30 ? "амавасья" : TITHI_BASE[(n - 1) % 15];
+
+function tithiMid(t, n) {
+    const target = n - 0.5;
+    const f = d => {
+        let x = moonNew(d).phase * 30;
+        if (x < target - 15) x += 30;
+        return x - target;
+    };
+    let lo = t.getTime() - 86400000;
+    let hi = t.getTime() + 86400000;
+    for (let i = 0; i < 40; i++) {
+        const mid = (lo + hi) / 2;
+        if (f(new Date(mid)) < 0) lo = mid; else hi = mid;
+    }
+    return new Date((lo + hi) / 2);
+}
 
 const MZODIAC_ICON = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"];
 const MZODIAC_RU = ["овен", "телец", "близнецы", "рак", "лев", "дева", "весы", "скорпион", "стрелец", "козерог", "водолей", "рыбы"];
@@ -236,9 +256,11 @@ const addYears = (t, i) => new Date(Date.UTC(t.getUTCFullYear() + i, t.getUTCMon
 function la(t) {
     const [w0, wh] = wdLocale(t);
     const m0 = moonNew(t);
-    const p0 = phaseName(m0, false);
-    const z0 = moonZodiacName(m0, false);
-    const z0Sure = moonZodiacBorderDist(m0) >= ZODIAC_BORDER_W;
+    const n0 = tithiInt(m0);
+    const mMid = moonNew(tithiMid(t, n0));
+    const p0 = phaseName(mMid, false);
+    const z0 = moonZodiacName(mMid, false);
+    const z0Sure = moonZodiacBorderDist(mMid) >= ZODIAC_BORDER_W;
     const s0 = sunZodiacNames(t, false)[0];
     const v0 = chineseZodiacName(t, false);
     const sq = z0 === s0 ? "²" : "";
@@ -248,8 +270,9 @@ function la(t) {
     years.push(
         s0 + hashTag(sunZodiacNames(t, true)[0]) + "\n" +
         w0 + hashTag(wh) + "\n" +
-        p0 + hashTag(phaseName(m0, true)) + "\n" +
-        z0 + hashTag(moonZodiacName(m0, true)) + "_\n" +
+        hashTag(tithiName(n0)) + "\n" +
+        p0 + hashTag(phaseName(mMid, true)) + "\n" +
+        z0 + hashTag(moonZodiacName(mMid, true)) + "_\n" +
         v0 + hashTag(chineseZodiacName(t, true)) + "\n" +
         "#" + t.getUTCFullYear() + yl + " " + w0 + p0 + z0 + sq + v0
     );
@@ -261,7 +284,7 @@ function la(t) {
         let [w] = wdLocale(bd);
         if (w0 === w) c++; else w = SPACE;
         let p = SPACE;
-        if (phaseMatch(m0, m)) { c++; p = p0; }
+        if (tithiInt(m) === n0) { c++; p = p0; }
         let z = moonZodiacName(m, false);
         if (z0Sure && moonZodiacBorderDist(m) >= ZODIAC_BORDER_W && z0 === z) c++; else z = SPACE;
         let v = chineseZodiacName(bd, false);
