@@ -273,7 +273,7 @@ function la(birth) {
         w0 + hashTag(wh) + "\n" +
         z0 + hashTag(moonZodiacName(mMid, true)) + "_\n" +
         p0 + hashTag(phaseName(mMid, true)) + "\n" +
-        String(n0).padStart(2, "0") + hashTag(tithiName(n0)) + "\n" +
+        String((n0 - 1) % 15 + 1).padStart(2, "0") + (n0 > 15 ? "☾#" : "☽#") + tithiName(n0) + (n0 > 15 ? "_" : "") + "\n" +
         "#" + birth.getUTCFullYear() + yl + " " + w0 + p0 + z0 + sq + v0
     );
     let fc = 0;
