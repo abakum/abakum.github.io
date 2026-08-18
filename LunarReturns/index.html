@@ -24,16 +24,14 @@
         }
         button {
             font: inherit;
-            font-size: 1.3em;
-            padding: 6px 10px;
+            font-size: 1.05em;
+            padding: 3px 8px;
             border: 1px solid #bbb;
             border-radius: 6px;
             background: #f0f0f0;
             cursor: pointer;
         }
         button:hover { background: #e0e0e0; }
-        button.primary { background: #d73a49; color: #fff; border-color: #d73a49; }
-        button.primary:hover { background: #b62f3c; }
         input[type="text"], input[type="date"], select {
             font: inherit;
             padding: 4px 6px;
@@ -69,15 +67,15 @@
     <p>Совпадения в днях рождений с первым днём рождения.</p>
 
     <section>
-        <div class="btnrow">
+        <form id="recForm" class="btnrow" onsubmit="submitRecord(); return false;">
             <input type="text" id="fName" maxlength="64" placeholder="Имя" style="flex:1 1 8em;">
             <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
                 <input type="date" id="fDate" style="width:9em;">
                 <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:3em;">
                 <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:3em;">
             </span>
-            <button id="addBtn" class="primary" onclick="submitRecord()" title="Добавить">➕</button>
-        </div>
+            <button id="addBtn" type="submit" title="Добавить">➕</button>
+        </form>
         <div class="btnrow">
             <select id="fCity" style="flex:1 1 100%;"></select>
         </div>
@@ -377,6 +375,8 @@ function readNum(id, max) {
     return n;
 }
 
+const sortDb = () => db.sort((a, b) => a.d.localeCompare(b.d) || ((a.h ?? 12) - (b.h ?? 12)) || ((a.m ?? 0) - (b.m ?? 0)));
+
 function submitRecord() {
     const n = document.getElementById("fName").value.trim();
     const d = document.getElementById("fDate").value;
@@ -420,6 +420,9 @@ function submitRecord() {
         db.push(rec);
         if (!saveDb()) { db.pop(); return; }
     }
+    const sel = selectedIdx >= 0 ? db[selectedIdx] : null;
+    sortDb();
+    selectedIdx = sel ? db.indexOf(sel) : -1;
     document.getElementById("fName").value = "";
     document.getElementById("fDate").value = "";
     document.getElementById("fCity").value = "";
@@ -608,6 +611,7 @@ function pasteDb() {
             a.findIndex(x => x.n === r.n && x.d === r.d) === i);
         const backup = db;
         db = merged;
+        sortDb();
         adaSeeded = false;
         if (!saveDb()) { db = backup; return; }
         selectedIdx = -1;
@@ -727,6 +731,7 @@ function cloudGet() {
             a.findIndex(x => x.n === r.n && x.d === r.d) === i);
         const backup = db;
         db = merged;
+        sortDb();
         adaSeeded = seeded;
         if (!saveDb()) { db = backup; return; }
         selectedIdx = -1;
