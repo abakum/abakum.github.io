@@ -179,11 +179,24 @@ const TITHI_BASE = ["пратипада", "двитья", "трития", "ча�
 const tithiName = n => n === 15 ? "пурнима" : n === 30 ? "амавасья" : TITHI_BASE[(n - 1) % 15];
 
 function tithiMid(t, n) {
-    const target = n - 0.5;
+    const m = moonNew(t);
+    let x = m.phase * 30; // Абсолютная фаза луны (от 0 до 30)
+    
+    const nInt = Math.floor(x);
+    let posInTithi = x - nInt; // Позиция внутри Титхи: от 0.0 (начало) до 1.0 (конец)
+    
+    // Оставляем небольшой буфер (0.1) от краев на случай погрешностей UTC/високосных секунд,
+    // но в остальном используем РЕАЛЬНОЕ время рождения!
+    const BUFFER = 0.1;
+    if (posInTithi < BUFFER) posInTithi = BUFFER;
+    if (posInTithi > 1 - BUFFER) posInTithi = 1 - BUFFER;
+    
+    const target = nInt + posInTithi; // Вместо старого n - 0.5
+
     const f = d => {
-        let x = moonNew(d).phase * 30;
-        if (x < target - 15) x += 30;
-        return x - target;
+        let y = moonNew(d).phase * 30;
+        if (y < target - 15) y += 30;
+        return y - target;
     };
     let lo = t.getTime() - 86400000;
     let hi = t.getTime() + 86400000;
