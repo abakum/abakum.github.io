@@ -316,7 +316,7 @@ function loadDb() {
         const raw = localStorage.getItem(DB_KEY);
         if (raw) {
             const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) db = parsed.filter(validRecord);
+            if (Array.isArray(parsed)) { db = parsed.filter(validRecord); sortDb(); }
         }
     } catch (e) { }
     if (db.length === 0) {
@@ -420,10 +420,14 @@ function submitRecord() {
         note = city + " " + pad(hh, 2) + ":" + pad(mm, 2) + " → МСК " + pad(rec.h, 2) + ":" + pad(rec.m, 2)
             + (rec.d !== d ? " " + rec.d : "");
     }
+    const sel = selectedIdx >= 0 ? db[selectedIdx] : null;
     if (editingIdx >= 0) {
         const old = db[editingIdx];
         db[editingIdx] = rec;
-        if (!saveDb()) { db[editingIdx] = old; return; }
+        sortDb();
+        selectedIdx = sel ? db.indexOf(sel) : -1;
+        editingIdx = db.indexOf(rec);
+        if (!saveDb()) { db[db.indexOf(rec)] = old; sortDb(); selectedIdx = sel ? db.indexOf(sel) : -1; editingIdx = db.indexOf(old); return; }
         cancelEdit();
     } else {
         if (adaSeeded) {
@@ -431,11 +435,10 @@ function submitRecord() {
             db = [];
         }
         db.push(rec);
-        if (!saveDb()) { db.pop(); return; }
+        sortDb();
+        selectedIdx = sel ? db.indexOf(sel) : -1;
+        if (!saveDb()) { db.splice(db.indexOf(rec), 1); selectedIdx = sel ? db.indexOf(sel) : -1; return; }
     }
-    const sel = selectedIdx >= 0 ? db[selectedIdx] : null;
-    sortDb();
-    selectedIdx = sel ? db.indexOf(sel) : -1;
     document.getElementById("fName").value = "";
     document.getElementById("fDate").value = "";
     document.getElementById("fCity").value = "";
