@@ -530,16 +530,16 @@ function renderResult() {
     document.getElementById("resultTitle").textContent = r.n;
     const ta = document.getElementById("resultText");
     ta.value = text;
+    document.getElementById("resultSec").style.display = "block";
     const lines = text.split("\n").length;
     ta.style.height = "";
     ta.rows = 1;
     const base = ta.offsetHeight;
     ta.rows = 2;
     const lineH = ta.offsetHeight - base;
-    ta.style.height = (base + (lines - 2) * lineH) + "px";
+    ta.style.height = Math.floor(base + (lines - 2) * lineH) + "px";
     ta.scrollTop = 0;
     showQr(document.getElementById("resultQr"), text);
-    document.getElementById("resultSec").style.display = "block";
 }
 
 function hideResult() {
