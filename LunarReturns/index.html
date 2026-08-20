@@ -60,11 +60,18 @@
         #status { color: #555; min-height: 1.2em; overflow-wrap: anywhere; }
         #status.error { color: #c62828; }
         .btnrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
+        #cols { display: block; }
+        @media (min-width: 900px) and (orientation: landscape) {
+            body { max-width: 1280px; }
+            #cols { display: flex; gap: 12px; align-items: flex-start; }
+            #cols > section { flex: 1 1 0; min-width: 0; margin-bottom: 12px; }
+        }
     </style>
 </head>
 <body>
     <h1><img src="1f319.webp" alt="🌙" width="24" height="24" style="vertical-align:-3px;"> Лунно-солнечные юбилеи</h1>
 
+<div id="cols">
     <section>
         <form id="recForm" class="btnrow" onsubmit="submitRecord(); return false;">
             <input type="text" id="fName" maxlength="64" placeholder="Имя" style="flex:1 1 8em;">
@@ -104,6 +111,7 @@
         </div>
         <div class="qr" id="resultQr"></div>
     </section>
+</div>
 
     <p id="status">Годы, когда обычный солнечный день рождения совпадает с лунным днем рождения (ведическим Титхи), называют лунно-солнечными юбилеями. В этот день Солнце (дух) и Луна (душа) встают в те же позиции относительно друг друга, что и в миг вашего первого вздоха. Юбилей может произойти уже через 11 лет (субметонов цикл), но это случается лишь с теми, кто родился в первые 4 часа титхи, и если на эти 11 лет выпало ровно 2 високосных года. Остальным юбилей придётся ждать 19 лет (Метонов цикл).</p>
 
@@ -498,7 +506,8 @@ function selectRecord(i) {
     selectedIdx = i;
     renderList();
     renderResult();
-    document.getElementById("resultSec").scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!matchMedia("(min-width: 900px) and (orientation: landscape)").matches)
+        document.getElementById("resultSec").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderResult() {
