@@ -99,14 +99,11 @@
         <div id="dbQr" class="qr"></div>
     </section>
 
-    <section id="detailSec" style="display:none;">
-        <label><input type="checkbox" id="detailChk" onchange="renderResult()"> Подробней</label>
-    </section>
-
     <section id="resultSec" style="display:none;">
         <h2 id="resultTitle"></h2>
         <textarea id="resultText" rows="12" readonly></textarea>
         <div class="btnrow">
+            <button type="button" id="detailBtn" onclick="toggleDetail()" title="Сжато">⋯</button>
             <button onclick="copyResult()" title="Копировать текст">⎘</button>
         </div>
         <div class="qr" id="resultQr"></div>
@@ -138,6 +135,7 @@ let db = [];
 let adaSeeded = false;
 let selectedIdx = -1;
 let editingIdx = -1;
+let detailMode = false;
 let yandexToken = "";
 
 function moonNew(date) {
@@ -274,7 +272,7 @@ function la(birth) {
         if (z0 === z) c++; else z = SPACE;
         let v = chineseZodiacName(bd, false);
         if (v0 === v) c++; else v = "";
-        if (i >= f && c > 0 || (document.getElementById("detailChk").checked ? c > 0 : c > 1) && i < 90) {
+        if (i >= f && c > 0 || (detailMode ? c > 0 : c > 1) && i < 90) {
             years.push("#" + bd.getUTCFullYear() + yl + " " + w + p + z + v);
             if (i > f && c > 0) fc++;
         }
@@ -510,6 +508,14 @@ function selectRecord(i) {
         document.getElementById("resultSec").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function toggleDetail() {
+    detailMode = !detailMode;
+    const btn = document.getElementById("detailBtn");
+    btn.textContent = detailMode ? "⋮" : "⋯";
+    btn.title = detailMode ? "Подробно" : "Сжато";
+    renderResult();
+}
+
 function renderResult() {
     const i = selectedIdx;
     if (i < 0 || i >= db.length) { hideResult(); return; }
@@ -520,16 +526,16 @@ function renderResult() {
     const t = new Date(Date.UTC(y, mo - 1, d, h, m, 0));
     const text = r.n + " " + r.d + (hasTime(r) ? " " + timeLabel(r) : "") + "\n" + la(t).join("\n");
     document.getElementById("resultTitle").textContent = r.n;
-    document.getElementById("resultText").value = text;
-    document.getElementById("resultText").rows = text.split("\n").length;
+    const ta = document.getElementById("resultText");
+    ta.value = text;
+    ta.scrollTop = 0;
+    ta.rows = Math.max(text.split("\n").length - 1, 1);
     showQr(document.getElementById("resultQr"), text);
-    document.getElementById("detailSec").style.display = "block";
     document.getElementById("resultSec").style.display = "block";
 }
 
 function hideResult() {
     document.getElementById("resultSec").style.display = "none";
-    document.getElementById("detailSec").style.display = "none";
 }
 
 function showQr(el, text) {
