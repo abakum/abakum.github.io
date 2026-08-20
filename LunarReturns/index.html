@@ -530,10 +530,14 @@ function renderResult() {
     document.getElementById("resultTitle").textContent = r.n;
     const ta = document.getElementById("resultText");
     ta.value = text;
-    ta.scrollTop = 0;
     const lines = text.split("\n").length;
+    ta.style.height = "";
     ta.rows = 1;
-    ta.style.height = (lines - 1) * 1.2 + "em";
+    const base = ta.offsetHeight;
+    ta.rows = 2;
+    const lineH = ta.offsetHeight - base;
+    ta.style.height = (base + (lines - 2) * lineH) + "px";
+    ta.scrollTop = 0;
     showQr(document.getElementById("resultQr"), text);
     document.getElementById("resultSec").style.display = "block";
 }
