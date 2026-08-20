@@ -64,10 +64,6 @@
 </head>
 <body>
     <h1><img src="1f319.webp" alt="🌙" width="24" height="24" style="vertical-align:-3px;"> Лунно-солнечные юбилеи</h1>
-    <p>Годы, когда обычный солнечный день рождения совпадает с лунным днем рождения (ведическим Титхи), называют лунно-солнечными юбилеями.</p>
-    <p>В этот день Солнце (дух) и Луна (душа) встают в те же позиции относительно друг друга, что и в миг вашего первого вздоха.</p>
-    <p>Юбилей может произойти уже через 11 лет (субметонов цикл), но это случается лишь с теми, кто родился в первые 4 часа титхи, и если на эти 11 лет выпало ровно 2 високосных года.</p>
-    <p>Остальным юбилей придётся ждать 19 лет (Метонов цикл).</p>
 
     <section>
         <form id="recForm" class="btnrow" onsubmit="submitRecord(); return false;">
@@ -78,6 +74,7 @@
                 <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:3em;">
             </span>
             <button id="addBtn" type="submit" title="Добавить">➕</button>
+            <button type="button" id="delBtn" onclick="deleteCurrent()" title="Удалить" style="display:none;">➖</button>
         </form>
         <div class="btnrow">
             <select id="fCity" style="flex:1 1 100%;"></select>
@@ -87,11 +84,16 @@
             <button id="loginBtn" onclick="loginYandex()" title="Войти через Яндекс">🔑</button>
             <button id="cloudPutBtn" onclick="cloudPut()" title="Сохранить базу в облако" style="display:none;">📤</button>
             <button id="cloudGetBtn" onclick="cloudGet()" title="Загрузить базу из облака" style="display:none;">📥</button>
+            <button onclick="clearDb()" title="Очистить всю базу">❌</button>
             <button onclick="pasteDb()" title="Вставить базу из буфера">📋</button>
             <button onclick="showDbQr()" title="Показать базу как QR">⛶</button>
             <button onclick="copyDb()" title="Скопировать базу">⎘</button>
         </div>
         <div id="dbQr" class="qr"></div>
+    </section>
+
+    <section id="detailSec" style="display:none;">
+        <label><input type="checkbox" id="detailChk" onchange="renderResult()"> Подробней</label>
     </section>
 
     <section id="resultSec" style="display:none;">
@@ -103,7 +105,7 @@
         <div class="qr" id="resultQr"></div>
     </section>
 
-    <p id="status"></p>
+    <p id="status">Годы, когда обычный солнечный день рождения совпадает с лунным днем рождения (ведическим Титхи), называют лунно-солнечными юбилеями. В этот день Солнце (дух) и Луна (душа) встают в те же позиции относительно друг друга, что и в миг вашего первого вздоха. Юбилей может произойти уже через 11 лет (субметонов цикл), но это случается лишь с теми, кто родился в первые 4 часа титхи, и если на эти 11 лет выпало ровно 2 високосных года. Остальным юбилей придётся ждать 19 лет (Метонов цикл).</p>
 
 <script>
 const YANDEX_CLIENT_ID = "6abbc1008e0b40a4910c287ed145e86b";
@@ -181,36 +183,6 @@ const TITHI_BASE = ["пратипада", "двитья", "трития", "ча�
     "саптами", "аштами", "навами", "дашами", "экадаши", "двадаши", "трайодаши", "чатурдаши"];
 const tithiName = n => n === 15 ? "пурнима" : n === 30 ? "амавасья" : TITHI_BASE[(n - 1) % 15];
 
-function tithiMid(t, n) {
-    return t;
-    const m = moonNew(t);
-    let x = m.phase * 30; // Абсолютная фаза луны (от 0 до 30)
-    
-    const nInt = Math.floor(x);
-    let posInTithi = x - nInt; // Позиция внутри Титхи: от 0.0 (начало) до 1.0 (конец)
-    
-    // Оставляем небольшой буфер (0.1) от краев на случай погрешностей UTC/високосных секунд,
-    // но в остальном используем РЕАЛЬНОЕ время рождения!
-    const BUFFER = 0.1;
-    if (posInTithi < BUFFER) posInTithi = BUFFER;
-    if (posInTithi > 1 - BUFFER) posInTithi = 1 - BUFFER;
-    
-    const target = nInt + posInTithi; // Вместо старого n - 0.5
-
-    const f = d => {
-        let y = moonNew(d).phase * 30;
-        if (y < target - 15) y += 30;
-        return y - target;
-    };
-    let lo = t.getTime() - 86400000;
-    let hi = t.getTime() + 86400000;
-    for (let i = 0; i < 40; i++) {
-        const mid = (lo + hi) / 2;
-        if (f(new Date(mid)) < 0) lo = mid; else hi = mid;
-    }
-    return new Date((lo + hi) / 2);
-}
-
 const MZODIAC_ICON = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"];
 const MZODIAC_RU = ["овен", "телец", "близнецы", "рак", "лев", "дева", "весы", "скорпион", "стрелец", "козерог", "водолей", "рыбы"];
 const norm360 = a => a - 360 * Math.floor(a / 360);
@@ -261,8 +233,7 @@ const hashTag = s => "#" + s.toLowerCase().replace(/ /g, "_");
 const addYears = (t, i) => new Date(Date.UTC(t.getUTCFullYear() + i, t.getUTCMonth(), t.getUTCDate(), t.getUTCHours(), t.getUTCMinutes(), 0));
 
 function la(birth) {
-    const tMid = tithiMid(birth, tithiInt(moonNew(birth)));
-    const mMid = moonNew(tMid);
+    const mMid = moonNew(birth);
     const n0 = tithiInt(mMid);
     const p0 = phaseName(n0, false);
     const z0 = moonZodiacName(mMid, false);
@@ -285,7 +256,7 @@ function la(birth) {
     let fc = 0;
     for (let i = 1; fc < 1; i++) {
         const bd = addYears(birth, i);
-        const m = moonNew(addYears(tMid, i));
+        const m = moonNew(addYears(birth, i));
         let c = 0;
         let [w] = wdLocale(bd);
         if (w0 === w) c++; else w = SPACE;
@@ -295,7 +266,7 @@ function la(birth) {
         if (z0 === z) c++; else z = SPACE;
         let v = chineseZodiacName(bd, false);
         if (v0 === v) c++; else v = "";
-        if (i >= f && c > 0 || c > 1 && i < 90) {
+        if (i >= f && c > 0 || (document.getElementById("detailChk").checked ? c > 0 : c > 1) && i < 90) {
             years.push("#" + bd.getUTCFullYear() + yl + " " + w + p + z + v);
             if (i > f && c > 0) fc++;
         }
@@ -356,6 +327,7 @@ function refreshDbQr() {
 function renderList() {
     const list = document.getElementById("list");
     list.innerHTML = "";
+    document.getElementById("delBtn").style.display = (editingIdx >= 0 || selectedIdx >= 0) ? "" : "none";
     db.forEach((r, i) => {
         const row = document.createElement("div");
         row.className = "row" + (i === selectedIdx ? " selected" : "");
@@ -365,16 +337,8 @@ function renderList() {
         const d = document.createElement("span");
         d.className = "d";
         d.textContent = r.d + (hasTime(r) ? " " + timeLabel(r) : "");
-        const edit = document.createElement("button");
-        edit.textContent = "✏️";
-        edit.title = "Изменить";
-        edit.onclick = e => { e.stopPropagation(); startEdit(i); };
-        const del = document.createElement("button");
-        del.textContent = "❌";
-        del.title = "Удалить";
-        del.onclick = e => { e.stopPropagation(); removeRecord(i); };
-        row.append(n, d, edit, del);
-        row.onclick = () => selectRecord(i);
+        row.append(n, d);
+        row.onclick = () => { selectRecord(i); startEdit(i); };
         list.appendChild(row);
     });
 }
@@ -483,6 +447,15 @@ function removeRecord(i) {
     status("Удалено. Записей: " + db.length);
 }
 
+function deleteCurrent() {
+    const i = editingIdx >= 0 ? editingIdx : selectedIdx;
+    if (i < 0) {
+        status("Сначала выберите запись", true);
+        return;
+    }
+    removeRecord(i);
+}
+
 function hasTime(r) {
     return Number.isInteger(r.h) || Number.isInteger(r.m);
 }
@@ -524,6 +497,13 @@ function timeLabel(r) {
 function selectRecord(i) {
     selectedIdx = i;
     renderList();
+    renderResult();
+    document.getElementById("resultSec").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderResult() {
+    const i = selectedIdx;
+    if (i < 0 || i >= db.length) { hideResult(); return; }
     const r = db[i];
     const [y, mo, d] = r.d.split("-").map(Number);
     const h = Number.isInteger(r.h) ? r.h : 12;
@@ -534,11 +514,13 @@ function selectRecord(i) {
     document.getElementById("resultText").value = text;
     document.getElementById("resultText").rows = text.split("\n").length;
     showQr(document.getElementById("resultQr"), text);
+    document.getElementById("detailSec").style.display = "block";
     document.getElementById("resultSec").style.display = "block";
 }
 
 function hideResult() {
     document.getElementById("resultSec").style.display = "none";
+    document.getElementById("detailSec").style.display = "none";
 }
 
 function showQr(el, text) {
@@ -602,6 +584,21 @@ function showDbQr() {
     }
     showQr(el, json);
     status("QR базы: " + byteLen(json) + "/" + QR_MAX_BYTES + " байт, записей: " + db.length);
+}
+
+function clearDb() {
+    if (db.length === 0) { status("База уже пуста", true); return; }
+    if (!confirm("Удалить ВСЕ записи (" + db.length + ")?")) return;
+    db = [];
+    adaSeeded = false;
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
+    selectedIdx = -1;
+    editingIdx = -1;
+    cancelEdit();
+    hideResult();
+    renderList();
+    refreshDbQr();
+    status("База очищена");
 }
 
 function pasteDb() {
