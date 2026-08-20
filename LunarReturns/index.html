@@ -209,15 +209,11 @@ function tithiMid(t, n) {
 
 const MZODIAC_ICON = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"];
 const MZODIAC_RU = ["овен", "телец", "близнецы", "рак", "лев", "дева", "весы", "скорпион", "стрелец", "козерог", "водолей", "рыбы"];
-const ZODIAC_BORDER_W = 1.5;
 const norm360 = a => a - 360 * Math.floor(a / 360);
 function moonZodiacInt(m) {
     return Math.floor(norm360(m.longitude) / 30) % 12;
 }
-function moonZodiacBorderDist(m) {
-    const b = norm360(m.longitude) % 30;
-    return Math.min(b, 30 - b);
-}
+
 const moonZodiacName = (m, ru) => (ru ? MZODIAC_RU : MZODIAC_ICON)[moonZodiacInt(m)];
 
 const ZODIAC_ICON = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"];
@@ -266,7 +262,6 @@ function la(birth) {
     const n0 = tithiInt(mMid);
     const p0 = phaseName(n0, false);
     const z0 = moonZodiacName(mMid, false);
-    const z0Sure = moonZodiacBorderDist(mMid) >= ZODIAC_BORDER_W;
     const [w0, wh] = wdLocale(birth);
     const s0 = sunZodiacNames(birth, false)[0];
     const v0 = chineseZodiacName(birth, false);
@@ -293,7 +288,7 @@ function la(birth) {
         let p = SPACE;
         if (tithiInt(m) === n0) { c++; p = p0; }
         let z = moonZodiacName(m, false);
-        if (z0Sure && moonZodiacBorderDist(m) >= ZODIAC_BORDER_W && z0 === z) c++; else z = SPACE;
+        if (z0 === z) c++; else z = SPACE;
         let v = chineseZodiacName(bd, false);
         if (v0 === v) c++; else v = "";
         if (i >= f && c > 0 || c > 1 && i < 90) {
