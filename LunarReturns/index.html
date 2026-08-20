@@ -112,7 +112,10 @@
     </section>
 </div>
 
-    <p id="status">Годы, когда обычный солнечный день рождения совпадает с лунным днем рождения (ведическим Титхи), называют лунно-солнечными юбилеями. В этот день Солнце (дух) и Луна (душа) встают в те же позиции относительно друг друга, что и в миг вашего первого вздоха. Юбилей может произойти уже через 11 лет (субметонов цикл), но это случается лишь с теми, кто родился в первые 4 часа титхи, и если на эти 11 лет выпало ровно 2 високосных года. Остальным юбилей придётся ждать 19 лет (Метонов цикл).</p>
+    <p id="status">Годы, когда обычный солнечный день рождения совпадает с лунным днем рождения (ведическим Титхи), называют лунно-солнечными юбилеями.
+ В этот день Солнце (дух) и Луна (душа) воссоединяются как в миг Вашего первого вздоха.
+ Юбилей может произойти уже через 11 лет (субметонов цикл), но это случается лишь с теми, кто родился в первые 4 часа титхи, и если на эти 11 лет выпало ровно 2 високосных года.
+ Остальным юбилей придётся ждать 19 лет (Метонов цикл).</p>
 
 <script>
 const YANDEX_CLIENT_ID = "6abbc1008e0b40a4910c287ed145e86b";
@@ -534,12 +537,9 @@ function renderResult() {
     const lines = text.split("\n").length;
     ta.style.height = "";
     ta.rows = lines;
-    ta.style.height = "auto";
-    const full = ta.scrollHeight;
-    ta.rows = 1;
-    const one = ta.scrollHeight;
-    const lineH = (full - one) / (lines - 1);
-    ta.style.height = Math.ceil(full - lineH) + "px";
+    const full = ta.offsetHeight;
+    const lineH = parseFloat(getComputedStyle(ta).lineHeight);
+    ta.style.height = (detailMode ? full : Math.ceil(full - lineH)) + "px";
     ta.scrollTop = 0;
     showQr(document.getElementById("resultQr"), text);
 }
