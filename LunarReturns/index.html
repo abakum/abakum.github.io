@@ -533,11 +533,13 @@ function renderResult() {
     document.getElementById("resultSec").style.display = "block";
     const lines = text.split("\n").length;
     ta.style.height = "";
+    ta.rows = lines;
+    ta.style.height = "auto";
+    const full = ta.scrollHeight;
     ta.rows = 1;
-    const base = ta.offsetHeight;
-    ta.rows = 2;
-    const lineH = ta.offsetHeight - base;
-    ta.style.height = Math.floor(base + (lines - 2) * lineH) + "px";
+    const one = ta.scrollHeight;
+    const lineH = (full - one) / (lines - 1);
+    ta.style.height = Math.ceil(full - lineH) + "px";
     ta.scrollTop = 0;
     showQr(document.getElementById("resultQr"), text);
 }
