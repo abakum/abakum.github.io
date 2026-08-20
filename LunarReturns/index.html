@@ -539,7 +539,7 @@ function renderResult() {
     ta.rows = lines;
     const full = ta.offsetHeight;
     const lineH = parseFloat(getComputedStyle(ta).lineHeight);
-    ta.style.height = (detailMode ? full : Math.ceil(full - lineH)) - 2 + "px";
+    ta.style.height = (detailMode ? full : Math.ceil(full - lineH) - 2) + "px";
     ta.scrollTop = 0;
     showQr(document.getElementById("resultQr"), text);
 }
