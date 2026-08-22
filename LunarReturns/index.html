@@ -77,10 +77,10 @@
     <section>
         <form id="recForm" class="btnrow" onsubmit="submitRecord(); return false;">
             <input type="text" id="fName" maxlength="64" placeholder="Имя" style="flex:1 1 8em;">
-            <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;" title="Дата и время — по местному времени места рождения">
-                <input type="date" id="fDate" style="width:9em;" title="Дата — по местному времени места рождения">
-                <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:3em;" title="Час — по местному времени места рождения">
-                <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:3em;" title="Минуты — по местному времени места рождения">
+            <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;" title="Дата — по времени места рождения">
+                <input type="date" id="fDate" style="width:9em;" title="Дата — по времени места рождения">
+                <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:3em;" title="Час — по времени места рождения">
+                <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:3em;" title="Минуты — по времени места рождения">
             </span>
             <button id="addBtn" type="submit" title="Добавить">➕</button>
             <button type="button" id="delBtn" onclick="deleteCurrent()" title="Удалить" style="display:none;">➖</button>
