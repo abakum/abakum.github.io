@@ -1012,12 +1012,11 @@ function checkOAuthHash() {
     if (!pdConsentGiven()) { history.replaceState(null, "", location.pathname); return; }
     yandexToken = decodeURIComponent(m[1]);
     history.replaceState(null, "", location.pathname);
-    document.getElementById("cloudPutBtn").style.display = "";
-    document.getElementById("cloudGetBtn").style.display = "";
     const lb = document.getElementById("loginBtn");
     lb.textContent = "🔒";
     lb.title = "Выйти";
     lb.onclick = logoutYandex;
+    applyPdConsent();
     status("Вход через Яндекс выполнен");
 }
 
