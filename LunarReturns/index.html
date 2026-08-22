@@ -77,10 +77,10 @@
     <section>
         <form id="recForm" class="btnrow" onsubmit="submitRecord(); return false;">
             <input type="text" id="fName" maxlength="64" placeholder="Имя" style="flex:1 1 8em;">
-            <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
-                <input type="date" id="fDate" style="width:9em;">
-                <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:3em;">
-                <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:3em;">
+            <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;" title="Дата и время — по местному времени места рождения">
+                <input type="date" id="fDate" style="width:9em;" title="Дата — по местному времени места рождения">
+                <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:3em;" title="Час — по местному времени места рождения">
+                <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:3em;" title="Минуты — по местному времени места рождения">
             </span>
             <button id="addBtn" type="submit" title="Добавить">➕</button>
             <button type="button" id="delBtn" onclick="deleteCurrent()" title="Удалить" style="display:none;">➖</button>
@@ -119,6 +119,14 @@
     </section>
 </div>
 
+    <label style="display:block; font-size:0.9em; color:#555;">
+        <input type="checkbox" id="pdConsent">
+        Согласен(на) на хранения моих персональных данных (ПДн: имена и даты рождения) и ПДн третьих лиц в Яндекс.Облаке (🔑📤) согласно 152-ФЗ и GDPR. Отзыв согласия удаляет ПДн из Яндекс.Облака.
+    </label>
+    <p id="pdLocalNote" style="display:none; font-size:0.9em; color:#555;">
+        ПДн хранятся только локально в браузере на устройстве пользователя.
+    </p>
+
     <p id="status">Годы, когда обычный солнечный день рождения совпадает с лунным днем рождения (ведическим Титхи), называют лунно-солнечными юбилеями. В этот день Солнце (дух) и Луна (душа) воссоединяются как в миг Вашего первого вздоха. 
 <br>
 Юбилей может произойти уже через <b>11 лет</b>, но это случается лишь с теми, кто родился в первые 4 часа титхи, и если на эти 11 лет выпало ровно 2 високосных года. Остальным юбилей придётся ждать <b>19 лет</b>.
@@ -132,6 +140,7 @@
 const YANDEX_CLIENT_ID = "6abbc1008e0b40a4910c287ed145e86b";
 const FUNCTION_URL = "https://functions.yandexcloud.net/d4erotuod7vp1l2k59in";
 const DB_KEY = "lunarreturns.db";
+const PD_CONSENT_KEY = "lunarreturns.pdConsent";
 const QR_MAX_BYTES = 2953;
 const SPACE = "\u2002\u2004";
 const WIDE_SPACE = "\u2003\u2004";
@@ -913,7 +922,78 @@ function pasteDb() {
     }, () => status("Не удалось прочитать буфер обмена", true));
 }
 
+function pdConsentGiven() {
+    return localStorage.getItem(PD_CONSENT_KEY) === "1";
+}
+
+function applyPdConsent() {
+    const lb = document.getElementById("loginBtn");
+    const note = document.getElementById("pdLocalNote");
+    if (pdConsentGiven()) {
+        lb.style.display = "";
+        note.style.display = "none";
+        if (yandexToken) {
+            document.getElementById("cloudPutBtn").style.display = "";
+            document.getElementById("cloudGetBtn").style.display = "";
+        } else {
+            lb.textContent = "🔑";
+            lb.title = "Войти через Яндекс";
+            lb.onclick = loginYandex;
+        }
+    } else {
+        yandexToken = "";
+        lb.style.display = "none";
+        document.getElementById("cloudPutBtn").style.display = "none";
+        document.getElementById("cloudGetBtn").style.display = "none";
+        note.style.display = "";
+    }
+}
+
+function cloudDelete(token) {
+    cloudPresign("put", token).then(data =>
+        fetch(data.url, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: "[]"
+        })
+    ).then(resp => {
+        if (!resp.ok) return resp.text().then(t => {
+            throw new Error("S3 вернул " + resp.status + ": " + t.slice(0, 200));
+        });
+        status("Согласие отозвано: ПДн удалены из облака. Локальная база сохранена");
+    }).catch(e => status("Не удалось удалить ПДн из облака (" + e.message + ") — повторите отзыв согласия: поставьте и снова снимите галочку", true));
+}
+
+function initPdConsent() {
+    const cb = document.getElementById("pdConsent");
+    cb.checked = pdConsentGiven();
+    cb.addEventListener("change", () => {
+        if (cb.checked) {
+            localStorage.setItem(PD_CONSENT_KEY, "1");
+            applyPdConsent();
+            return;
+        }
+        localStorage.removeItem(PD_CONSENT_KEY);
+        if (yandexToken) {
+            if (confirm("Удалить ПДн из Яндекс.Облака? Локальная база сохранится.")) {
+                const token = yandexToken;
+                applyPdConsent();
+                cloudDelete(token);
+            } else {
+                cb.checked = true;
+            }
+        } else {
+            applyPdConsent();
+        }
+    });
+    applyPdConsent();
+}
+
 function loginYandex() {
+    if (!pdConsentGiven()) {
+        status("Для облачного хранения требуется согласие", true);
+        return;
+    }
     if (!YANDEX_CLIENT_ID) {
         status("YANDEX_CLIENT_ID не задан — зарегистрируйте приложение, см. README.md", true);
         return;
@@ -927,6 +1007,7 @@ function loginYandex() {
 function checkOAuthHash() {
     const m = location.hash.match(/access_token=([^&]+)/);
     if (!m) return;
+    if (!pdConsentGiven()) { history.replaceState(null, "", location.pathname); return; }
     yandexToken = decodeURIComponent(m[1]);
     history.replaceState(null, "", location.pathname);
     document.getElementById("cloudPutBtn").style.display = "";
@@ -942,6 +1023,7 @@ function logoutYandex() {
     yandexToken = "";
     document.getElementById("cloudPutBtn").style.display = "none";
     document.getElementById("cloudGetBtn").style.display = "none";
+    if (!pdConsentGiven()) return;
     const lb = document.getElementById("loginBtn");
     lb.textContent = "🔑";
     lb.title = "Войти через Яндекс";
@@ -949,19 +1031,20 @@ function logoutYandex() {
     status("Вы вышли из аккаунта");
 }
 
-function cloudPresign(action) {
+function cloudPresign(action, token) {
+    token = token || yandexToken;
     if (!FUNCTION_URL) {
         status("FUNCTION_URL не задан — разверните функцию, см. README.md", true);
         return Promise.reject();
     }
-    if (!yandexToken) {
+    if (!token) {
         status("Сначала войдите через Яндекс", true);
         return Promise.reject();
     }
     return fetch(FUNCTION_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: yandexToken, action })
+        body: JSON.stringify({ token, action })
     }).then(resp => {
         if (!resp.ok) throw new Error("функция вернула " + resp.status);
         return resp.json();
@@ -1040,6 +1123,7 @@ function cloudGet() {
 loadDb();
 renderList();
 renderCitySelect();
+initPdConsent();
 checkOAuthHash();
 </script>
 </body>
