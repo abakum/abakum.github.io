@@ -121,7 +121,7 @@
 
     <label style="display:block; font-size:0.9em; color:#555;">
         <input type="checkbox" id="pdConsent">
-        Согласен(на) на хранения моих персональных данных (ПДн: имена и даты рождения) и ПДн третьих лиц в Яндекс.Облаке (🔑📤) согласно 152-ФЗ и GDPR. Отзыв согласия удаляет ПДн из Яндекс.Облака.
+        Согласен(на) на хранения моих персональных данных (ПДн: имена и даты рождения) и ПДн третьих лиц в Яндекс.Облаке (🔑📤) согласно 152-ФЗ и GDPR. <span id="pdWithdrawNote" style="display:none;">Отзыв согласия удаляет ПДн из Яндекс.Облака.</span>
     </label>
     <p id="pdLocalNote" style="display:none; font-size:0.9em; color:#555;">
         ПДн хранятся только локально в браузере на устройстве пользователя.
@@ -935,6 +935,7 @@ function applyPdConsent() {
         if (yandexToken) {
             document.getElementById("cloudPutBtn").style.display = "";
             document.getElementById("cloudGetBtn").style.display = "";
+            document.getElementById("pdWithdrawNote").style.display = "";
         } else {
             lb.textContent = "🔑";
             lb.title = "Войти через Яндекс";
@@ -945,6 +946,7 @@ function applyPdConsent() {
         lb.style.display = "none";
         document.getElementById("cloudPutBtn").style.display = "none";
         document.getElementById("cloudGetBtn").style.display = "none";
+        document.getElementById("pdWithdrawNote").style.display = "none";
         note.style.display = "";
     }
 }
