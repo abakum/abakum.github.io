@@ -1024,6 +1024,7 @@ function logoutYandex() {
     yandexToken = "";
     document.getElementById("cloudPutBtn").style.display = "none";
     document.getElementById("cloudGetBtn").style.display = "none";
+    document.getElementById("pdWithdrawNote").style.display = "none";
     if (!pdConsentGiven()) return;
     const lb = document.getElementById("loginBtn");
     lb.textContent = "🔑";
