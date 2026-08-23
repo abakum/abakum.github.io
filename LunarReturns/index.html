@@ -63,6 +63,37 @@
         #status.error { color: #c62828; }
         .btnrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
         #cols { display: block; }
+        #pasteOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.4);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+        }
+        #pasteOverlay.open { display: flex; }
+        #pasteDialog {
+            background: #fff;
+            border: 1px solid #bbb;
+            border-radius: 8px;
+            padding: 12px;
+            max-width: 480px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        #pasteDialog h2 { margin-top: 0; }
+        #pasteDialog textarea {
+            width: 100%;
+            box-sizing: border-box;
+            font: inherit;
+            min-height: 100px;
+            margin: 6px 0;
+        }
+        #pasteDialog .btnrow {
+            justify-content: center;
+        }
         @media (min-width: 900px) and (orientation: landscape) {
             body { max-width: 1280px; }
             #cols { display: flex; gap: 12px; align-items: flex-start; }
@@ -108,6 +139,16 @@
         </div>
         <div id="dbQr" class="qr"></div>
     </section>
+
+    <div id="pasteOverlay" onclick="pasteOverlayBackdrop(event)">
+        <div id="pasteDialog">
+            <textarea id="pasteFallbackArea" placeholder="Вставьте JSON базы сюда"></textarea>
+            <div class="btnrow">
+                <button type="button" onclick="pasteFallbackImport()" title="Вставить и импортировать">📋</button>
+                <button type="button" onclick="hidePasteDialog()" title="Отмена">❌</button>
+            </div>
+        </div>
+    </div>
 
     <section id="resultSec" style="display:none;">
         <textarea id="resultText" rows="12" readonly></textarea>
@@ -890,36 +931,67 @@ function clearDb() {
 }
 
 function pasteDb() {
-    if (!navigator.clipboard || !navigator.clipboard.readText) {
-        status("Буфер обмена недоступен в этом браузере", true);
+    if (navigator.clipboard && navigator.clipboard.readText) {
+        navigator.clipboard.readText().then(text => {
+            importDbText(text);
+        }, () => showPasteDialog());
+    } else {
+        showPasteDialog();
+    }
+}
+
+function importDbText(text) {
+    let incoming;
+    try {
+        incoming = JSON.parse(text);
+    } catch (e) {
+        status("В буфере не JSON база данных", true);
         return;
     }
-    navigator.clipboard.readText().then(text => {
-        let incoming;
-        try {
-            incoming = JSON.parse(text);
-        } catch (e) {
-            status("В буфере не JSON база данных", true);
-            return;
-        }
-        if (!Array.isArray(incoming) || !incoming.every(validRecord)) {
-            status("Неверный формат базы", true);
-            return;
-        }
-        const replace = confirm("OK — заменить текущую базу (" + incoming.length + " зап.), Отмена — объединить");
-        const merged = replace ? incoming : db.concat(incoming).filter((r, i, a) =>
-            a.findIndex(x => x.n === r.n && x.d === r.d) === i);
-        const backup = db;
-        db = merged;
-        sortDb();
-        adaSeeded = false;
-        if (!saveDb()) { db = backup; return; }
-        selectedIdx = -1;
-        hideResult();
-        renderList();
-        refreshDbQr();
-        status("Записей: " + db.length + ", размер " + byteLen(JSON.stringify(db)) + "/" + QR_MAX_BYTES + " байт");
-    }, () => status("Не удалось прочитать буфер обмена", true));
+    if (!Array.isArray(incoming) || !incoming.every(validRecord)) {
+        status("Неверный формат базы", true);
+        return;
+    }
+    const replace = confirm("OK — заменить текущую базу (" + incoming.length + " зап.), Отмена — объединить");
+    const merged = replace ? incoming : db.concat(incoming).filter((r, i, a) =>
+        a.findIndex(x => x.n === r.n && x.d === r.d) === i);
+    const backup = db;
+    db = merged;
+    sortDb();
+    adaSeeded = false;
+    if (!saveDb()) { db = backup; return; }
+    selectedIdx = -1;
+    hideResult();
+    renderList();
+    refreshDbQr();
+    status("Записей: " + db.length + ", размер " + byteLen(JSON.stringify(db)) + "/" + QR_MAX_BYTES + " байт");
+}
+
+function showPasteDialog() {
+    const overlay = document.getElementById("pasteOverlay");
+    const area = document.getElementById("pasteFallbackArea");
+    area.value = "";
+    overlay.classList.add("open");
+    area.focus();
+}
+
+function hidePasteDialog() {
+    document.getElementById("pasteOverlay").classList.remove("open");
+}
+
+function pasteOverlayBackdrop(e) {
+    if (e.target === e.currentTarget) hidePasteDialog();
+}
+
+function pasteFallbackImport() {
+    const area = document.getElementById("pasteFallbackArea");
+    const text = area.value.trim();
+    if (!text) {
+        status("Вставьте данные в поле", true);
+        return;
+    }
+    hidePasteDialog();
+    importDbText(text);
 }
 
 function pdConsentGiven() {
