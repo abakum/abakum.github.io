@@ -4,6 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Лунно-солнечные юбилеи</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#f9f9f9">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
     <script src="qr/qrcode.js"></script>
     <style>
         body {
@@ -1199,6 +1202,8 @@ renderList();
 renderCitySelect();
 initPdConsent();
 checkOAuthHash();
+if ("serviceWorker" in navigator && location.protocol === "https:")
+    navigator.serviceWorker.register("./sw.js");
 </script>
 </body>
 </html>
