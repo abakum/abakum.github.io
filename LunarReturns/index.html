@@ -132,6 +132,7 @@
                 <button type="button" onclick="showHolidays('catholic')" title="Католические дни">✝️</button>
                 <button type="button" onclick="showHolidays('jewish')" title="Иудейские дни">✡️</button>
             </span>
+            <button id="pushBtn" onclick="togglePush()" title="Включить оповещения о днях рождения">🔕</button>
             <button id="loginBtn" onclick="loginYandex()" title="Войти через Яндекс">🔑</button>
             <button id="cloudPutBtn" onclick="cloudPut()" title="Сохранить базу в облако" style="display:none;">📤</button>
             <button id="cloudGetBtn" onclick="cloudGet()" title="Загрузить базу из облака" style="display:none;">📥</button>
@@ -183,6 +184,8 @@
 <script>
 const YANDEX_CLIENT_ID = "6abbc1008e0b40a4910c287ed145e86b";
 const FUNCTION_URL = "https://functions.yandexcloud.net/d4erotuod7vp1l2k59in";
+const PUSH_URL = "";
+const PUSH_PUBLIC_KEY = "";
 const DB_KEY = "lunarreturns.db";
 const PD_CONSENT_KEY = "lunarreturns.pdConsent";
 const QR_MAX_BYTES = 2953;
@@ -389,6 +392,8 @@ function saveDb() {
         return false;
     }
     localStorage.setItem(DB_KEY, json);
+    idbPutDb();
+    updatePushDates();
     return true;
 }
 
@@ -1197,11 +1202,114 @@ function cloudGet() {
     }).catch(e => status("Ошибка загрузки: " + e.message, true));
 }
 
+function b64urlToUint8(b64) {
+    const pad = "=".repeat((4 - b64.length % 4) % 4);
+    const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+    const arr = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return arr;
+}
+
+function idbOpen() {
+    return new Promise((res, rej) => {
+        const rq = indexedDB.open("lunarreturns", 1);
+        rq.onupgradeneeded = () => rq.result.createObjectStore("kv");
+        rq.onsuccess = () => res(rq.result);
+        rq.onerror = () => rej(rq.error);
+    });
+}
+
+async function idbPutDb() {
+    try {
+        const idb = await idbOpen();
+        await new Promise((res, rej) => {
+            const tx = idb.transaction("kv", "readwrite");
+            tx.objectStore("kv").put(JSON.stringify(db), "db");
+            tx.oncomplete = res;
+            tx.onerror = () => rej(tx.error);
+        });
+        idb.close();
+    } catch (e) { }
+}
+
+function dbDates() {
+    return db.map(r => r.d.slice(5));
+}
+
+function pushApi(action, payload) {
+    return fetch(PUSH_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.assign({ action: action }, payload))
+    }).then(r => {
+        if (!r.ok) throw new Error("функция вернула " + r.status);
+        return r.json();
+    });
+}
+
+function getPushSubscription() {
+    if (!("serviceWorker" in navigator) || !PUSH_URL) return Promise.resolve(null);
+    return navigator.serviceWorker.ready
+        .then(reg => reg.pushManager.getSubscription())
+        .catch(() => null);
+}
+
+function updatePushDates() {
+    if (!PUSH_URL) return;
+    getPushSubscription().then(sub => {
+        if (sub) pushApi("subscribe", { subscription: sub.toJSON(), dates: dbDates() }).catch(() => { });
+    });
+}
+
+async function togglePush() {
+    try {
+        if (!("serviceWorker" in navigator) || !PUSH_URL || !PUSH_PUBLIC_KEY) {
+            status("Оповещения недоступны (нет PUSH_URL или ключа)", true);
+            return;
+        }
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+            await sub.unsubscribe();
+            pushApi("unsubscribe", { endpoint: sub.endpoint }).catch(() => { });
+            status("Оповещения о днях рождения отключены");
+        } else {
+            if ((await Notification.requestPermission()) !== "granted") {
+                status("Разрешение на уведомления не выдано", true);
+                return;
+            }
+            const newSub = await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: b64urlToUint8(PUSH_PUBLIC_KEY)
+            });
+            await pushApi("subscribe", { subscription: newSub.toJSON(), dates: dbDates() });
+            status("Оповещения включены");
+        }
+    } catch (e) {
+        status("Ошибка оповещений: " + e.message, true);
+    }
+    refreshPushBtn();
+}
+
+function refreshPushBtn() {
+    const btn = document.getElementById("pushBtn");
+    if (!("serviceWorker" in navigator) || location.protocol !== "https:" || !PUSH_URL || !PUSH_PUBLIC_KEY) {
+        btn.style.display = "none";
+        return;
+    }
+    getPushSubscription().then(sub => {
+        btn.textContent = sub ? "🔔" : "🔕";
+        btn.title = sub ? "Отключить оповещения о днях рождения" : "Включить оповещения о днях рождения";
+    });
+}
+
 loadDb();
 renderList();
 renderCitySelect();
 initPdConsent();
 checkOAuthHash();
+refreshPushBtn();
+idbPutDb();
 if ("serviceWorker" in navigator && location.protocol === "https:")
     navigator.serviceWorker.register("./sw.js");
 </script>

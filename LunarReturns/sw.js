@@ -1,4 +1,4 @@
-const CACHE = "lunarreturns-v1";
+const CACHE = "lunarreturns-v2";
 const INSTALL_URLS = [
     "./",
     "./index.html",
@@ -21,6 +21,59 @@ self.addEventListener("activate", e => {
             .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
             .then(() => self.clients.claim())
     );
+});
+
+function readDb() {
+    return new Promise(res => {
+        const rq = indexedDB.open("lunarreturns", 1);
+        rq.onupgradeneeded = () => rq.result.createObjectStore("kv");
+        rq.onsuccess = () => {
+            const idb = rq.result;
+            try {
+                const rq2 = idb.transaction("kv").objectStore("kv").get("db");
+                rq2.onsuccess = () => { idb.close(); res(rq2.result || null); };
+                rq2.onerror = () => { idb.close(); res(null); };
+            } catch (e) { idb.close(); res(null); }
+        };
+        rq.onerror = () => res(null);
+    });
+}
+
+function todayMsk() {
+    return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Moscow" });
+}
+
+function birthdayNames(list) {
+    const iso = todayMsk();
+    const year = iso.slice(0, 4);
+    const today = iso.slice(5);
+    const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    const mds = [today];
+    if (today === "02-28" && !leap) mds.push("02-29");
+    return list.filter(r => r && typeof r.d === "string" && mds.includes(r.d.slice(5))).map(r => r.n);
+}
+
+self.addEventListener("push", e => {
+    e.waitUntil((async () => {
+        const raw = await readDb();
+        if (raw === null)
+            return self.registration.showNotification("День рождения", {
+                body: "Проверьте дни рождения в приложении",
+                tag: "bd"
+            });
+        let names = [];
+        try { names = birthdayNames(JSON.parse(raw)); } catch (err) { return; }
+        if (names.length)
+            return self.registration.showNotification("День рождения", {
+                body: names.join(", "),
+                tag: "bd"
+            });
+    })());
+});
+
+self.addEventListener("notificationclick", e => {
+    e.notification.close();
+    e.waitUntil(clients.openWindow("./"));
 });
 
 self.addEventListener("fetch", e => {
