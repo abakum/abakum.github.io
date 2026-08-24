@@ -1080,7 +1080,8 @@ function loginYandex() {
         status("YANDEX_CLIENT_ID не задан — зарегистрируйте приложение, см. README.md", true);
         return;
     }
-    const redirect = location.origin + location.pathname;
+    const redirect = location.origin
+        + location.pathname.replace(/index\.html$/, "");
     location = "https://oauth.yandex.ru/authorize?response_type=token&client_id="
         + encodeURIComponent(YANDEX_CLIENT_ID)
         + "&redirect_uri=" + encodeURIComponent(redirect);
