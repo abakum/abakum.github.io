@@ -1,4 +1,4 @@
-const CACHE = "lunarreturns-v2";
+const CACHE = "lunarreturns-v3";
 const INSTALL_URLS = [
     "./",
     "./index.html",
@@ -23,14 +23,14 @@ self.addEventListener("activate", e => {
     );
 });
 
-function readDb() {
+function readKey(key) {
     return new Promise(res => {
         const rq = indexedDB.open("lunarreturns", 1);
         rq.onupgradeneeded = () => rq.result.createObjectStore("kv");
         rq.onsuccess = () => {
             const idb = rq.result;
             try {
-                const rq2 = idb.transaction("kv").objectStore("kv").get("db");
+                const rq2 = idb.transaction("kv").objectStore("kv").get(key);
                 rq2.onsuccess = () => { idb.close(); res(rq2.result || null); };
                 rq2.onerror = () => { idb.close(); res(null); };
             } catch (e) { idb.close(); res(null); }
@@ -53,21 +53,25 @@ function birthdayNames(list) {
     return list.filter(r => r && typeof r.d === "string" && mds.includes(r.d.slice(5))).map(r => r.n);
 }
 
+function dayNames(list) {
+    const today = todayMsk().slice(5);
+    return (list || []).filter(r => r && typeof r.d === "string" && r.d === today && typeof r.n === "string").map(r => r.n);
+}
+
 self.addEventListener("push", e => {
     e.waitUntil((async () => {
-        const raw = await readDb();
-        if (raw === null)
-            return self.registration.showNotification("День рождения", {
-                body: "Проверьте дни рождения в приложении",
-                tag: "bd"
-            });
-        let names = [];
-        try { names = birthdayNames(JSON.parse(raw)); } catch (err) { return; }
-        if (names.length)
-            return self.registration.showNotification("День рождения", {
-                body: names.join(", "),
-                tag: "bd"
-            });
+        const [raw, rawDays] = await Promise.all([readKey("db"), readKey("days")]);
+        let names = [], days = [];
+        try { if (raw !== null) names = birthdayNames(JSON.parse(raw)); } catch (err) { }
+        try { if (rawDays !== null) days = dayNames(JSON.parse(rawDays)); } catch (err) { }
+        const all = names.concat(days);
+        if (!all.length) return;
+        const title = names.length && days.length ? "День рождения и события"
+            : names.length ? "День рождения" : "События";
+        return self.registration.showNotification(title, {
+            body: all.join(", "),
+            tag: "bd"
+        });
     })());
 });
 

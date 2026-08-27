@@ -41,18 +41,18 @@
             border: 1px solid #bbb;
             border-radius: 6px;
         }
-        #list div.row {
+        #list div.row, .days div.row {
             display: flex;
             align-items: center;
             gap: 6px;
             padding: 4px 6px;
             border-radius: 6px;
-            cursor: pointer;
         }
-        #list div.row:hover { background: #f0f0f0; }
+        #list div.row { cursor: pointer; }
+        #list div.row:hover, .days div.row:hover { background: #f0f0f0; }
         #list div.row.selected { background: #e8f5e9; }
-        #list span.n { flex: 1; }
-        #list span.d { color: #555; }
+        #list span.n, .days span.n { flex: 1; }
+        #list span.d, .days span.d { color: #555; }
         #resultText {
             width: 100%;
             box-sizing: border-box;
@@ -105,7 +105,7 @@
     </style>
 </head>
 <body>
-    <h1><img src="1f319.webp" alt="🌙" width="24" height="24" style="vertical-align:-3px;"> Лунно-солнечные юбилеи</h1>
+    <h1 id="titleH1"><img src="1f319.webp" alt="🌙" width="24" height="24" style="vertical-align:-3px;"> Лунно-солнечные юбилеи</h1>
 
 <div id="cols">
     <section>
@@ -119,20 +119,25 @@
             <button id="addBtn" type="submit" title="Добавить">➕</button>
             <button type="button" id="delBtn" onclick="deleteCurrent()" title="Удалить" style="display:none;">➖</button>
         </form>
-        <div class="btnrow">
+        <div class="btnrow" id="cityRow">
             <select id="fCity" style="flex:1 1 100%;"></select>
         </div>
         <div id="list"></div>
-        <div class="btnrow">
-            <button type="button" onclick="toggleReligionBtns()" title="Пасхальное яйцо">🥚</button>
+        <div id="orthodox" class="days" style="display:none;"></div>
+        <div id="islam" class="days" style="display:none;"></div>
+        <div id="buddhist" class="days" style="display:none;"></div>
+        <div id="catholic" class="days" style="display:none;"></div>
+        <div id="jewish" class="days" style="display:none;"></div>
+        <div class="btnrow" id="toolbar">
+            <button type="button" id="eggBtn" onclick="toggleReligionBtns()" title="Пасхальное яйцо">🥚</button>
             <span id="religionBtns" style="display:none;">
-                <button type="button" onclick="showHolidays('orthodox')" title="Православные дни">☦️</button>
-                <button type="button" onclick="showHolidays('islam')" title="Исламские дни">☪️</button>
-                <button type="button" onclick="showHolidays('buddhist')" title="Буддийские дни">☸️</button>
-                <button type="button" onclick="showHolidays('catholic')" title="Католические дни">✝️</button>
-                <button type="button" onclick="showHolidays('jewish')" title="Иудейские дни">✡️</button>
+                <button type="button" onclick="toggleDays('orthodox')" title="Православные дни">☦️</button>
+                <button type="button" onclick="toggleDays('islam')" title="Исламские дни">☪️</button>
+                <button type="button" onclick="toggleDays('buddhist')" title="Буддийские дни">☸️</button>
+                <button type="button" onclick="toggleDays('catholic')" title="Католические дни">✝️</button>
+                <button type="button" onclick="toggleDays('jewish')" title="Иудейские дни">✡️</button>
             </span>
-            <button id="pushBtn" onclick="togglePush()" title="Включить оповещения о днях рождения">🔕</button>
+            <button id="pushBtn" onclick="togglePush()" title="Включить оповещения о днях">🔕</button>
             <button id="loginBtn" onclick="loginYandex()" title="Войти через Яндекс">🔑</button>
             <button id="cloudPutBtn" onclick="cloudPut()" title="Сохранить базу в облако" style="display:none;">📤</button>
             <button id="cloudGetBtn" onclick="cloudGet()" title="Загрузить базу из облака" style="display:none;">📥</button>
@@ -164,7 +169,7 @@
     </section>
 </div>
 
-    <label style="display:block; font-size:0.9em; color:#555;">
+    <label id="pdConsentLabel" style="display:block; font-size:0.9em; color:#555;">
         <input type="checkbox" id="pdConsent">
         Согласен(на) на хранения моих персональных данных (ПДн: имена и даты рождения) и ПДн третьих лиц в Яндекс.Облаке (🔑📤) согласно 152-ФЗ и GDPR. <span id="pdWithdrawNote" style="display:none;">Отзыв согласия удаляет ПДн из Яндекс.Облака.</span>
     </label>
@@ -187,6 +192,7 @@ const FUNCTION_URL = "https://functions.yandexcloud.net/d4erotuod7vp1l2k59in";
 const PUSH_URL = "https://functions.yandexcloud.net/d4evfk4qtt38fh8s4cdh";
 const PUSH_PUBLIC_KEY = "BKk3Q3_LmRhK3_kE1Jp8fx34AhWWfBHhn160jIUcdKeHy3y36YuRhaCq1VhZB1p6PQy2hiCEKByj3ME9-GDAAS4";
 const DB_KEY = "lunarreturns.db";
+const DAYS_KEY = "lunarreturns.days";
 const PD_CONSENT_KEY = "lunarreturns.pdConsent";
 const QR_MAX_BYTES = 2953;
 const SPACE = "\u2002\u2004";
@@ -636,8 +642,6 @@ function jdnToGreg(j) {
     return [100 * b + d - 4800 + Math.floor(m2 / 10), m2 + 3 - 12 * Math.floor(m2 / 10), e - Math.floor((153 * m2 + 2) / 5) + 1];
 }
 
-const jdnYmd = j => { const [y, m, d] = jdnToGreg(j); return "#" + y + String(m).padStart(2, "0") + String(d).padStart(2, "0"); };
-
 function orthodoxEasterJdn(y) {
     const a = y % 4, b = y % 7, c = y % 19, d = (19 * c + 15) % 30, e = (2 * a + 4 * b - d + 34) % 7;
     return julianToJdn(y, Math.floor((d + e + 114) / 31), (d + e + 114) % 31 + 1);
@@ -696,7 +700,7 @@ const mskToday = () => {
     return [t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate()];
 };
 
-let holStart = 0, holEnd = 0;
+let dayStart = 0, dayEnd = 0, dayKind = "";
 
 const ORTH_OFFS = [[-7, "Вход Господень в Иерусалим"], [-1, "Великая Суббота"], [0, "Пасха"], [9, "Радоница"], [39, "Вознесение Господне"], [49, "День Святой Троицы"]];
 const CATH_OFFS = [[-46, "Пепельная среда"], [-7, "Вербное воскресенье"], [0, "Пасха"], [39, "Вознесение"], [49, "Пятидесятница"], [60, "Праздник Тела и Крови Христовых"]];
@@ -714,7 +718,7 @@ function adjustCatholicFixed(j, m, d, e) {
     return j;
 }
 
-function buildChristianHolidays(easterJdn, offs, fixed, fixedToJdn, adjust) {
+function buildChristianDays(easterJdn, offs, fixed, fixedToJdn, adjust) {
     const y0 = mskToday()[0];
     const out = [];
     for (let y = y0; y <= y0 + 1; y++) {
@@ -731,14 +735,14 @@ const ISLAM_ANCHOR_JDN = gregToJdn(2025, 6, 26); // 1 Мухаррам 1447
 
 function buildIslamic() {
     // месяц начинается на следующий день после астрономического новолуния (методика ДУМ РФ)
-    const [news] = lunarNewsFulls(ISLAM_ANCHOR_JDN - 15, holEnd);
+    const [news] = lunarNewsFulls(ISLAM_ANCHOR_JDN - 15, dayEnd);
     const starts = news.map(j => j + 1).filter(j => j >= ISLAM_ANCHOR_JDN);
     const out = [];
     for (let i = 0; i < starts.length; i++) {
         const m = i % 12 + 1;
         for (const [hm, hd, name] of ISLAM_HOL) if (m === hm) {
             const j = starts[i] + hd - 1;
-            if (j >= holStart && j < holEnd) out.push([j, name]);
+            if (j >= dayStart && j < dayEnd) out.push([j, name]);
         }
     }
     return out;
@@ -750,7 +754,7 @@ const HEB_HOL = leap => leap
 
 function buildJewish() {
     const out = [];
-    for (let j = holStart; j < holEnd; j++) {
+    for (let j = dayStart; j < dayEnd; j++) {
         const h = jdnToHebrew(j);
         for (const [hm, hd, name] of HEB_HOL(hebrewLeap(h[0]))) if (h[1] === hm && h[2] === hd) out.push([j, name]);
     }
@@ -828,36 +832,144 @@ function buildBuddhist() {
     return out;
 }
 
-const HOLIDAY_DEFS = {
-    orthodox: ["Православные дни", () => buildChristianHolidays(orthodoxEasterJdn, ORTH_OFFS, ORTH_FIXED, julianToJdn, j => j)],
-    catholic: ["Католические дни", () => buildChristianHolidays(catholicEasterJdn, CATH_OFFS, CATH_FIXED, gregToJdn, adjustCatholicFixed)],
-    islam: ["Исламские дни", buildIslamic],
-    jewish: ["Иудейские дни", buildJewish],
-    buddhist: ["Буддийские дни", buildBuddhist]
+const DAYS_DEFS = {
+    orthodox: ["Православные дни", () => buildChristianDays(orthodoxEasterJdn, ORTH_OFFS, ORTH_FIXED, julianToJdn, j => j), "☦️"],
+    catholic: ["Католические дни", () => buildChristianDays(catholicEasterJdn, CATH_OFFS, CATH_FIXED, gregToJdn, adjustCatholicFixed), "✝️"],
+    islam: ["Исламские дни", buildIslamic, "☪️"],
+    jewish: ["Иудейские дни", buildJewish, "✡️"],
+    buddhist: ["Буддийские дни", buildBuddhist, "☸️"]
 };
 
+let savedUiDisp = null;
+let religionMode = false;
+
 function toggleReligionBtns() {
-    const el = document.getElementById("religionBtns");
-    el.style.display = el.style.display === "none" ? "inline" : "none";
+    const rb = document.getElementById("religionBtns");
+    const on = rb.style.display === "none";
+    religionMode = on;
+    if (on) {
+        savedUiDisp = [];
+        const els = [document.getElementById("recForm"), document.getElementById("cityRow"), document.getElementById("list"),
+            document.getElementById("pdConsentLabel"), document.getElementById("pdLocalNote")]
+            .concat([...document.getElementById("toolbar").children].filter(c => c !== rb && c.id !== "eggBtn" && c.id !== "pushBtn"));
+        for (const el of els) { savedUiDisp.push([el, el.style.display]); el.style.display = "none"; }
+        rb.style.display = "inline";
+        hideResult();
+        if (dayKind) renderDays(dayKind);
+    } else {
+        if (savedUiDisp) for (const [el, d] of savedUiDisp) el.style.display = d;
+        savedUiDisp = null;
+        rb.style.display = "none";
+        if (dayKind) hideDaysDiv(dayKind);
+    }
+    renderTitle();
 }
 
-function showHolidays(kind) {
+function loadDayKind() {
+    let v = localStorage.getItem(DAYS_KEY) || "";
+    if (v.startsWith("[")) {
+        try { v = JSON.parse(v)[0] || ""; } catch (e) { v = ""; }
+    }
+    dayKind = DAYS_DEFS[v] ? v : "";
+}
+
+function saveDayKind() {
+    localStorage.setItem(DAYS_KEY, dayKind);
+    updatePushDates();
+    idbPutDays();
+}
+
+function daysEntries() {
+    const out = [];
+    if (dayKind) for (const [j, name] of buildDays(dayKind)) {
+        const [, m, d] = jdnToGreg(j);
+        out.push({ d: String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0"), n: name });
+    }
+    return out;
+}
+
+async function idbPutDays() {
+    try {
+        const idb = await idbOpen();
+        await new Promise((res, rej) => {
+            const tx = idb.transaction("kv", "readwrite");
+            tx.objectStore("kv").put(JSON.stringify(daysEntries()), "days");
+            tx.oncomplete = res;
+            tx.onerror = () => rej(tx.error);
+        });
+        idb.close();
+    } catch (e) { }
+}
+
+function buildDays(kind) {
     const [y, m, d] = mskToday();
-    holStart = gregToJdn(y, m, d);
-    holEnd = holStart + 365;
-    const [title, build] = HOLIDAY_DEFS[kind];
-    const items = build().filter(x => x[0] >= holStart && x[0] < holEnd).sort((a, b) => a[0] - b[0]);
+    dayStart = gregToJdn(y, m, d);
+    dayEnd = dayStart + 365;
+    return DAYS_DEFS[kind][1]().filter(x => x[0] >= dayStart && x[0] < dayEnd).sort((a, b) => a[0] - b[0]);
+}
+
+function renderTitle() {
+    const h = document.getElementById("titleH1");
+    if (religionMode && dayKind) h.textContent = DAYS_DEFS[dayKind][2] + " " + DAYS_DEFS[dayKind][0];
+    else h.innerHTML = '<img src="1f319.webp" alt="🌙" width="24" height="24" style="vertical-align:-3px;"> Лунно-солнечные юбилеи';
+}
+
+function hideDaysDiv(kind) {
+    const el = document.getElementById(kind);
+    el.innerHTML = "";
+    el.style.display = "none";
+}
+
+function renderDays(kind, items) {
+    const el = document.getElementById(kind);
+    if (!items) items = buildDays(kind);
+    el.innerHTML = "";
+    for (const [j, name] of items) {
+        const row = document.createElement("div");
+        row.className = "row";
+        const n = document.createElement("span");
+        n.className = "n";
+        n.textContent = name;
+        const d = document.createElement("span");
+        d.className = "d";
+        const [y, m, dd] = jdnToGreg(j);
+        d.textContent = y + "-" + String(m).padStart(2, "0") + "-" + String(dd).padStart(2, "0");
+        row.append(n, d);
+        el.appendChild(row);
+    }
+    el.style.display = "";
+}
+
+function toggleDays(kind) {
+    if (dayKind === kind) {
+        dayKind = "";
+        hideDaysDiv(kind);
+        renderTitle();
+        saveDayKind();
+        return;
+    }
+    if (dayKind) hideDaysDiv(dayKind);
+    const items = buildDays(kind);
     if (items.length === 0) { status("Дни в ближайший год не найдены", true); return; }
-    const text = title + "\n" + items.map(([j, name]) => jdnYmd(j) + " " + name).join("\n");
-    document.getElementById("resultSec").style.display = "block";
-    const ta = document.getElementById("resultText");
-    ta.value = text;
-    ta.style.height = "";
-    ta.rows = items.length + 1;
-    const full = ta.offsetHeight;
-    ta.style.height = full + "px";
-    ta.scrollTop = 0;
-    showQr(document.getElementById("resultQr"), text);
+    dayKind = kind;
+    hideResult();
+    renderDays(kind, items);
+    renderTitle();
+    saveDayKind();
+}
+
+function religionDates() {
+    const out = [];
+    if (dayKind) for (const [j] of buildDays(dayKind)) {
+        const [, m, d] = jdnToGreg(j);
+        const md = String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+        if (!out.includes(md)) out.push(md);
+    }
+    return out;
+}
+
+function allPushDates() {
+    return dbDates().concat(religionDates()).filter((v, i, a) => a.indexOf(v) === i);
 }
 
 function showQr(el, text) {
@@ -1258,7 +1370,7 @@ function getPushSubscription() {
 function updatePushDates() {
     if (!PUSH_URL) return;
     getPushSubscription().then(sub => {
-        if (sub) pushApi("subscribe", { subscription: sub.toJSON(), dates: dbDates() }).catch(() => { });
+        if (sub) pushApi("subscribe", { subscription: sub.toJSON(), dates: allPushDates() }).catch(() => { });
     });
 }
 
@@ -1273,7 +1385,7 @@ async function togglePush() {
         if (sub) {
             await sub.unsubscribe();
             pushApi("unsubscribe", { endpoint: sub.endpoint }).catch(() => { });
-            status("Оповещения о днях рождения отключены");
+            status("Оповещения отключены");
         } else {
             if ((await Notification.requestPermission()) !== "granted") {
                 status("Разрешение на уведомления не выдано", true);
@@ -1283,7 +1395,7 @@ async function togglePush() {
                 userVisibleOnly: true,
                 applicationServerKey: b64urlToUint8(PUSH_PUBLIC_KEY)
             });
-            await pushApi("subscribe", { subscription: newSub.toJSON(), dates: dbDates() });
+            await pushApi("subscribe", { subscription: newSub.toJSON(), dates: allPushDates() });
             status("Оповещения включены");
         }
     } catch (e) {
@@ -1300,12 +1412,14 @@ function refreshPushBtn() {
     }
     getPushSubscription().then(sub => {
         btn.textContent = sub ? "🔔" : "🔕";
-        btn.title = sub ? "Отключить оповещения о днях рождения" : "Включить оповещения о днях рождения";
+        btn.title = sub ? "Отключить оповещения о днях" : "Включить оповещения о днях";
     });
 }
 
 loadDb();
+loadDayKind();
 renderList();
+idbPutDays();
 renderCitySelect();
 initPdConsent();
 checkOAuthHash();
