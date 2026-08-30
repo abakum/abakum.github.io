@@ -318,28 +318,36 @@ const hashTag = s => "#" + s.toLowerCase().replace(/ /g, "_");
 
 const addYears = (t, i) => new Date(Date.UTC(t.getUTCFullYear() + i, t.getUTCMonth(), t.getUTCDate(), t.getUTCHours(), t.getUTCMinutes(), 0));
 
+function legend(t) {
+    const mMid = moonNew(t);
+    const n0 = tithiInt(mMid);
+    const p0 = phaseName(n0, false);
+    const z0 = moonZodiacName(mMid, false);
+    const [w0, wh] = wdLocale(t);
+    const s0 = sunZodiacNames(t, false)[0];
+    const v0 = chineseZodiacName(t, false);
+    const t0 = n0 > 15 ? "☾" : "☽";
+    return s0 + hashTag(sunZodiacNames(t, true)[0]) + "\n" +
+        v0 + hashTag(chineseZodiacName(t, true)) + "\n" +
+        w0 + hashTag(wh) + "\n" +
+        z0 + hashTag(moonZodiacName(mMid, true)) + "_\n" +
+        p0 + hashTag(phaseName(n0, true)) + "\n" +
+        String((n0 - 1) % 15 + 1).padStart(2, "0") + (n0 > 15 ? "☾#" : "☽#") + tithiName(n0) + (n0 > 15 ? "_" : "");
+}
+
 function la(birth) {
     const mMid = moonNew(birth);
     const n0 = tithiInt(mMid);
     const p0 = phaseName(n0, false);
     const z0 = moonZodiacName(mMid, false);
-    const [w0, wh] = wdLocale(birth);
+    const [w0] = wdLocale(birth);
     const s0 = sunZodiacNames(birth, false)[0];
     const v0 = chineseZodiacName(birth, false);
     const sq = z0 === s0 ? "²" : "";
     const t0 = n0 > 15 ? "☾" : "☽";
     const yl = "г";
     const f = new Date().getFullYear() - birth.getUTCFullYear();
-    const years = [];
-    years.push(
-        s0 + hashTag(sunZodiacNames(birth, true)[0]) + "\n" +
-        v0 + hashTag(chineseZodiacName(birth, true)) + "\n" +
-        w0 + hashTag(wh) + "\n" +
-        z0 + hashTag(moonZodiacName(mMid, true)) + "_\n" +
-        p0 + hashTag(phaseName(n0, true)) + "\n" +
-        String((n0 - 1) % 15 + 1).padStart(2, "0") + (n0 > 15 ? "☾#" : "☽#") + tithiName(n0) + (n0 > 15 ? "_" : "") + "\n" +
-        "#" + birth.getUTCFullYear() + yl + " " + v0 + w0 + z0 + sq + p0 + t0
-    );
+    const years = [legend(birth) + "\n#" + birth.getUTCFullYear() + yl + " " + v0 + w0 + z0 + sq + p0 + t0];
     let fc = 0;
     for (let i = 1; fc < 1; i++) {
         const bd = addYears(birth, i);
@@ -642,6 +650,21 @@ function renderResult() {
 
 function hideResult() {
     document.getElementById("resultSec").style.display = "none";
+}
+
+function renderNow() {
+    const now = new Date(Date.now() + TZ_MS);
+    const pad = x => String(x).padStart(2, "0");
+    const when = "Сейчас " + now.getUTCFullYear() + "-" + pad(now.getUTCMonth() + 1) + "-" + pad(now.getUTCDate())
+        + " " + pad(now.getUTCHours()) + ":" + pad(now.getUTCMinutes());
+    const text = when + "\n" + legend(now);
+    const ta = document.getElementById("resultText");
+    ta.value = text;
+    document.getElementById("resultSec").style.display = "block";
+    ta.style.height = "";
+    ta.rows = text.split("\n").length;
+    ta.scrollTop = 0;
+    showQr(document.getElementById("resultQr"), text);
 }
 
 function gregToJdn(y, m, d) {
@@ -1483,6 +1506,7 @@ function refreshPushBtn() {
 loadDb();
 loadDayKind();
 renderList();
+renderNow();
 idbPutDays();
 renderCitySelect();
 initPdConsent();
