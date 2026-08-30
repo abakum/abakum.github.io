@@ -185,6 +185,7 @@
 <b>Ритм Луны:</b> возвращение фазы Луны складывается из циклов в 3 и 5 лет. Их сумма (3+5) дает 8-летний цикл (Октаэтерис).<br>
 <b>Великое слияние:</b> сложение лунного 8-летнего и недельного 11-летнего циклов (8+11) дает 19-летний Метонов цикл. При этом +38 часов 11 минут погрешности 8-летнего цикла складываются с -36 часами 6 минутами погрешности 11-летнего цикла, снижая общую погрешность до 2 часов 5 минут.</li>
 </p>
+<div id="pushlog" style="display:none; font-size:0.85em; color:#777; white-space:pre-line;"></div>
 
 <script>
 const YANDEX_CLIENT_ID = "6abbc1008e0b40a4910c287ed145e86b";
@@ -901,6 +902,52 @@ async function idbPutDays() {
     } catch (e) { }
 }
 
+async function idbGetLog() {
+    try {
+        const idb = await idbOpen();
+        const raw = await new Promise((res, rej) => {
+            const rq = idb.transaction("kv").objectStore("kv").get("pushlog");
+            rq.onsuccess = () => res(rq.result);
+            rq.onerror = () => rej(rq.error);
+        });
+        idb.close();
+        return Array.isArray(raw) ? raw : [];
+    } catch (e) { return []; }
+}
+
+async function renderPushLog() {
+    const el = document.getElementById("pushlog");
+    const log = await idbGetLog();
+    if (!log.length) { el.style.display = "none"; return; }
+    el.textContent = "Журнал пушей:\n" + log.map(r =>
+        r.t + " — " + (r.payload ? "payload" : "без payload") +
+        " — db:" + (r.db === null ? "нет" : r.db) +
+        " days:" + (r.days === null ? "нет" : r.days) +
+        " — " + (r.shown ? "показано" : "НЕ показано")
+    ).join("\n") + "\n";
+    const clr = document.createElement("button");
+    clr.type = "button";
+    clr.textContent = "Очистить журнал";
+    clr.style.fontSize = "0.85em";
+    clr.onclick = clearPushLog;
+    el.appendChild(clr);
+    el.style.display = "block";
+}
+
+async function clearPushLog() {
+    try {
+        const idb = await idbOpen();
+        await new Promise((res, rej) => {
+            const tx = idb.transaction("kv", "readwrite");
+            tx.objectStore("kv").delete("pushlog");
+            tx.oncomplete = res;
+            tx.onerror = () => rej(tx.error);
+        });
+        idb.close();
+    } catch (e) { }
+    document.getElementById("pushlog").style.display = "none";
+}
+
 function buildDays(kind) {
     const [y, m, d] = mskToday();
     dayStart = gregToJdn(y, m, d);
@@ -1424,6 +1471,7 @@ renderCitySelect();
 initPdConsent();
 checkOAuthHash();
 refreshPushBtn();
+renderPushLog();
 idbPutDb();
 if ("serviceWorker" in navigator && location.protocol === "https:")
     navigator.serviceWorker.register("./sw.js");

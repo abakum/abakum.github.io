@@ -1,4 +1,4 @@
-const CACHE = "lunarreturns-v4";
+const CACHE = "lunarreturns-v5";
 const INSTALL_URLS = [
     "./",
     "./index.html",
@@ -36,6 +36,34 @@ function readKey(key) {
             } catch (e) { idb.close(); res(null); }
         };
         rq.onerror = () => res(null);
+    });
+}
+
+function idbPutLog(entry) {
+    return new Promise(res => {
+        try {
+            const rq = indexedDB.open("lunarreturns", 1);
+            rq.onupgradeneeded = () => rq.result.createObjectStore("kv");
+            rq.onerror = () => res();
+            rq.onsuccess = () => {
+                const idb = rq.result;
+                try {
+                    const tx = idb.transaction("kv", "readwrite");
+                    const store = tx.objectStore("kv");
+                    const rq2 = store.get("pushlog");
+                    rq2.onerror = () => { idb.close(); res(); };
+                    rq2.onsuccess = () => {
+                        try {
+                            const log = Array.isArray(rq2.result) ? rq2.result : [];
+                            log.unshift(entry);
+                            const rq3 = store.put(log.slice(0, 10), "pushlog");
+                            rq3.onsuccess = () => { idb.close(); res(); };
+                            rq3.onerror = () => { idb.close(); res(); };
+                        } catch (e) { idb.close(); res(); }
+                    };
+                } catch (e) { idb.close(); res(); }
+            };
+        } catch (e) { res(); }
     });
 }
 
@@ -80,15 +108,29 @@ function dayNames(list) {
 
 self.addEventListener("push", e => {
     e.waitUntil((async () => {
+        let payload = null;
+        try { payload = e.data ? e.data.text().slice(0, 200) : null; } catch (err) { }
+        let nDb = null, nDays = null, shown = false;
         const [raw, rawDays] = await Promise.all([readKey("db"), readKey("days")]);
         let labels = [], days = [];
         try { if (raw !== null) labels = dbLabels(JSON.parse(raw)); } catch (err) { }
         try { if (rawDays !== null) days = dayNames(JSON.parse(rawDays)); } catch (err) { }
+        nDb = raw === null ? null : labels.length;
+        nDays = rawDays === null ? null : days.length;
         const all = labels.concat(days);
-        if (!all.length) return;
-        return self.registration.showNotification("Сегодня", {
-            body: all.join(", "),
-            tag: "bd"
+        if (all.length) {
+            await self.registration.showNotification("Сегодня", {
+                body: all.join(", "),
+                tag: "bd"
+            });
+            shown = true;
+        }
+        await idbPutLog({
+            t: new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" }),
+            payload: payload,
+            db: nDb,
+            days: nDays,
+            shown: shown
         });
     })());
 });
