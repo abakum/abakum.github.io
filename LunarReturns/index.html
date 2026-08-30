@@ -601,6 +601,23 @@ function toggleDetail() {
     renderResult();
 }
 
+const WED = {
+    1: "ситцевая", 2: "бумажная", 3: "кожаная", 4: "льняная", 5: "деревянная",
+    6: "чугунная", 7: "медная", 8: "жестяная", 9: "фаянсовая", 10: "оловянная",
+    11: "стальная", 12: "никелевая", 13: "кружевная", 14: "агатовая", 15: "стеклянная",
+    16: "бирюзовая", 17: "розовая", 18: "гранатовая", 19: "криптоновая", 20: "фарфоровая",
+    21: "опаловая", 22: "бронзовая", 23: "берилловая", 24: "сатиновая", 25: "серебряная",
+    30: "жемчужная", 35: "полотняная", 40: "рубиновая", 45: "сапфировая", 50: "золотая",
+    55: "изумрудная", 60: "бриллиантовая", 65: "железная", 70: "благодатная", 75: "корональная",
+    80: "дубовая"
+};
+
+function ageSuffix(n, d) {
+    const age = mskToday()[0] - Number(d.slice(0, 4));
+    if (age < 1) return "";
+    return " " + age + (n.includes("+") && WED[age] ? " " + WED[age] : "");
+}
+
 function renderResult() {
     const i = selectedIdx;
     if (i < 0 || i >= db.length) { hideResult(); return; }
@@ -609,7 +626,7 @@ function renderResult() {
     const h = Number.isInteger(r.h) ? r.h : 12;
     const m = Number.isInteger(r.m) ? r.m : 0;
     const t = new Date(Date.UTC(y, mo - 1, d, h, m, 0));
-    const text = r.n + " " + r.d + (hasTime(r) ? " " + timeLabel(r) : "") + "\n" + la(t).join("\n");
+    const text = r.n + " " + r.d + (hasTime(r) ? " " + timeLabel(r) : "") + ageSuffix(r.n, r.d) + "\n" + la(t).join("\n");
     const ta = document.getElementById("resultText");
     ta.value = text;
     document.getElementById("resultSec").style.display = "block";
