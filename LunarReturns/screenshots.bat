@@ -1,0 +1,2 @@
+chrome.exe --headless --window-size=600,1200 --screenshot="C:\tmp\screenshot.png" "https://abakum.github.io/LunarReturns/"
+chrome.exe --headless --window-size=600,1200 --screenshot="C:\tmp\screenshot2.png" "https://abakum.github.io/LunarReturns/#1"
