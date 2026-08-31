@@ -1302,6 +1302,15 @@ function checkOAuthHash() {
     status("Вход через Яндекс выполнен");
 }
 
+function hashSelect() {
+    const m = location.hash.match(/^#(\d+)$/);
+    if (!m) return;
+    const row = document.querySelectorAll("#list .row")[Number(m[1]) - 1];
+    if (!row) return;
+    row.click();
+    window.scrollTo(0, 0);
+}
+
 function logoutYandex() {
     yandexToken = "";
     document.getElementById("cloudPutBtn").style.display = "none";
@@ -1513,6 +1522,7 @@ idbPutDays();
 renderCitySelect();
 initPdConsent();
 checkOAuthHash();
+hashSelect();
 refreshPushBtn();
 renderPushLog();
 idbPutDb();
