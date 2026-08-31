@@ -959,12 +959,14 @@ async function renderPushLog() {
     const el = document.getElementById("pushlog");
     const log = await idbGetLog();
     if (!log.length) { el.style.display = "none"; return; }
-    el.textContent = "Журнал пушей:\n" + log.map(r =>
-        r.t + " — " + (r.payload ? "payload" : "без payload") +
-        " — db:" + (r.db === null ? "нет" : r.db) +
-        " days:" + (r.days === null ? "нет" : r.days) +
-        " — " + (r.shown ? "показано" : "НЕ показано")
-    ).join("\n") + "\n";
+    el.textContent = "Журнал пушей:\n" + log.map(r => {
+        const main = r.t +
+            " — db:" + (r.db === null ? "нет" : r.db) +
+            " days:" + (r.days === null ? "нет" : r.days);
+        return typeof r.body === "string"
+            ? main + "\n" + (r.body || "(пусто)")
+            : main;
+    }).join("\n") + "\n";
     const clr = document.createElement("button");
     clr.type = "button";
     clr.textContent = "Очистить журнал";

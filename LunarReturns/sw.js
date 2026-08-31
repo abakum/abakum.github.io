@@ -1,4 +1,4 @@
-const CACHE = "lunarreturns-v6";
+const CACHE = "lunarreturns-v7";
 const INSTALL_URLS = [
     "./",
     "./index.html",
@@ -108,8 +108,6 @@ function dayNames(list) {
 
 self.addEventListener("push", e => {
     e.waitUntil((async () => {
-        let payload = null;
-        try { payload = e.data ? e.data.text().slice(0, 200) : null; } catch (err) { }
         let nDb = null, nDays = null, shown = false;
         const [raw, rawDays] = await Promise.all([readKey("db"), readKey("days")]);
         let labels = [], days = [];
@@ -127,10 +125,10 @@ self.addEventListener("push", e => {
         }
         await idbPutLog({
             t: new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" }),
-            payload: payload,
             db: nDb,
             days: nDays,
-            shown: shown
+            shown: shown,
+            body: all.join(", ").slice(0, 200)
         });
     })());
 });

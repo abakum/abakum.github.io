@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "yandex-cloud-documentation": {
+      "type": "streamable-http",
+      "url": "https://docs.mcp.cloud.yandex.net/mcp"
+    }
+  }
+}
