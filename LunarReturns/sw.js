@@ -1,4 +1,4 @@
-const CACHE = "lunarreturns-v7";
+const CACHE = "lunarreturns-v8";
 const INSTALL_URLS = [
     "./",
     "./index.html",
@@ -125,6 +125,7 @@ self.addEventListener("push", e => {
         }
         await idbPutLog({
             t: new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" }),
+            v: CACHE,
             db: nDb,
             days: nDays,
             shown: shown,

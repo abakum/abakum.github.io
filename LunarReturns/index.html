@@ -960,12 +960,12 @@ async function renderPushLog() {
     const log = await idbGetLog();
     if (!log.length) { el.style.display = "none"; return; }
     el.textContent = "Журнал пушей:\n" + log.map(r => {
-        const main = r.t +
+        const ver = typeof r.v === "string" ? " [sw " + r.v.replace(/^lunarreturns-/, "") + "]" : " [sw старый]";
+        const main = r.t + ver +
             " — db:" + (r.db === null ? "нет" : r.db) +
             " days:" + (r.days === null ? "нет" : r.days);
-        return typeof r.body === "string"
-            ? main + "\n" + (r.body || "(пусто)")
-            : main;
+        if (typeof r.body !== "string") return main + "\n(тело не сохранялось — запись от старого SW)";
+        return main + "\n" + (r.body || "(пусто)");
     }).join("\n") + "\n";
     const clr = document.createElement("button");
     clr.type = "button";
