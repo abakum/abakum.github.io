@@ -14,7 +14,8 @@ const dest = path.join(root, "build");
 const entries = [
   "index.html",
   "1f319.webp",
-  "qr"
+  "qr",
+  "vendor"
 ];
 
 if (fs.existsSync(dest)) {

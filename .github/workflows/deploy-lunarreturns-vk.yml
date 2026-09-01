@@ -38,6 +38,9 @@ jobs:
         run: npm install --no-audit --no-fund
 
       # Dev-деплой полностью автоматический: код подтверждения не требуется.
+      # Вывод деплоя сохраняем: VK выдаёт стейджинг-версии новый URL при каждой
+      # выкладке, его нужно копировать вручную — поэтому дальше шаг «URLs in summary»
+      # выносит адрес в сводку запуска, чтобы не искать его в логе.
       - name: Deploy to VK hosting (dev)
         if: github.event.inputs.environment == 'dev'
         working-directory: LunarReturns
@@ -45,7 +48,7 @@ jobs:
           MINI_APPS_ACCESS_TOKEN: ${{ secrets.MINI_APPS_ACCESS_TOKEN }}
           MINI_APPS_ENVIRONMENT: dev
           CI_URLS: 'true'
-        run: npm run deploy
+        run: npm run deploy 2>&1 | tee "$RUNNER_TEMP/deploy.log"
 
       # Production требует код подтверждения от главного администратора.
       # Псевдо-TTY (script) нужен, т.к. библиотека читает код из stdin, а у GitHub Actions нет TTY.
@@ -62,4 +65,21 @@ jobs:
             echo "::error::Для production нужен confirmation_code (код от главного администратора). Получите его и перезапустите воркфлоу."
             exit 1
           fi
-          printf '%s\n' "$CODE" | script -qec "npm run deploy" /dev/null
+          printf '%s\n' "$CODE" | script -qec "npm run deploy" /dev/null | tee "$RUNNER_TEMP/deploy.log"
+
+      # Выносит URL выложенной версии из лога деплоя в сводку запуска (Summary)
+      # и в заметки шага (::notice) — адрес не нужно искать в сыром выводе CI.
+      - name: URLs in summary
+        run: |
+          LOG="$RUNNER_TEMP/deploy.log"
+          [[ -f "$LOG" ]] || { echo "Лог деплоя не найден"; exit 0; }
+          URLS=$(grep -oE 'https://[A-Za-z0-9._/-]+' "$LOG" | sort -u)
+          [[ -n "$URLS" ]] || { echo "URL в выводе деплоя не найден"; exit 0; }
+          {
+            echo "## URL мини-аппа после выкладки"
+            echo "VK выдаёт каждой выкладке новый адрес — скопируйте актуальный отсюда:"
+            echo '```'
+            echo "$URLS"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r u; do echo "::notice::URL выложенной версии: $u"; done <<< "$URLS"

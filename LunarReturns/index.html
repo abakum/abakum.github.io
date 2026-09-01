@@ -171,7 +171,7 @@
 
     <label id="pdConsentLabel" style="display:block; font-size:0.9em; color:#555;">
         <input type="checkbox" id="pdConsent">
-        Согласен(на) на хранения моих персональных данных (ПДн: имена и даты рождения) и ПДн третьих лиц в Яндекс.Облаке (🔑📤) согласно 152-ФЗ и GDPR. <span id="pdWithdrawNote" style="display:none;">Отзыв согласия удаляет ПДн из Яндекс.Облака.</span>
+        <span id="pdConsentText">Согласен(на) на хранения моих персональных данных (ПДн: имена и даты рождения) и ПДн третьих лиц в облаке Яндекс (🔑📤) согласно 152-ФЗ и GDPR.</span> <span id="pdWithdrawNote" style="display:none;">Отзыв согласия удаляет ПДн из облака Яндекс.</span>
     </label>
     <p id="pdLocalNote" style="display:none; font-size:0.9em; color:#555;">
         Пусть ПДн хранятся только локально на моём устройстве.
@@ -191,6 +191,8 @@
     <a href="https://github.com/abakum/LunarReturns/issues" target="_blank" rel="noopener" style="color:#555; margin-left:6px;">Сообщить об ошибке</a>
 </div>
 
+<!-- vk-bridge @3.0.2, локальная копия: https://unpkg.com/@vkontakte/vk-bridge@3.0.2/dist/browser.min.js -->
+<script src="./vendor/vk-bridge.min.js"></script>
 <script>
 const YANDEX_CLIENT_ID = "6abbc1008e0b40a4910c287ed145e86b";
 const FUNCTION_URL = "https://functions.yandexcloud.net/d4erotuod7vp1l2k59in";
@@ -221,7 +223,9 @@ let selectedIdx = -1;
 let editingIdx = -1;
 let detailMode = false;
 let yandexToken = "";
-let vkminiapp = false;
+// VK Mini App определяется по параметру vk_app_id в URL, который VK всегда
+// добавляет при запуске мини-аппа (см. dev.vk.com/mini-apps/development/launch-params).
+const vkminiapp = new URLSearchParams(location.search).has("vk_app_id");
 
 function moonNew(date) {
     const fixangle = a => a - 360 * Math.floor(a / 360);
@@ -1232,12 +1236,14 @@ function pdConsentGiven() {
     return localStorage.getItem(PD_CONSENT_KEY) === "1";
 }
 
-// При взведённом флаге vkminiapp (PWA/SW недоступны в мини-аппе) прячем
-// нерелевантные элементы: согласие на облачное хранение, строку версии SW и кнопку пушей.
+// В мини-аппе ВКонтакте (vkminiapp) PWA/SW и Web Push недоступны: прячем
+// строку версии SW и кнопку пушей, а текст согласия ПДн переводим на «облако ВКонтакте».
 function applyVkUi() {
     if (!vkminiapp) return;
-    const c = document.getElementById("pdConsentLabel");
-    if (c) c.style.display = "none";
+    const t = document.getElementById("pdConsentText");
+    if (t) t.textContent = "Согласен(на) на хранения моих персональных данных (ПДн: имена и даты рождения) и ПДн третьих лиц в облаке ВКонтакте (📤📥) согласно 152-ФЗ и GDPR.";
+    const w = document.getElementById("pdWithdrawNote");
+    if (w) w.textContent = "Отзыв согласия удаляет ПДн из облака ВКонтакте.";
     const sw = document.getElementById("swver");
     if (sw) sw.style.display = "none";
     const p = document.getElementById("pushBtn");
@@ -1247,6 +1253,17 @@ function applyVkUi() {
 function applyPdConsent() {
     const lb = document.getElementById("loginBtn");
     const note = document.getElementById("pdLocalNote");
+    if (vkminiapp) {
+        // В мини-аппе вход через Яндекс недоступен: база пишется в облако
+        // ВКонтакте без логина, кнопки видны только при согласии ПДн.
+        lb.style.display = "none";
+        const given = pdConsentGiven();
+        document.getElementById("cloudPutBtn").style.display = given ? "" : "none";
+        document.getElementById("cloudGetBtn").style.display = given ? "" : "none";
+        document.getElementById("pdWithdrawNote").style.display = given ? "" : "none";
+        note.style.display = given ? "none" : "";
+        return;
+    }
     if (pdConsentGiven()) {
         lb.style.display = "";
         note.style.display = "none";
@@ -1294,8 +1311,17 @@ function initPdConsent() {
             return;
         }
         localStorage.removeItem(PD_CONSENT_KEY);
-        if (yandexToken) {
-            if (confirm("Удалить ПДн из Яндекс.Облака? Локальная база сохранится.")) {
+        if (vkminiapp) {
+            if (confirm("Удалить ПДн из облака ВКонтакте? Локальная база сохранится.")) {
+                applyPdConsent();
+                vkDbClear();
+            } else {
+                cb.checked = true;
+                localStorage.setItem(PD_CONSENT_KEY, "1");
+                applyPdConsent();
+            }
+        } else if (yandexToken) {
+            if (confirm("Удалить ПДн из облака Яндекс? Локальная база сохранится.")) {
                 const token = yandexToken;
                 applyPdConsent();
                 cloudDelete(token);
@@ -1384,7 +1410,99 @@ function cloudPresign(action, token) {
     });
 }
 
+// ---- Облако ВКонтакте (VKWebAppStorage): одна запись db = один ключ "0".."999".
+// Лимиты VK: значение ≤ 4096 байт (записи {n,d} хватает с запасом),
+// 1000 ключей на пользователя; удаление ключей отсутствует — затираем пустой строкой.
+
+function vkErr(e) {
+    return (e && (e.message || (e.error_data && e.error_data.error_reason)))
+        || "хранилище ВКонтакте недоступно";
+}
+
+function vkStorageSet(key, value) {
+    return vkBridge.send("VKWebAppStorageSet", { key, value });
+}
+
+function vkStorageGet(keys) {
+    return vkBridge.send("VKWebAppStorageGet", { keys });
+}
+
+function vkStorageGetKeys() {
+    return vkBridge.send("VKWebAppStorageGetKeys", { count: 1000, offset: 0 })
+        .then(res => (res && res.keys) || []);
+}
+
+async function vkDbPut() {
+    try {
+        if (db.length > 999) {
+            status("Слишком много записей для облака ВКонтакте (максимум 999)", true);
+            return;
+        }
+        const oldKeys = await vkStorageGetKeys();
+        const maxOld = oldKeys.reduce((m, k) => Math.max(m, (parseInt(k, 10) || 0) + 1), 0);
+        for (let i = 0; i < db.length; i++) await vkStorageSet(String(i), JSON.stringify(db[i]));
+        for (let i = db.length; i < maxOld; i++) await vkStorageSet(String(i), "");
+        status("База сохранена в облако ВКонтакте. Записей: " + db.length);
+    } catch (e) {
+        status("Ошибка сохранения: " + vkErr(e), true);
+    }
+}
+
+async function vkDbGet() {
+    try {
+        const keys = [];
+        for (let i = 0; i < 999; i++) keys.push(String(i));
+        const res = await vkStorageGet(keys);
+        const byKey = {};
+        for (const kv of (res && res.keys) || []) byKey[kv.key] = kv.value;
+        let incoming = [];
+        let empty = true;
+        for (let i = 0; i < 999; i++) {
+            const v = byKey[String(i)];
+            if (!v) continue;
+            empty = false;
+            try {
+                incoming.push(JSON.parse(v));
+            } catch (err) {
+                throw new Error("в облаке ВКонтакте не JSON");
+            }
+        }
+        if (empty) incoming = [{ n: "Ада", d: "1815-12-10" }];
+        if (!incoming.every(validRecord)) {
+            throw new Error("неверный формат базы в облаке ВКонтакте");
+        }
+        const replace = confirm("OK — заменить текущую базу (" + incoming.length + " зап.), Отмена — объединить");
+        const merged = replace ? incoming : db.concat(incoming).filter((r, i, a) =>
+            a.findIndex(x => x.n === r.n && x.d === r.d) === i);
+        const backup = db;
+        db = merged;
+        sortDb();
+        adaSeeded = empty;
+        if (!saveDb()) { db = backup; return; }
+        selectedIdx = -1;
+        hideResult();
+        renderList();
+        refreshDbQr();
+        status(empty
+            ? "В облаке ВКонтакте пусто — заготовка: Ада"
+            : "База загружена из облака ВКонтакте. Записей: " + db.length);
+    } catch (e) {
+        status("Ошибка загрузки: " + vkErr(e), true);
+    }
+}
+
+async function vkDbClear() {
+    try {
+        const keys = await vkStorageGetKeys();
+        for (const k of keys) await vkStorageSet(k, "");
+        status("Согласие отозвано: ПДн удалены из облака ВКонтакте. Локальная база сохранена");
+    } catch (e) {
+        status("Не удалось удалить ПДн из облака ВКонтакте (" + vkErr(e) + ") — повторите отзыв согласия: поставьте и снова снимите галочку", true);
+    }
+}
+
 function cloudPut() {
+    if (vkminiapp) { vkDbPut(); return; }
     cloudPresign("put").then(data =>
         fetch(data.url, {
             method: "PUT",
@@ -1400,6 +1518,7 @@ function cloudPut() {
 }
 
 function cloudGet() {
+    if (vkminiapp) { vkDbGet(); return; }
     let presignBirthday = null;
     cloudPresign("get").then(data => {
         presignBirthday = data.birthday || null;
@@ -1565,13 +1684,14 @@ refreshPushBtn();
 renderPushLog();
 renderSwVersion();
 idbPutDb();
-if ("serviceWorker" in navigator && location.protocol === "https:") {
-    // Если sw.js не задеплоен (например, в VK Mini App), тихо пропускаем регистрацию,
-    // чтобы не получить необработанное rejected-обещание, и взводим флаг vkminiapp.
-    navigator.serviceWorker.register("./sw.js").catch(() => {
-        vkminiapp = true;
-        applyVkUi();
-    });
+if (vkminiapp) {
+    // Мини-апп ВКонтакте: сервис-воркер и PWA не используются.
+    // Инициализируем vk-bridge и включаем VK-интерфейс (тексты согласия,
+    // скрытие 🔑 Яндекса, кнопки пушей и версии SW).
+    if (window.vkBridge) vkBridge.send("VKWebAppInit").catch(() => { });
+    applyVkUi();
+} else if ("serviceWorker" in navigator && location.protocol === "https:") {
+    navigator.serviceWorker.register("./sw.js").catch(() => { });
     navigator.serviceWorker.ready.then(() => renderSwVersion());
     navigator.serviceWorker.addEventListener("controllerchange", () => renderSwVersion());
 }
