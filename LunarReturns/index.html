@@ -227,6 +227,20 @@ let yandexToken = "";
 // добавляет при запуске мини-аппа (см. dev.vk.com/mini-apps/development/launch-params).
 const vkminiapp = new URLSearchParams(location.search).has("vk_app_id");
 
+// Посторонние адреса (stage-хосты дев-версий в обычном браузере, чужие зеркала)
+// уводим на страницу мини-аппа: приложение не опубликовано, там его видят
+// только админы. Внутри VK (vk_app_id есть) не трогаем — иначе петля:
+// vk.ru/app сам грузит страницу со stage-хоста.
+const VK_APP_URL = "https://vk.ru/app54746591";
+const PWA_PREFIX = "https://abakum.github.io/LunarReturns";
+function isAllowedUrl() {
+    if (vkminiapp) return true;
+    if (location.protocol === "file:") return true;
+    if (location.hostname === "localhost" || location.hostname === "127.0.0.1") return true;
+    return location.href === PWA_PREFIX || location.href.startsWith(PWA_PREFIX + "/");
+}
+if (!isAllowedUrl()) location.replace(VK_APP_URL);
+
 function moonNew(date) {
     const fixangle = a => a - 360 * Math.floor(a / 360);
     const sin = d => Math.sin(d * Math.PI / 180);
