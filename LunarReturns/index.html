@@ -1470,9 +1470,10 @@ function cloudPresign(action, token) {
     });
 }
 
-// ---- Облако ВКонтакте (VKWebAppStorage): одна запись db = один ключ "0".."999".
+// ---- Облако ВКонтакте (VKWebAppStorage): одна запись db = один ключ "0".."989".
 // Лимиты VK: значение ≤ 4096 байт (записи {n,d} хватает с запасом),
-// 1000 ключей на пользователя; удаление ключей отсутствует — затираем пустой строкой.
+// 1000 ключей на пользователя суммарно: 990 под записи + до 10 под
+// указатели версий lr_origin_*; удаление ключей отсутствует — затираем пустой строкой.
 
 function vkErr(e) {
     return (e && (e.message || (e.error_data && e.error_data.error_reason)))
@@ -1559,8 +1560,8 @@ function showMigrateFallback(list) {
 
 async function vkDbPut() {
     try {
-        if (db.length > 999) {
-            status("Слишком много записей для облака ВКонтакте (максимум 999)", true);
+        if (db.length > 989) {
+            status("Слишком много записей для облака ВКонтакте (максимум 989)", true);
             return;
         }
         const oldKeys = await vkStorageGetKeys();
@@ -1576,13 +1577,13 @@ async function vkDbPut() {
 async function vkDbGet() {
     try {
         const keys = [];
-        for (let i = 0; i < 999; i++) keys.push(String(i));
+        for (let i = 0; i < 990; i++) keys.push(String(i));
         const res = await vkStorageGet(keys);
         const byKey = {};
         for (const kv of (res && res.keys) || []) byKey[kv.key] = kv.value;
         let incoming = [];
         let empty = true;
-        for (let i = 0; i < 999; i++) {
+        for (let i = 0; i < 990; i++) {
             const v = byKey[String(i)];
             if (!v) continue;
             empty = false;
