@@ -1,0 +1,15 @@
+{
+  "name": "lunarreturns",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Лунно-солнечные юбилеи — VK Mini App",
+  "homepage": ".",
+  "scripts": {
+    "build": "node scripts/copy-build.js",
+    "predeploy": "npm run build",
+    "deploy": "vk-miniapps-deploy"
+  },
+  "devDependencies": {
+    "@vkontakte/vk-miniapps-deploy": "^1.0.2"
+  }
+}

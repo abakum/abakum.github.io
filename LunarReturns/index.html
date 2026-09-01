@@ -221,6 +221,7 @@ let selectedIdx = -1;
 let editingIdx = -1;
 let detailMode = false;
 let yandexToken = "";
+let vkminiapp = false;
 
 function moonNew(date) {
     const fixangle = a => a - 360 * Math.floor(a / 360);
@@ -1231,6 +1232,18 @@ function pdConsentGiven() {
     return localStorage.getItem(PD_CONSENT_KEY) === "1";
 }
 
+// При взведённом флаге vkminiapp (PWA/SW недоступны в мини-аппе) прячем
+// нерелевантные элементы: согласие на облачное хранение, строку версии SW и кнопку пушей.
+function applyVkUi() {
+    if (!vkminiapp) return;
+    const c = document.getElementById("pdConsentLabel");
+    if (c) c.style.display = "none";
+    const sw = document.getElementById("swver");
+    if (sw) sw.style.display = "none";
+    const p = document.getElementById("pushBtn");
+    if (p) p.style.display = "none";
+}
+
 function applyPdConsent() {
     const lb = document.getElementById("loginBtn");
     const note = document.getElementById("pdLocalNote");
@@ -1490,7 +1503,8 @@ function getPushSubscription() {
 }
 
 function updatePushDates() {
-    if (!PUSH_URL) return;
+    // В VK Mini App пуши недоступны — при сохранении баз db/days подписку не отправляем.
+    if (vkminiapp || !PUSH_URL) return;
     getPushSubscription().then(sub => {
         if (sub) pushApi("subscribe", { subscription: sub.toJSON(), dates: allPushDates() }).catch(() => { });
     });
@@ -1498,7 +1512,7 @@ function updatePushDates() {
 
 async function togglePush() {
     try {
-        if (!("serviceWorker" in navigator) || !PUSH_URL || !PUSH_PUBLIC_KEY) {
+        if (vkminiapp || !("serviceWorker" in navigator) || !PUSH_URL || !PUSH_PUBLIC_KEY) {
             status("Оповещения недоступны (нет PUSH_URL или ключа)", true);
             return;
         }
@@ -1528,7 +1542,7 @@ async function togglePush() {
 
 function refreshPushBtn() {
     const btn = document.getElementById("pushBtn");
-    if (!("serviceWorker" in navigator) || location.protocol !== "https:" || !PUSH_URL || !PUSH_PUBLIC_KEY) {
+    if (vkminiapp || !("serviceWorker" in navigator) || location.protocol !== "https:" || !PUSH_URL || !PUSH_PUBLIC_KEY) {
         btn.style.display = "none";
         return;
     }
@@ -1552,7 +1566,12 @@ renderPushLog();
 renderSwVersion();
 idbPutDb();
 if ("serviceWorker" in navigator && location.protocol === "https:") {
-    navigator.serviceWorker.register("./sw.js");
+    // Если sw.js не задеплоен (например, в VK Mini App), тихо пропускаем регистрацию,
+    // чтобы не получить необработанное rejected-обещание, и взводим флаг vkminiapp.
+    navigator.serviceWorker.register("./sw.js").catch(() => {
+        vkminiapp = true;
+        applyVkUi();
+    });
     navigator.serviceWorker.ready.then(() => renderSwVersion());
     navigator.serviceWorker.addEventListener("controllerchange", () => renderSwVersion());
 }

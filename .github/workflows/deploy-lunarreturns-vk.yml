@@ -1,0 +1,65 @@
+name: Deploy LunarReturns to VK Mini Apps
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Окружение деплоя на хостинг VK"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - production
+      confirmation_code:
+        description: "Код подтверждения (обязателен для production; приходит главному администратору)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: LunarReturns
+        run: npm install --no-audit --no-fund
+
+      # Dev-деплой полностью автоматический: код подтверждения не требуется.
+      - name: Deploy to VK hosting (dev)
+        if: github.event.inputs.environment == 'dev'
+        working-directory: LunarReturns
+        env:
+          MINI_APPS_ACCESS_TOKEN: ${{ secrets.MINI_APPS_ACCESS_TOKEN }}
+          MINI_APPS_ENVIRONMENT: dev
+          CI_URLS: 'true'
+        run: npm run deploy
+
+      # Production требует код подтверждения от главного администратора.
+      # Псевдо-TTY (script) нужен, т.к. библиотека читает код из stdin, а у GitHub Actions нет TTY.
+      - name: Deploy to VK hosting (production)
+        if: github.event.inputs.environment == 'production'
+        working-directory: LunarReturns
+        env:
+          MINI_APPS_ACCESS_TOKEN: ${{ secrets.MINI_APPS_ACCESS_TOKEN }}
+          MINI_APPS_ENVIRONMENT: production
+          CI_URLS: 'true'
+        run: |
+          CODE="${{ github.event.inputs.confirmation_code }}"
+          if [[ -z "$CODE" ]]; then
+            echo "::error::Для production нужен confirmation_code (код от главного администратора). Получите его и перезапустите воркфлоу."
+            exit 1
+          fi
+          printf '%s\n' "$CODE" | script -qec "npm run deploy" /dev/null
