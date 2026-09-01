@@ -20,8 +20,28 @@ self.addEventListener("activate", e => {
         caches.keys()
             .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
             .then(() => self.clients.claim())
+            .then(() => idbPut("swver", CACHE))
     );
 });
+
+function idbPut(key, value) {
+    return new Promise(res => {
+        try {
+            const rq = indexedDB.open("lunarreturns", 1);
+            rq.onupgradeneeded = () => rq.result.createObjectStore("kv");
+            rq.onerror = () => res();
+            rq.onsuccess = () => {
+                const idb = rq.result;
+                try {
+                    const tx = idb.transaction("kv", "readwrite");
+                    tx.objectStore("kv").put(value, key);
+                    tx.oncomplete = () => { idb.close(); res(); };
+                    tx.onerror = () => { idb.close(); res(); };
+                } catch (e) { idb.close(); res(); }
+            };
+        } catch (e) { res(); }
+    });
+}
 
 function readKey(key) {
     return new Promise(res => {

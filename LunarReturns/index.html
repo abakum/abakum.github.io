@@ -186,6 +186,10 @@
 <b>Великое слияние:</b> сложение лунного 8-летнего и недельного 11-летнего циклов (8+11) дает 19-летний Метонов цикл. При этом +38 часов 11 минут погрешности 8-летнего цикла складываются с -36 часами 6 минутами погрешности 11-летнего цикла, снижая общую погрешность до 2 часов 5 минут.</li>
 </p>
 <div id="pushlog" style="display:none; font-size:0.85em; color:#777; white-space:pre-line;"></div>
+<div id="swver" style="font-size:0.85em; color:#777; min-height:1.2em;">
+    <span id="swverText"></span>
+    <a href="https://github.com/abakum/LunarReturns/issues" target="_blank" rel="noopener" style="color:#555; margin-left:6px;">Сообщить об ошибке</a>
+</div>
 
 <script>
 const YANDEX_CLIENT_ID = "6abbc1008e0b40a4910c287ed145e86b";
@@ -955,13 +959,33 @@ async function idbGetLog() {
     } catch (e) { return []; }
 }
 
+async function idbGetKey(key) {
+    try {
+        const idb = await idbOpen();
+        const val = await new Promise((res, rej) => {
+            const rq = idb.transaction("kv").objectStore("kv").get(key);
+            rq.onsuccess = () => res(rq.result);
+            rq.onerror = () => rej(rq.error);
+        });
+        idb.close();
+        return val;
+    } catch (e) { return undefined; }
+}
+
+async function renderSwVersion() {
+    const el = document.getElementById("swverText");
+    const ver = await idbGetKey("swver");
+    el.textContent = typeof ver === "string"
+        ? "Версия приложения (SW): " + ver.replace(/^lunarreturns-/, "")
+        : "Версия приложения (SW): …";
+}
+
 async function renderPushLog() {
     const el = document.getElementById("pushlog");
     const log = await idbGetLog();
     if (!log.length) { el.style.display = "none"; return; }
     el.textContent = "Журнал пушей:\n" + log.map(r => {
-        const ver = typeof r.v === "string" ? " [sw " + r.v.replace(/^lunarreturns-/, "") + "]" : " [sw старый]";
-        const main = r.t + ver +
+        const main = r.t +
             " — db:" + (r.db === null ? "нет" : r.db) +
             " days:" + (r.days === null ? "нет" : r.days);
         if (typeof r.body !== "string") return main + "\n(тело не сохранялось — запись от старого SW)";
@@ -1525,9 +1549,13 @@ checkOAuthHash();
 hashSelect();
 refreshPushBtn();
 renderPushLog();
+renderSwVersion();
 idbPutDb();
-if ("serviceWorker" in navigator && location.protocol === "https:")
+if ("serviceWorker" in navigator && location.protocol === "https:") {
     navigator.serviceWorker.register("./sw.js");
+    navigator.serviceWorker.ready.then(() => renderSwVersion());
+    navigator.serviceWorker.addEventListener("controllerchange", () => renderSwVersion());
+}
 </script>
 </body>
 </html>
