@@ -1481,7 +1481,22 @@ async function vkDbGet() {
                 throw new Error("в облаке ВКонтакте не JSON");
             }
         }
-        if (empty) incoming = [{ n: "Ада", d: "1815-12-10" }];
+        let emptyMsg = "В облаке ВКонтакте пусто и дата рождения в профиле не указана — заготовка: Ада";
+        if (empty) {
+            incoming = [{ n: "Ада", d: "1815-12-10" }];
+            try {
+                const user = await vkBridge.send("VKWebAppGetUserInfo");
+                const m = /^(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?$/.exec((user && user.bdate) || "");
+                if (m) {
+                    const dd = m[1].padStart(2, "0");
+                    const mm = m[2].padStart(2, "0");
+                    incoming = [{ n: "Я", d: (m[3] || "1815") + "-" + mm + "-" + dd }];
+                    emptyMsg = m[3]
+                        ? "В облаке ВКонтакте пусто — загружена дата рождения из профиля ВКонтакте"
+                        : "В облаке ВКонтакте пусто — дата рождения из профиля без года, подставлен 1815";
+                }
+            } catch (err) { }
+        }
         if (!incoming.every(validRecord)) {
             throw new Error("неверный формат базы в облаке ВКонтакте");
         }
@@ -1491,14 +1506,14 @@ async function vkDbGet() {
         const backup = db;
         db = merged;
         sortDb();
-        adaSeeded = empty;
+        adaSeeded = empty && incoming[0].n === "Ада";
         if (!saveDb()) { db = backup; return; }
         selectedIdx = -1;
         hideResult();
         renderList();
         refreshDbQr();
         status(empty
-            ? "В облаке ВКонтакте пусто — заготовка: Ада"
+            ? emptyMsg
             : "База загружена из облака ВКонтакте. Записей: " + db.length);
     } catch (e) {
         status("Ошибка загрузки: " + vkErr(e), true);
