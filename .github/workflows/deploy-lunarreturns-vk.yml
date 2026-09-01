@@ -39,17 +39,21 @@ jobs:
 
       # Dev-деплой полностью автоматический: код подтверждения не требуется.
       # В vk-hosting-config.json задан update_dev=1 — после выкладки VK сам
-      # переключает dev-URL приложения на новую версию. Вывод деплоя сохраняем,
-      # а шаг «URLs in summary» выносит стейджинг-адрес в сводку запуска
-      # (справочно, копировать его вручную больше не нужно).
+      # переключает dev-URL приложения на новую версию, поэтому stage-адрес
+      # больше не нужен и из CI он скрывается: утилита всегда печатает его
+      # в stdout, так что вывод деплоя перенаправляется в файл, маскируется
+      # и только затем попадает в лог запуска.
       - name: Deploy to VK hosting (dev)
         if: github.event.inputs.environment == 'dev'
         working-directory: LunarReturns
         env:
           MINI_APPS_ACCESS_TOKEN: ${{ secrets.MINI_APPS_ACCESS_TOKEN }}
           MINI_APPS_ENVIRONMENT: dev
-          CI_URLS: 'true'
-        run: npm run deploy 2>&1 | tee "$RUNNER_TEMP/deploy.log"
+        run: |
+          status=0
+          npm run deploy > "$RUNNER_TEMP/deploy.log" 2>&1 || status=$?
+          sed -E 's#https://stage-app[^[:space:]]*#[stage-URL скрыт]#g' "$RUNNER_TEMP/deploy.log"
+          exit $status
 
       # Production требует код подтверждения от главного администратора.
       # Псевдо-TTY (script) нужен, т.к. библиотека читает код из stdin, а у GitHub Actions нет TTY.
@@ -68,9 +72,11 @@ jobs:
           fi
           printf '%s\n' "$CODE" | script -qec "npm run deploy" /dev/null | tee "$RUNNER_TEMP/deploy.log"
 
-      # Выносит URL выложенной версии из лога деплоя в сводку запуска (Summary)
-      # и в заметки шага (::notice) — адрес не нужно искать в сыром выводе CI.
+      # Выносит URL выложенной production-версии из лога деплоя в сводку
+      # запуска (Summary) и в заметки шага (::notice). Для dev не выполняется:
+      # stage-адрес из CI скрывается, URL приложения переключается автоматически.
       - name: URLs in summary
+        if: github.event.inputs.environment == 'production'
         run: |
           LOG="$RUNNER_TEMP/deploy.log"
           [[ -f "$LOG" ]] || { echo "Лог деплоя не найден"; exit 0; }
@@ -78,7 +84,6 @@ jobs:
           [[ -n "$URLS" ]] || { echo "URL в выводе деплоя не найден"; exit 0; }
           {
             echo "## URL мини-аппа после выкладки"
-            echo "VK выдаёт каждой выкладке новый адрес — скопируйте актуальный отсюда:"
             echo '```'
             echo "$URLS"
             echo '```'

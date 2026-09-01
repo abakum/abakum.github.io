@@ -227,19 +227,64 @@ let yandexToken = "";
 // добавляет при запуске мини-аппа (см. dev.vk.com/mini-apps/development/launch-params).
 const vkminiapp = new URLSearchParams(location.search).has("vk_app_id");
 
-// Посторонние адреса (stage-хосты дев-версий в обычном браузере, чужие зеркала)
-// уводим на страницу мини-аппа: приложение не опубликовано, там его видят
-// только админы. Внутри VK (vk_app_id есть) не трогаем — иначе петля:
-// vk.ru/app сам грузит страницу со stage-хоста.
-const VK_APP_URL = "https://vk.ru/app54746591";
-const PWA_PREFIX = "https://abakum.github.io/LunarReturns";
-function isAllowedUrl() {
-    if (vkminiapp) return true;
-    if (location.protocol === "file:") return true;
-    if (location.hostname === "localhost" || location.hostname === "127.0.0.1") return true;
-    return location.href === PWA_PREFIX || location.href.startsWith(PWA_PREFIX + "/");
+// ---- Миграция базы между версиями VK-хостинга ----
+// Каждая выкладка получает новый stage-URL (новый origin) с пустым localStorage.
+// Указатели прежних версий хранятся в VKWebAppStorage (ключи lr_origin_<unixtime>,
+// значение — origin; URL не является ПДн), а сама база передаётся цепочкой
+// location.replace только через #-фрагмент URL: фрагмент не отправляется на
+// серверы, поэтому ПДн не покидают устройство. Редирект посторонних адресов
+// (isAllowedUrl) убран: старые stage-URL должны открываться напрямую, чтобы
+// базу можно было перенести вручную (⎘ на старой версии → 📋 на новой).
+const LR_ORIGIN_PREFIX = "lr_origin_";
+const LR_ORIGIN_RE = /^https:\/\/(stage|prod)-app54746591-[a-z0-9]+\.pages\.vk-apps\.(ru|com)$/;
+const LR_MIGRATE_MAX_TRIES = 3;
+let lrMigrated = false;
+
+function lrHashParams() {
+    return new URLSearchParams(location.hash.slice(1));
 }
-if (!isAllowedUrl()) location.replace(VK_APP_URL);
+
+function lrSeedJson() {
+    return JSON.stringify([{ n: "Ада", d: "1815-12-10" }]);
+}
+
+// Режим отдачи: эта (прежняя) версия отдаёт базу новой и не рендерится.
+// Переход выполняется только на origin нашего приложения (LR_ORIGIN_RE).
+if (lrHashParams().has("lr_migrate")) {
+    let back = null;
+    try {
+        const u = new URL(lrHashParams().get("lr_migrate") || "");
+        if (u.protocol === "https:" && LR_ORIGIN_RE.test(u.origin) && u.pathname === location.pathname) back = u;
+    } catch (e) { }
+    if (back) {
+        let raw = null;
+        try {
+            const parsed = JSON.parse(localStorage.getItem(DB_KEY) || "");
+            if (Array.isArray(parsed) && parsed.length) raw = localStorage.getItem(DB_KEY);
+        } catch (e) { }
+        back.hash = raw ? "lr_db=" + encodeURIComponent(raw) : "lr_fail=1";
+        location.replace(back.href);
+        throw "lr_migrate_serve";
+    }
+}
+
+// Приём базы от прежней версии: только если локальная база пуста/сид.
+if (lrHashParams().has("lr_db")) {
+    const raw = localStorage.getItem(DB_KEY);
+    if (!raw || raw === lrSeedJson()) {
+        try {
+            const parsed = JSON.parse(lrHashParams().get("lr_db") || "");
+            if (Array.isArray(parsed) && parsed.length && parsed.every(validRecord)) {
+                localStorage.setItem(DB_KEY, lrHashParams().get("lr_db"));
+                lrMigrated = true;
+            }
+        } catch (e) { }
+    }
+    history.replaceState(null, "", location.pathname + location.search);
+} else if (lrHashParams().has("lr_fail")) {
+    sessionStorage.setItem("lr_migrate_attempts", String(lrAttempts() + 1));
+    history.replaceState(null, "", location.pathname + location.search);
+}
 
 function moonNew(date) {
     const fixangle = a => a - 360 * Math.floor(a / 360);
@@ -430,6 +475,7 @@ function saveDb() {
         return false;
     }
     localStorage.setItem(DB_KEY, json);
+    if (vkminiapp) vkPointerPut().catch(() => { });
     idbPutDb();
     updatePushDates();
     return true;
@@ -1446,6 +1492,71 @@ function vkStorageGetKeys() {
         .then(res => (res && res.keys) || []);
 }
 
+// ---- Указатели версий и миграция базы (см. блок в начале скрипта) ----
+
+function lrAttempts() {
+    return Number(sessionStorage.getItem("lr_migrate_attempts") || 0) || 0;
+}
+
+// Список прежних версий из VKWebAppStorage: [{date, origin}], свежие первыми.
+async function vkPointerGet() {
+    const keys = (await vkStorageGetKeys()).filter(k => k.startsWith(LR_ORIGIN_PREFIX));
+    if (!keys.length) return [];
+    const res = await vkStorageGet(keys);
+    const by = {};
+    for (const kv of (res && res.keys) || []) by[kv.key] = kv.value;
+    return keys
+        .map(k => ({ date: Number(k.slice(LR_ORIGIN_PREFIX.length)) || 0, origin: by[k] || "" }))
+        .filter(p => LR_ORIGIN_RE.test(p.origin))
+        .sort((a, b) => b.date - a.date);
+}
+
+// Запоминает origin текущей версии; история ≤ 10, старшие затираются пустой строкой
+// (удаления ключей в VKWebAppStorage нет). URL версии — не ПДн, согласие не требуется.
+async function vkPointerPut() {
+    const list = await vkPointerGet();
+    if (list.some(p => p.origin === location.origin)) return;
+    await vkStorageSet(LR_ORIGIN_PREFIX + Math.floor(Date.now() / 1000), location.origin);
+    for (const p of list.slice(9)) await vkStorageSet(LR_ORIGIN_PREFIX + p.date, "");
+}
+
+// Запуск миграции: база пуста/сид → перейти за ней на свежий непробованный origin.
+async function maybeMigrateDb() {
+    if (!window.vkBridge) return;
+    if (db.length !== 0 && !(db.length === 1 && adaSeeded)) return;
+    let list = [];
+    try { list = await vkPointerGet(); } catch (e) { return; }
+    const others = list.filter(p => p.origin !== location.origin);
+    if (lrAttempts() >= LR_MIGRATE_MAX_TRIES || !others.length) {
+        if (others.length) showMigrateFallback(others);
+        return;
+    }
+    const tried = JSON.parse(sessionStorage.getItem("lr_migrate_tried") || "[]");
+    const next = others.find(p => !tried.includes(p.origin));
+    if (!next) { showMigrateFallback(others); return; }
+    tried.push(next.origin);
+    sessionStorage.setItem("lr_migrate_tried", JSON.stringify(tried));
+    const back = location.origin + location.pathname + location.search;
+    location.replace(next.origin + location.pathname + location.search
+        + "#lr_migrate=" + encodeURIComponent(back));
+}
+
+// Фолбэк: ссылки на прежние версии + инструкция ручного переноса (⎘ → 📋).
+function showMigrateFallback(list) {
+    const anchor = document.getElementById("status");
+    const div = document.createElement("div");
+    div.id = "lrFallback";
+    div.style.cssText = "font-size:0.9em;color:#555;margin:8px 0;";
+    const links = list.map(p => {
+        const d = p.date ? new Date(p.date * 1000).toLocaleDateString("ru-RU") : "дата неизвестна";
+        return '<a href="' + p.origin + location.pathname + '" target="_blank" rel="noopener">версия от ' + d + "</a>";
+    }).join("<br>");
+    div.innerHTML = "Не удалось перенести базу автоматически.<br>"
+        + "Откройте прежнюю версию, нажмите ⎘ (скопировать базу), вернитесь сюда и нажмите 📋 (вставить):<br>"
+        + links;
+    anchor.parentNode.insertBefore(div, anchor);
+}
+
 async function vkDbPut() {
     try {
         if (db.length > 999) {
@@ -1719,6 +1830,9 @@ if (vkminiapp) {
     // скрытие 🔑 Яндекса, кнопки пушей и версии SW).
     if (window.vkBridge) vkBridge.send("VKWebAppInit").catch(() => { });
     applyVkUi();
+    if (lrMigrated) status("База перенесена со старой версии автоматически");
+    vkPointerPut().catch(() => { });
+    maybeMigrateDb();
 } else if ("serviceWorker" in navigator && location.protocol === "https:") {
     navigator.serviceWorker.register("./sw.js").catch(() => { });
     navigator.serviceWorker.ready.then(() => renderSwVersion());
