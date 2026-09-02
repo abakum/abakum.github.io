@@ -173,6 +173,10 @@
         <input type="checkbox" id="pdConsent">
         <span id="pdConsentText">Разрешаю хранить🔑📤 персональные данные (ПДн: названия событий и даты) в облаке Яндекс согласно 152-ФЗ и GDPR.</span> <span id="pdWithdrawNote" style="display:none;">Отзыв согласия удаляет ПДн из облака Яндекс.</span>
     </label>
+    <label id="pdPushConsentLabel" style="display:none; font-size:0.9em; color:#555;">
+        <input type="checkbox" id="pdPushConsent">
+        <span id="pdPushConsentText">Разрешаю хранить уведомления (Уведомления: идентификатор пользователя ВКонтакте и даты без годов и без названий событий) в облаке Яндекс согласно 152-ФЗ и GDPR.</span> <span id="pdPushWithdrawNote" style="display:none;">Отзыв согласия удаляет Уведомления из облака Яндекса.</span>
+    </label>
     <p id="pdLocalNote" style="display:none; font-size:0.9em; color:#555;">
         Пусть ПДн хранятся только локально на моём устройстве.
     </p>
@@ -201,6 +205,7 @@ const PUSH_PUBLIC_KEY = "BKk3Q3_LmRhK3_kE1Jp8fx34AhWWfBHhn160jIUcdKeHy3y36YuRhaC
 const DB_KEY = "lunarreturns.db";
 const DAYS_KEY = "lunarreturns.days";
 const PD_CONSENT_KEY = "lunarreturns.pdConsent";
+const PD_PUSH_CONSENT_KEY = "lunarreturns.pdPushConsent";
 const AUTOTAP_KEY = "lunarreturns.autotap";
 const VKPUSH_KEY = "lunarreturns.vkpush";
 const QR_MAX_BYTES = 2953;
@@ -962,7 +967,7 @@ function toggleReligionBtns() {
     if (on) {
         savedUiDisp = [];
         const els = [document.getElementById("recForm"), document.getElementById("cityRow"), document.getElementById("list"),
-            document.getElementById("pdConsentLabel"), document.getElementById("pdLocalNote")]
+            document.getElementById("pdConsentLabel"), document.getElementById("pdPushConsentLabel"), document.getElementById("pdLocalNote")]
             .concat([...document.getElementById("toolbar").children].filter(c => c !== rb && c.id !== "eggBtn" && c.id !== "pushBtn"));
         for (const el of els) { savedUiDisp.push([el, el.style.display]); el.style.display = "none"; }
         rb.style.display = "inline";
@@ -1298,10 +1303,48 @@ function pdConsentGiven() {
     return localStorage.getItem(PD_CONSENT_KEY) === "1";
 }
 
+// Отдельное согласие на пуш-подписку (только ВК-режим): сервер функции
+// хранит vk_user_id + MM-DD в облаке Яндекса — это иной состав данных,
+// чем у первого чекбокса (база событий), поэтому согласий два.
+function pushConsentGiven() {
+    return localStorage.getItem(PD_PUSH_CONSENT_KEY) === "1";
+}
+
+function initPushConsent() {
+    if (!vkminiapp) return;
+    document.getElementById("pdPushConsentLabel").style.display = "block";
+    const cb = document.getElementById("pdPushConsent");
+    const note = document.getElementById("pdPushWithdrawNote");
+    cb.checked = pushConsentGiven();
+    note.style.display = cb.checked ? "" : "none";
+    cb.addEventListener("change", () => {
+        if (cb.checked) {
+            localStorage.setItem(PD_PUSH_CONSENT_KEY, "1");
+            note.style.display = "";
+            refreshPushBtn();
+            return;
+        }
+        const subscribed = localStorage.getItem(VKPUSH_KEY) === "1";
+        if (subscribed && !confirm("Отозвать согласие и удалить подписку на оповещения из облака Яндекса?")) {
+            cb.checked = true;
+            return;
+        }
+        localStorage.removeItem(PD_PUSH_CONSENT_KEY);
+        note.style.display = "none";
+        if (subscribed) {
+            localStorage.removeItem(VKPUSH_KEY);
+            pushApi("vk_unsubscribe", { launch_params: vkLaunchParams() }).catch(() => { });
+            if (window.vkBridge) vkBridge.send("VKWebAppDenyNotifications").catch(() => { });
+            status("Согласие отозвано: подписка удалена из облака Яндекса");
+        }
+        refreshPushBtn();
+    });
+}
+
 // В мини-аппе ВКонтакте (vkminiapp) PWA/SW и Web Push недоступны: прячем
 // строку версии SW, а текст согласия ПДн переводим на «облако ВКонтакте».
-// Кнопка пушей остаётся: в ВК-режиме она включает ВК-нативные уведомления
-// (refreshPushBtn/togglePush), а не Web Push.
+// Кнопка пушей в ВК-режиме включает ВК-нативные уведомления
+// (refreshPushBtn/togglePush) и видна только при push-согласии.
 function applyVkUi() {
     if (!vkminiapp) return;
     const t = document.getElementById("pdConsentText");
@@ -1807,6 +1850,10 @@ function vkLaunchParams() {
 }
 
 async function togglePushVk() {
+    if (!pushConsentGiven()) {
+        status("Для оповещений требуется согласие (чекбокс под списком)", true);
+        return;
+    }
     if (localStorage.getItem(VKPUSH_KEY) === "1") {
         localStorage.removeItem(VKPUSH_KEY);
         pushApi("vk_unsubscribe", { launch_params: vkLaunchParams() }).catch(() => { });
@@ -1837,7 +1884,7 @@ function updatePushDates() {
     if (vkminiapp) {
         // ВК-подписка: серверу уходит только vk_user_id (в подписанных launch-параметрах)
         // и обезличенные MM-DD; имена не покидают устройство.
-        if (localStorage.getItem(VKPUSH_KEY) === "1")
+        if (localStorage.getItem(VKPUSH_KEY) === "1" && pushConsentGiven())
             pushApi("vk_subscribe", { launch_params: vkLaunchParams(), dates: allPushDates() }).catch(() => { });
         return;
     }
@@ -1887,7 +1934,7 @@ async function togglePush() {
 function refreshPushBtn() {
     const btn = document.getElementById("pushBtn");
     if (vkminiapp) {
-        if (!PUSH_URL) { btn.style.display = "none"; return; }
+        if (!PUSH_URL || !pushConsentGiven()) { btn.style.display = "none"; return; }
         btn.style.display = "";
         const on = localStorage.getItem(VKPUSH_KEY) === "1";
         btn.textContent = on ? "🔔" : "🔕";
@@ -1911,6 +1958,7 @@ renderNow();
 idbPutDays();
 renderCitySelect();
 initPdConsent();
+initPushConsent();
 checkOAuthHash();
 if (!hashSelect()) autoTapToday();
 refreshPushBtn();
