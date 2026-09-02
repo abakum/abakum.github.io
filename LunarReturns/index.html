@@ -201,6 +201,8 @@ const PUSH_PUBLIC_KEY = "BKk3Q3_LmRhK3_kE1Jp8fx34AhWWfBHhn160jIUcdKeHy3y36YuRhaC
 const DB_KEY = "lunarreturns.db";
 const DAYS_KEY = "lunarreturns.days";
 const PD_CONSENT_KEY = "lunarreturns.pdConsent";
+const AUTOTAP_KEY = "lunarreturns.autotap";
+const VKPUSH_KEY = "lunarreturns.vkpush";
 const QR_MAX_BYTES = 2953;
 const SPACE = "\u2002\u2004";
 const WIDE_SPACE = "\u2003\u2004";
@@ -1297,7 +1299,9 @@ function pdConsentGiven() {
 }
 
 // В мини-аппе ВКонтакте (vkminiapp) PWA/SW и Web Push недоступны: прячем
-// строку версии SW и кнопку пушей, а текст согласия ПДн переводим на «облако ВКонтакте».
+// строку версии SW, а текст согласия ПДн переводим на «облако ВКонтакте».
+// Кнопка пушей остаётся: в ВК-режиме она включает ВК-нативные уведомления
+// (refreshPushBtn/togglePush), а не Web Push.
 function applyVkUi() {
     if (!vkminiapp) return;
     const t = document.getElementById("pdConsentText");
@@ -1306,8 +1310,6 @@ function applyVkUi() {
     if (w) w.textContent = "Отзыв согласия удаляет ПДн из облака ВКонтакте.";
     const sw = document.getElementById("swver");
     if (sw) sw.style.display = "none";
-    const p = document.getElementById("pushBtn");
-    if (p) p.style.display = "none";
 }
 
 function applyPdConsent() {
@@ -1427,11 +1429,44 @@ function checkOAuthHash() {
 
 function hashSelect() {
     const m = location.hash.match(/^#(\d+)$/);
-    if (!m) return;
+    if (!m) return false;
     const row = document.querySelectorAll("#list .row")[Number(m[1]) - 1];
-    if (!row) return;
+    if (!row) return false;
     row.click();
     window.scrollTo(0, 0);
+    return true;
+}
+
+// Автотап при открытии (веб и ВК), раз в день: сегодняшняя MM-DD (МСК, с
+// правилом 02-28→02-29 невисокосного года, паритет sw.js dbLabels) ищется
+// сначала в записях базы, затем — при выбранном религиозном календаре — в
+// днях («тап по яйцу» открывает список от сегодняшней даты). Явный #N из
+// hashSelect приоритетнее; миграционные хэши автотап отключают.
+function autoTapToday() {
+    try {
+        const p = lrHashParams();
+        if (p.has("lr_db") || p.has("lr_migrate") || p.has("lr_fail")) return;
+        const [y, m, d] = mskToday();
+        const pad = x => String(x).padStart(2, "0");
+        const iso = y + "-" + pad(m) + "-" + pad(d);
+        const md = pad(m) + "-" + pad(d);
+        const leap = y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0);
+        const mds = md === "02-28" && !leap ? [md, "02-29"] : [md];
+        if (localStorage.getItem(AUTOTAP_KEY) === iso) return;
+        const idx = db.findIndex(r => r && typeof r.d === "string" && mds.includes(r.d.slice(5)));
+        if (idx >= 0) {
+            const row = document.querySelectorAll("#list .row")[idx];
+            if (!row) return;
+            row.click();
+            window.scrollTo(0, 0);
+            localStorage.setItem(AUTOTAP_KEY, iso);
+            return;
+        }
+        if (dayKind && daysEntries().some(e => e && mds.includes(e.d)) && !religionMode) {
+            toggleReligionBtns();
+            localStorage.setItem(AUTOTAP_KEY, iso);
+        }
+    } catch (e) { }
 }
 
 function logoutYandex() {
@@ -1762,9 +1797,50 @@ function getPushSubscription() {
         .catch(() => null);
 }
 
+// Подписанные launch-параметры ВК (vk_* и sign) для серверной проверки sign.
+function vkLaunchParams() {
+    const p = {};
+    new URLSearchParams(location.search).forEach((v, k) => {
+        if (k === "sign" || k.startsWith("vk_")) p[k] = v;
+    });
+    return p;
+}
+
+async function togglePushVk() {
+    if (localStorage.getItem(VKPUSH_KEY) === "1") {
+        localStorage.removeItem(VKPUSH_KEY);
+        pushApi("vk_unsubscribe", { launch_params: vkLaunchParams() }).catch(() => { });
+        if (window.vkBridge) vkBridge.send("VKWebAppDenyNotifications").catch(() => { });
+        status("Оповещения отключены");
+        return;
+    }
+    if (!new URLSearchParams(location.search).get("vk_user_id")) {
+        status("Оповещения недоступны (нет vk_user_id в launch-параметрах)", true);
+        return;
+    }
+    if (!window.vkBridge) {
+        status("Оповещения недоступны (vk-bridge не загружен)", true);
+        return;
+    }
+    const perm = await vkBridge.send("VKWebAppAllowNotifications").catch(() => null);
+    if (!perm || perm.result === false) {
+        status("Разрешение на уведомления не выдано", true);
+        return;
+    }
+    await pushApi("vk_subscribe", { launch_params: vkLaunchParams(), dates: allPushDates() });
+    localStorage.setItem(VKPUSH_KEY, "1");
+    status("Оповещения включены");
+}
+
 function updatePushDates() {
-    // В VK Mini App пуши недоступны — при сохранении баз db/days подписку не отправляем.
-    if (vkminiapp || !PUSH_URL) return;
+    if (!PUSH_URL) return;
+    if (vkminiapp) {
+        // ВК-подписка: серверу уходит только vk_user_id (в подписанных launch-параметрах)
+        // и обезличенные MM-DD; имена не покидают устройство.
+        if (localStorage.getItem(VKPUSH_KEY) === "1")
+            pushApi("vk_subscribe", { launch_params: vkLaunchParams(), dates: allPushDates() }).catch(() => { });
+        return;
+    }
     getPushSubscription().then(sub => {
         if (sub) pushApi("subscribe", { subscription: sub.toJSON(), dates: allPushDates() }).catch(() => { });
     });
@@ -1772,27 +1848,35 @@ function updatePushDates() {
 
 async function togglePush() {
     try {
-        if (vkminiapp || !("serviceWorker" in navigator) || !PUSH_URL || !PUSH_PUBLIC_KEY) {
-            status("Оповещения недоступны (нет PUSH_URL или ключа)", true);
-            return;
-        }
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        if (sub) {
-            await sub.unsubscribe();
-            pushApi("unsubscribe", { endpoint: sub.endpoint }).catch(() => { });
-            status("Оповещения отключены");
-        } else {
-            if ((await Notification.requestPermission()) !== "granted") {
-                status("Разрешение на уведомления не выдано", true);
+        if (vkminiapp) {
+            if (!PUSH_URL) {
+                status("Оповещения недоступны (нет PUSH_URL)", true);
                 return;
             }
-            const newSub = await reg.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: b64urlToUint8(PUSH_PUBLIC_KEY)
-            });
-            await pushApi("subscribe", { subscription: newSub.toJSON(), dates: allPushDates() });
-            status("Оповещения включены");
+            await togglePushVk();
+        } else {
+            if (!("serviceWorker" in navigator) || !PUSH_URL || !PUSH_PUBLIC_KEY) {
+                status("Оповещения недоступны (нет PUSH_URL или ключа)", true);
+                return;
+            }
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            if (sub) {
+                await sub.unsubscribe();
+                pushApi("unsubscribe", { endpoint: sub.endpoint }).catch(() => { });
+                status("Оповещения отключены");
+            } else {
+                if ((await Notification.requestPermission()) !== "granted") {
+                    status("Разрешение на уведомления не выдано", true);
+                    return;
+                }
+                const newSub = await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: b64urlToUint8(PUSH_PUBLIC_KEY)
+                });
+                await pushApi("subscribe", { subscription: newSub.toJSON(), dates: allPushDates() });
+                status("Оповещения включены");
+            }
         }
     } catch (e) {
         status("Ошибка оповещений: " + e.message, true);
@@ -1802,7 +1886,15 @@ async function togglePush() {
 
 function refreshPushBtn() {
     const btn = document.getElementById("pushBtn");
-    if (vkminiapp || !("serviceWorker" in navigator) || location.protocol !== "https:" || !PUSH_URL || !PUSH_PUBLIC_KEY) {
+    if (vkminiapp) {
+        if (!PUSH_URL) { btn.style.display = "none"; return; }
+        btn.style.display = "";
+        const on = localStorage.getItem(VKPUSH_KEY) === "1";
+        btn.textContent = on ? "🔔" : "🔕";
+        btn.title = on ? "Отключить оповещения о днях" : "Включить оповещения о днях";
+        return;
+    }
+    if (!("serviceWorker" in navigator) || location.protocol !== "https:" || !PUSH_URL || !PUSH_PUBLIC_KEY) {
         btn.style.display = "none";
         return;
     }
@@ -1820,7 +1912,7 @@ idbPutDays();
 renderCitySelect();
 initPdConsent();
 checkOAuthHash();
-hashSelect();
+if (!hashSelect()) autoTapToday();
 refreshPushBtn();
 renderPushLog();
 renderSwVersion();
@@ -1828,7 +1920,7 @@ idbPutDb();
 if (vkminiapp) {
     // Мини-апп ВКонтакте: сервис-воркер и PWA не используются.
     // Инициализируем vk-bridge и включаем VK-интерфейс (тексты согласия,
-    // скрытие 🔑 Яндекса, кнопки пушей и версии SW).
+    // скрытие 🔑 Яндекса и версии SW; пуши — ВК-нативные).
     if (window.vkBridge) vkBridge.send("VKWebAppInit").catch(() => { });
     applyVkUi();
     if (lrMigrated) status("База перенесена со старой версии автоматически");
