@@ -244,6 +244,10 @@ const vkminiapp = new URLSearchParams(location.search).has("vk_app_id");
 // базу можно было перенести вручную (⎘ на старой версии → 📋 на новой).
 const LR_ORIGIN_PREFIX = "lr_origin_";
 const LR_ORIGIN_RE = /^https:\/\/(stage|prod)-app54746591-[a-z0-9]+\.pages\.vk-apps\.(ru|com)$/;
+// Production-версия мини-аппа: только на prod-origin хостинга ВК.
+// В dev/stage-версиях (и на локальном туннеле) ВК-уведомления запрещены
+// платформой («untrusted apps») — чекбокс согласия и 🔔 там не показываем.
+const vkProdApp = vkminiapp && /^https:\/\/prod-/.test(location.origin);
 const LR_MIGRATE_MAX_TRIES = 3;
 let lrMigrated = false;
 
@@ -1311,7 +1315,7 @@ function pushConsentGiven() {
 }
 
 function initPushConsent() {
-    if (!vkminiapp) return;
+    if (!vkProdApp) return;
     document.getElementById("pdPushConsentLabel").style.display = "block";
     const cb = document.getElementById("pdPushConsent");
     const note = document.getElementById("pdPushWithdrawNote");
@@ -1557,8 +1561,11 @@ function cloudPresign(action, token) {
 // указатели версий lr_origin_*; удаление ключей отсутствует — затираем пустой строкой.
 
 function vkErr(e) {
-    return (e && (e.message || (e.error_data && e.error_data.error_reason)))
-        || "хранилище ВКонтакте недоступно";
+    return (e && (e.message
+        || (e.error_data && (e.error_data.error_reason || e.error_data.error_type))
+        || e.error_reason || e.error_type
+        || ("#" + JSON.stringify(e).slice(0, 120))))
+        || "нет ответа vk-bridge";
 }
 
 function vkStorageSet(key, value) {
@@ -1853,8 +1860,8 @@ function vkLaunchParams() {
 }
 
 async function togglePushVk() {
-    if (!pushConsentGiven()) {
-        status("Для оповещений требуется согласие (чекбокс под списком)", true);
+    if (!vkProdApp || !pushConsentGiven()) {
+        status("Для оповещений требуется согласие (чекбокс под списком; доступно только в production-версии)", true);
         return;
     }
     if (localStorage.getItem(VKPUSH_KEY) === "1") {
@@ -1888,7 +1895,7 @@ function updatePushDates() {
     if (vkminiapp) {
         // ВК-подписка: серверу уходит только vk_user_id (в подписанных launch-параметрах)
         // и обезличенные MM-DD; имена не покидают устройство.
-        if (localStorage.getItem(VKPUSH_KEY) === "1" && pushConsentGiven())
+        if (vkProdApp && localStorage.getItem(VKPUSH_KEY) === "1" && pushConsentGiven())
             pushApi("vk_subscribe", { launch_params: vkLaunchParams(), dates: allPushDates() }).catch(() => { });
         return;
     }
@@ -1938,7 +1945,7 @@ async function togglePush() {
 function refreshPushBtn() {
     const btn = document.getElementById("pushBtn");
     if (vkminiapp) {
-        if (!PUSH_URL || !pushConsentGiven()) { btn.style.display = "none"; return; }
+        if (!PUSH_URL || !vkProdApp || !pushConsentGiven()) { btn.style.display = "none"; return; }
         btn.style.display = "";
         const on = localStorage.getItem(VKPUSH_KEY) === "1";
         btn.textContent = on ? "🔔" : "🔕";
