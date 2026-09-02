@@ -9,18 +9,67 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <script src="qr/qrcode.js"></script>
     <style>
+        /* Цвета вынесены в переменные: тёмная тема — по prefers-color-scheme,
+           классы .theme-dark/.theme-light на <html> (VK launch-параметр
+           appearance/vk_theme приоритетнее системы) перекрывают медиазапрос. */
+        :root {
+            --bg: #f9f9f9;
+            --surface: #fff;
+            --border: #ddd;
+            --border2: #bbb;
+            --btn: #f0f0f0;
+            --btn-h: #e0e0e0;
+            --muted: #555;
+            --muted2: #777;
+            --sel: #e8f5e9;
+            --err: #c62828;
+        }
+        :root.theme-light { --bg: #f9f9f9; --surface: #fff; --border: #ddd; --border2: #bbb; --btn: #f0f0f0; --btn-h: #e0e0e0; --muted: #555; --muted2: #777; --sel: #e8f5e9; --err: #c62828; }
+        @media (prefers-color-scheme: dark) {
+            :root:not(.theme-light) {
+                --bg: #17171a;
+                --surface: #232327;
+                --border: #333338;
+                --border2: #42424a;
+                --btn: #2c2c31;
+                --btn-h: #3a3a41;
+                --muted: #a0a0a8;
+                --muted2: #8a8a92;
+                --sel: #274232;
+                --err: #ef9a9a;
+            }
+        }
+        :root.theme-dark {
+            --bg: #17171a;
+            --surface: #232327;
+            --border: #333338;
+            --border2: #42424a;
+            --btn: #2c2c31;
+            --btn-h: #3a3a41;
+            --muted: #a0a0a8;
+            --muted2: #8a8a92;
+            --sel: #274232;
+            --err: #ef9a9a;
+        }
+        /* Подложка (чек-лист ВК: цветная, не чёрная и не белая, видна при
+           подтягивании за верхний край): жёлтая как 🌙, в тёмной — тёмное золото. */
+        html { background: #f7d774; }
+        html.theme-dark { background: #7a6425; }
+        @media (prefers-color-scheme: dark) {
+            html:not(.theme-light) { background: #7a6425; }
+        }
         body {
             font-family: sans-serif;
             max-width: 640px;
             margin: 0 auto;
             padding: 12px;
-            background: #f9f9f9;
+            background: var(--bg);
         }
         h1 { font-size: 1.4em; }
         h2 { font-size: 1.1em; margin-bottom: 6px; }
         section {
-            background: #fff;
-            border: 1px solid #ddd;
+            background: var(--surface);
+            border: 1px solid var(--border);
             border-radius: 8px;
             padding: 12px;
             margin-bottom: 12px;
@@ -29,17 +78,19 @@
             font: inherit;
             font-size: 1.05em;
             padding: 3px 8px;
-            border: 1px solid #bbb;
+            border: 1px solid var(--border2);
             border-radius: 6px;
-            background: #f0f0f0;
+            background: var(--btn);
             cursor: pointer;
         }
-        button:hover { background: #e0e0e0; }
+        button:hover { background: var(--btn-h); }
         input[type="text"], input[type="date"], select {
             font: inherit;
             padding: 4px 6px;
-            border: 1px solid #bbb;
+            border: 1px solid var(--border2);
             border-radius: 6px;
+            background: var(--surface);
+            color: inherit;
         }
         #list div.row, .days div.row {
             display: flex;
@@ -49,10 +100,10 @@
             border-radius: 6px;
         }
         #list div.row { cursor: pointer; }
-        #list div.row:hover, .days div.row:hover { background: #f0f0f0; }
-        #list div.row.selected { background: #e8f5e9; }
+        #list div.row:hover, .days div.row:hover { background: var(--btn); }
+        #list div.row.selected { background: var(--sel); }
         #list span.n, .days span.n { flex: 1; }
-        #list span.d, .days span.d { color: #555; }
+        #list span.d, .days span.d { color: var(--muted); }
         #resultText {
             width: 100%;
             box-sizing: border-box;
@@ -62,8 +113,8 @@
             resize: none;
         }
         .qr img, .qr svg { max-width: 100%; height: auto; }
-        #status { color: #555; min-height: 1.2em; overflow-wrap: anywhere; }
-        #status.error { color: #c62828; }
+        #status { color: var(--muted); min-height: 1.2em; overflow-wrap: anywhere; }
+        #status.error { color: var(--err); }
         .btnrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
         #cols { display: block; }
         #pasteOverlay {
@@ -78,8 +129,8 @@
         }
         #pasteOverlay.open { display: flex; }
         #pasteDialog {
-            background: #fff;
-            border: 1px solid #bbb;
+            background: var(--surface);
+            border: 1px solid var(--border2);
             border-radius: 8px;
             padding: 12px;
             max-width: 480px;
@@ -102,6 +153,19 @@
             #cols { display: flex; gap: 12px; align-items: flex-start; }
             #cols > section { flex: 1 1 0; min-width: 0; margin-bottom: 12px; }
         }
+        /* Индикатор Pull-to-Refresh (VK-режим): 🌙 над контентом. */
+        #ptrInd {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            font-size: 22px;
+            line-height: 40px;
+            opacity: 0;
+            z-index: 90;
+            transform: translateX(-50%);
+        }
+        #ptrInd.spin { animation: ptrSpin 0.6s linear infinite; }
+        @keyframes ptrSpin { to { transform: translateX(-50%) rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -169,15 +233,15 @@
     </section>
 </div>
 
-    <label id="pdConsentLabel" style="display:block; font-size:0.9em; color:#555;">
+    <label id="pdConsentLabel" style="display:block; font-size:0.9em; color:var(--muted);">
         <input type="checkbox" id="pdConsent">
         <span id="pdConsentText">Разрешаю хранить🔑📤 персональные данные (ПДн: названия событий и даты) в облаке Яндекс согласно 152-ФЗ и GDPR.</span> <span id="pdWithdrawNote" style="display:none;">Отзыв согласия удаляет ПДн из облака Яндекс.</span>
     </label>
-    <label id="pdPushConsentLabel" style="display:none; font-size:0.9em; color:#555;">
+    <label id="pdPushConsentLabel" style="display:none; font-size:0.9em; color:var(--muted);">
         <input type="checkbox" id="pdPushConsent">
         <span id="pdPushConsentText">Разрешаю хранить уведомления🔔 (Уведомления: идентификатор пользователя ВКонтакте и даты без годов и без названий событий) в облаке Яндекс согласно 152-ФЗ и GDPR.</span> <span id="pdPushWithdrawNote" style="display:none;">Отзыв согласия удаляет Уведомления из облака Яндекса.</span>
     </label>
-    <p id="pdLocalNote" style="display:none; font-size:0.9em; color:#555;">
+    <p id="pdLocalNote" style="display:none; font-size:0.9em; color:var(--muted);">
         Пусть ПДн хранятся только локально на моём устройстве.
     </p>
 
@@ -189,10 +253,10 @@
 <b>Ритм Луны:</b> возвращение фазы Луны складывается из циклов в 3 и 5 лет. Их сумма (3+5) дает 8-летний цикл (Октаэтерис).<br>
 <b>Великое слияние:</b> сложение лунного 8-летнего и недельного 11-летнего циклов (8+11) дает 19-летний Метонов цикл. При этом +38 часов 11 минут погрешности 8-летнего цикла складываются с -36 часами 6 минутами погрешности 11-летнего цикла, снижая общую погрешность до 2 часов 5 минут.</li>
 </p>
-<div id="pushlog" style="display:none; font-size:0.85em; color:#777; white-space:pre-line;"></div>
-<div id="swver" style="font-size:0.85em; color:#777; min-height:1.2em;">
+<div id="pushlog" style="display:none; font-size:0.85em; color:var(--muted2); white-space:pre-line;"></div>
+<div id="swver" style="font-size:0.85em; color:var(--muted2); min-height:1.2em;">
     <span id="swverText"></span>
-    <a href="https://github.com/abakum/LunarReturns/issues" target="_blank" rel="noopener" style="color:#555; margin-left:6px;">Сообщить об ошибке</a>
+    <a href="https://github.com/abakum/LunarReturns/issues" target="_blank" rel="noopener" style="color:var(--muted); margin-left:6px;">Сообщить об ошибке</a>
 </div>
 
 <!-- vk-bridge @3.0.2, локальная копия: https://unpkg.com/@vkontakte/vk-bridge@3.0.2/dist/browser.min.js -->
@@ -235,6 +299,121 @@ let yandexToken = "";
 // VK Mini App определяется по параметру vk_app_id в URL, который VK всегда
 // добавляет при запуске мини-аппа (см. dev.vk.com/mini-apps/development/launch-params).
 const vkminiapp = new URLSearchParams(location.search).has("vk_app_id");
+
+// ---- Тема (светлая/тёмная) ----
+// В VK-режиме приоритет у launch-параметра appearance (или легаси vk_theme):
+// класс на <html> перекрывает prefers-color-scheme. В вебе — только система.
+const vkQuery = new URLSearchParams(location.search);
+const vkAppearance = (vkQuery.get("appearance") || vkQuery.get("vk_theme") || "").toLowerCase();
+let themeForced = null; // null = авто по системе
+if (vkminiapp && (vkAppearance === "dark" || vkAppearance === "light")) themeForced = vkAppearance;
+const themeMql = matchMedia("(prefers-color-scheme: dark)");
+
+function applyTheme() {
+    const dark = themeForced ? themeForced === "dark" : themeMql.matches;
+    document.documentElement.classList.toggle("theme-dark", dark);
+    document.documentElement.classList.toggle("theme-light", !dark);
+    // theme-color = фактический фон body (статус-бар браузера/PWA).
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = dark ? "#17171a" : "#f9f9f9";
+    // Подложка окна приложения в мобильном клиенте ВК (VKWebAppSetViewSettings
+    // нет в схеме vk-bridge 3.0.2, но send() имя события не валидирует;
+    // на vk.com и старых клиентах событие просто не поддержано — глушим).
+    if (vkminiapp && window.vkBridge) {
+        try {
+            vkBridge.send("VKWebAppSetViewSettings", {
+                status_bar_style: dark ? "light" : "dark",
+                background_color: dark ? "#7a6425" : "#f7d774"
+            }).catch(() => { });
+        } catch (e) { }
+    }
+}
+
+if (typeof themeMql.addEventListener === "function")
+    themeMql.addEventListener("change", () => { if (themeForced === null) applyTheme(); });
+applyTheme();
+
+// ---- Pull-to-Refresh (только VK-режим) ----
+// Жест подтягивания при scrollY==0: контент следует за пальцем, над ним
+// крутится 🌙 на жёлтой подложке. Порог ~70px — location.reload():
+// подтянуть свежую версию кода после деплоя (чек-лист ВК «обновления
+// без выхода из приложения»). Облако ВК намеренно не перечитывается.
+(function () {
+    if (!vkminiapp) return;
+    const THRESHOLD = 70;
+    let startY = 0, pulling = false, dist = 0, armed = false;
+    const ind = document.createElement("div");
+    ind.id = "ptrInd";
+    ind.textContent = "🌙";
+    // В <html>, а не в <body>: transform на body делает fixed-детей body
+    // относительными body, индикатор же должен остаться на месте.
+    document.documentElement.appendChild(ind);
+
+    function ptrReset() {
+        ind.classList.remove("spin");
+        ind.style.transition = "transform .2s, opacity .2s";
+        document.body.style.transition = "transform .2s";
+        ind.style.opacity = "0";
+        ind.style.transform = "translateX(-50%)";
+        document.body.style.transform = "";
+        setTimeout(() => {
+            ind.style.transition = "";
+            document.body.style.transition = "";
+        }, 210);
+    }
+
+    addEventListener("touchstart", e => {
+        const overlay = document.getElementById("pasteOverlay");
+        armed = e.touches.length === 1 && scrollY <= 0
+            && !(overlay && overlay.classList.contains("open"));
+        if (armed) {
+            startY = e.touches[0].clientY;
+            pulling = false;
+            dist = 0;
+        }
+    }, { passive: true });
+
+    addEventListener("touchmove", e => {
+        if (!armed) return;
+        const dy = e.touches[0].clientY - startY;
+        if (dy <= 0 || scrollY > 0) {
+            if (pulling) ptrReset();
+            armed = false;
+            return;
+        }
+        if (e.cancelable) e.preventDefault();
+        pulling = true;
+        dist = dy * 0.5; // сопротивление
+        ind.style.transition = "none";
+        document.body.style.transition = "none";
+        ind.style.opacity = String(Math.min(1, dist / THRESHOLD));
+        ind.style.transform = "translateX(-50%) translateY(" + Math.min(THRESHOLD, dist) + "px)"
+            + " rotate(" + Math.round(dist * 3) + "deg)";
+        document.body.style.transform = "translateY(" + Math.round(dist) + "px)";
+    }, { passive: false });
+
+    function ptrEnd() {
+        if (!armed) return;
+        armed = false;
+        if (!pulling) return;
+        pulling = false;
+        if (dist >= THRESHOLD) {
+            ind.style.transform = "translateX(-50%) translateY(" + THRESHOLD + "px)";
+            ind.classList.add("spin");
+            document.body.style.transition = "transform .2s";
+            document.body.style.transform = "";
+            setTimeout(() => location.reload(), 600);
+        } else {
+            ptrReset();
+        }
+    }
+
+    addEventListener("touchend", ptrEnd, { passive: true });
+    addEventListener("touchcancel", () => {
+        armed = false;
+        if (pulling) { pulling = false; ptrReset(); }
+    }, { passive: true });
+})();
 
 // ---- Миграция базы между версиями VK-хостинга ----
 // Каждая выкладка получает новый stage-URL (новый origin) с пустым localStorage.
@@ -1679,7 +1858,7 @@ function showMigrateFallback(list) {
     const anchor = document.getElementById("status");
     const div = document.createElement("div");
     div.id = "lrFallback";
-    div.style.cssText = "font-size:0.9em;color:#555;margin:8px 0;";
+    div.style.cssText = "font-size:0.9em;color:var(--muted);margin:8px 0;";
     const links = list.map(p => {
         const d = p.date ? new Date(p.date * 1000).toLocaleDateString("ru-RU") : "дата неизвестна";
         return '<a href="' + p.origin + location.pathname + '" target="_blank" rel="noopener">версия от ' + d + "</a>";
@@ -2024,7 +2203,7 @@ if (vkminiapp) {
     // Мини-апп ВКонтакте: сервис-воркер и PWA не используются.
     // Инициализируем vk-bridge и включаем VK-интерфейс (тексты согласия,
     // скрытие 🔑 Яндекса и версии SW; пуши — ВК-нативные).
-    if (window.vkBridge) vkBridge.send("VKWebAppInit").catch(() => { });
+    if (window.vkBridge) vkBridge.send("VKWebAppInit").then(applyTheme, applyTheme);
     applyVkUi();
     if (lrMigrated) status("База перенесена со старой версии автоматически");
     vkPointerPut().catch(() => { });
