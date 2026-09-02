@@ -171,7 +171,7 @@
 
     <label id="pdConsentLabel" style="display:block; font-size:0.9em; color:#555;">
         <input type="checkbox" id="pdConsent">
-        <span id="pdConsentText">Согласен(на) на хранения моих персональных данных (ПДн: имена и даты рождения) и ПДн третьих лиц в облаке Яндекс (🔑📤) согласно 152-ФЗ и GDPR.</span> <span id="pdWithdrawNote" style="display:none;">Отзыв согласия удаляет ПДн из облака Яндекс.</span>
+        <span id="pdConsentText">Разрешаю хранить🔑📤 персональные данные (ПДн: названия событий и даты) в облаке Яндекс согласно 152-ФЗ и GDPR.</span> <span id="pdWithdrawNote" style="display:none;">Отзыв согласия удаляет ПДн из облака Яндекс.</span>
     </label>
     <p id="pdLocalNote" style="display:none; font-size:0.9em; color:#555;">
         Пусть ПДн хранятся только локально на моём устройстве.
@@ -1301,7 +1301,7 @@ function pdConsentGiven() {
 function applyVkUi() {
     if (!vkminiapp) return;
     const t = document.getElementById("pdConsentText");
-    if (t) t.textContent = "Согласен(на) на хранения моих персональных данных (ПДн: имена и даты рождения) и ПДн третьих лиц в облаке ВКонтакте (📤📥) согласно 152-ФЗ и GDPR.";
+    if (t) t.textContent = "Разрешаю хранить📤 персональные данные (ПДн: названия событий и даты) в облаке ВКонтакте согласно 152-ФЗ и GDPR.";
     const w = document.getElementById("pdWithdrawNote");
     if (w) w.textContent = "Отзыв согласия удаляет ПДн из облака ВКонтакте.";
     const sw = document.getElementById("swver");
