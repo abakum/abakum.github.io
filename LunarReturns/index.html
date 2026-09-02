@@ -175,7 +175,7 @@
     </label>
     <label id="pdPushConsentLabel" style="display:none; font-size:0.9em; color:#555;">
         <input type="checkbox" id="pdPushConsent">
-        <span id="pdPushConsentText">Разрешаю хранить уведомления (Уведомления: идентификатор пользователя ВКонтакте и даты без годов и без названий событий) в облаке Яндекс согласно 152-ФЗ и GDPR.</span> <span id="pdPushWithdrawNote" style="display:none;">Отзыв согласия удаляет Уведомления из облака Яндекса.</span>
+        <span id="pdPushConsentText">Разрешаю хранить уведомления🔔 (Уведомления: идентификатор пользователя ВКонтакте и даты без годов и без названий событий) в облаке Яндекс согласно 152-ФЗ и GDPR.</span> <span id="pdPushWithdrawNote" style="display:none;">Отзыв согласия удаляет Уведомления из облака Яндекса.</span>
     </label>
     <p id="pdLocalNote" style="display:none; font-size:0.9em; color:#555;">
         Пусть ПДн хранятся только локально на моём устройстве.
@@ -1347,6 +1347,9 @@ function initPushConsent() {
 // (refreshPushBtn/togglePush) и видна только при push-согласии.
 function applyVkUi() {
     if (!vkminiapp) return;
+    // Манифест в VK-сборку не входит (PWA не используется) — гасим 403 в консоли.
+    const mf = document.querySelector('link[rel="manifest"]');
+    if (mf) mf.remove();
     const t = document.getElementById("pdConsentText");
     if (t) t.textContent = "Разрешаю хранить📤 персональные данные (ПДн: названия событий и даты) в облаке ВКонтакте согласно 152-ФЗ и GDPR.";
     const w = document.getElementById("pdWithdrawNote");
@@ -1869,9 +1872,10 @@ async function togglePushVk() {
         status("Оповещения недоступны (vk-bridge не загружен)", true);
         return;
     }
-    const perm = await vkBridge.send("VKWebAppAllowNotifications").catch(() => null);
-    if (!perm || perm.result === false) {
-        status("Разрешение на уведомления не выдано", true);
+    const perm = await vkBridge.send("VKWebAppAllowNotifications")
+        .catch(e => ({ error: e }));
+    if (!perm || perm.result === false || perm.error) {
+        status("Разрешение на уведомления не выдано (" + vkErr(perm && perm.error) + ")", true);
         return;
     }
     await pushApi("vk_subscribe", { launch_params: vkLaunchParams(), dates: allPushDates() });
