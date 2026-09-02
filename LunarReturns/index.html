@@ -983,16 +983,24 @@ const DAYS_DEFS = {
 // Перенос настроек с прежней версии (#lr_ls): только белый список, только
 // отсутствующие в localStorage ключи, только валидные значения (чужие и
 // битые молча пропускаются). Вызов до loadDayKind()/initPdConsent().
+// DAYS_KEY допускает легаси-формат ["kind"] (как loadDayKind) —
+// нормализуем в текущий вид при переносе.
 function applyLsParams(ls) {
     if (!ls || typeof ls !== "object") return;
     for (const k of LR_LS_KEYS) {
-        const v = ls[k];
+        let v = ls[k];
         if (typeof v !== "string") continue;
         if (localStorage.getItem(k) !== null) continue;
-        const ok = k === DAYS_KEY ? !!DAYS_DEFS[v]
-            : k === AUTOTAP_KEY ? /^\d{4}-\d{2}-\d{2}$/.test(v)
-            : v === "1";
-        if (ok) localStorage.setItem(k, v);
+        if (k === DAYS_KEY) {
+            if (v.startsWith("[")) {
+                try { v = JSON.parse(v)[0] || ""; } catch (e) { v = ""; }
+            }
+            if (DAYS_DEFS[v]) localStorage.setItem(k, v);
+        } else if (k === AUTOTAP_KEY) {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(v)) localStorage.setItem(k, v);
+        } else if (v === "1") {
+            localStorage.setItem(k, v);
+        }
     }
 }
 if (lrLsPending) applyLsParams(lrLsPending);
