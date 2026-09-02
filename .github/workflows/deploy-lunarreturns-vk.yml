@@ -29,39 +29,25 @@ jobs:
         working-directory: LunarReturns
         run: npm install --no-audit --no-fund
 
-      # Dev-деплой полностью автоматический: код подтверждения не требуется.
-      # В vk-hosting-config.json задан update_dev=1 — после выкладки VK сам
-      # переключает dev-URL приложения на новую версию, поэтому stage-адрес
-      # больше не нужен и из CI он скрывается: утилита всегда печатает его
-      # в stdout, так что вывод деплоя перенаправляется в файл, маскируется
-      # и только затем попадает в лог запуска.
-      # Dev-деплой выполняется всегда.
-      - name: Deploy to VK hosting (dev)
+      # Деплой выполняется одним шагом: без галочки — только dev
+      # (MINI_APPS_ENVIRONMENT=dev), с галочкой production — одна и та же
+      # версия выкладывается сразу в обе среды (любое значение
+      # MINI_APPS_ENVIRONMENT, кроме dev/production, утилита трактует как
+      # dev+production). Это избавляет от двойной загрузки версии.
+      # Деплой полностью автоматический: сервисный ключ (MINI_APPS_ACCESS_TOKEN)
+      # не требует кода подтверждения администратора. В vk-hosting-config.json
+      # заданы update_dev=1 и update_prod=1 — после выкладки VK сам переключает
+      # dev- и prod-URL приложения на новую версию. Реальные URL утилита
+      # печатает в stdout (из-за CI_URLS), поэтому вывод деплоя перенаправляется
+      # в файл, маскируется и только затем попадает в лог запуска.
+      - name: Deploy to VK hosting
         working-directory: LunarReturns
         env:
           MINI_APPS_ACCESS_TOKEN: ${{ secrets.MINI_APPS_ACCESS_TOKEN }}
-          MINI_APPS_ENVIRONMENT: dev
-        run: |
-          status=0
-          npm run deploy > "$RUNNER_TEMP/dev.log" 2>&1 || status=$?
-          sed -E 's#https://stage-app[^[:space:]]*#[stage-URL скрыт]#g' "$RUNNER_TEMP/dev.log"
-          exit $status
-
-      # Production выполняется по чекбоксу и НЕ требует кода подтверждения:
-      # сервисный ключ (MINI_APPS_ACCESS_TOKEN) позволяет выкладку без
-      # подтверждения администратора (проверено экспериментальным деплоем).
-      # Реальные production-URL печатаются утилитой в stdout (из-за CI_URLS),
-      # поэтому вывод перенаправляется в файл и маскируется, чтобы URL не
-      # попадали в лог запуска.
-      - name: Deploy to VK hosting (production)
-        if: github.event.inputs.production == 'true'
-        working-directory: LunarReturns
-        env:
-          MINI_APPS_ACCESS_TOKEN: ${{ secrets.MINI_APPS_ACCESS_TOKEN }}
-          MINI_APPS_ENVIRONMENT: production
+          MINI_APPS_ENVIRONMENT: ${{ github.event.inputs.production == 'true' && 'all' || 'dev' }}
           CI_URLS: 'true'
         run: |
           status=0
-          npm run deploy > "$RUNNER_TEMP/prod.log" 2>&1 || status=$?
-          sed -E 's#https://[^[:space:]]*#[production-URL скрыт]#g' "$RUNNER_TEMP/prod.log"
+          npm run deploy > "$RUNNER_TEMP/deploy.log" 2>&1 || status=$?
+          sed -E 's#https://[^[:space:]]*#[URL скрыт]#g' "$RUNNER_TEMP/deploy.log"
           exit $status
