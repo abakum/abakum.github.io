@@ -7,6 +7,6 @@
     "mvk": "index.html"
   },
   "update_dev": 1,
-  "update_prod": 0,
+  "update_prod": 1,
   "noprompt": 1
 }
