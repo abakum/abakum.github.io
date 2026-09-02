@@ -208,6 +208,8 @@ const PD_CONSENT_KEY = "lunarreturns.pdConsent";
 const PD_PUSH_CONSENT_KEY = "lunarreturns.pdPushConsent";
 const AUTOTAP_KEY = "lunarreturns.autotap";
 const VKPUSH_KEY = "lunarreturns.vkpush";
+// Настройки, переносимые между версиями ВК-хостинга через #lr_ls (не ПДн).
+const LR_LS_KEYS = [DAYS_KEY, PD_CONSENT_KEY, PD_PUSH_CONSENT_KEY, VKPUSH_KEY, AUTOTAP_KEY];
 const QR_MAX_BYTES = 2953;
 const SPACE = "\u2002\u2004";
 const WIDE_SPACE = "\u2003\u2004";
@@ -259,6 +261,16 @@ function lrSeedJson() {
     return JSON.stringify([{ n: "Ада", d: "1815-12-10" }]);
 }
 
+// Настройки (#lr_ls) для передачи вслед за базой; значения — не ПДн.
+function lrLsHash() {
+    const ls = {};
+    for (const k of LR_LS_KEYS) {
+        const v = localStorage.getItem(k);
+        if (v !== null) ls[k] = v;
+    }
+    return Object.keys(ls).length ? "&lr_ls=" + encodeURIComponent(JSON.stringify(ls)) : "";
+}
+
 // Режим отдачи: эта (прежняя) версия отдаёт базу новой и не рендерится.
 // Переход выполняется только на origin нашего приложения (LR_ORIGIN_RE).
 if (lrHashParams().has("lr_migrate")) {
@@ -273,10 +285,17 @@ if (lrHashParams().has("lr_migrate")) {
             const parsed = JSON.parse(localStorage.getItem(DB_KEY) || "");
             if (Array.isArray(parsed) && parsed.length) raw = localStorage.getItem(DB_KEY);
         } catch (e) { }
-        back.hash = raw ? "lr_db=" + encodeURIComponent(raw) : "lr_fail=1";
+        back.hash = (raw ? "lr_db=" + encodeURIComponent(raw) : "lr_fail=1") + lrLsHash();
         location.replace(back.href);
         throw "lr_migrate_serve";
     }
+}
+
+// Настройки от прежней версии (#lr_ls): разбираем в обеих ветках (lr_db/lr_fail),
+// применяем ниже — после объявления DAYS_DEFS, до основного init.
+let lrLsPending = null;
+if (lrHashParams().has("lr_ls") && (lrHashParams().has("lr_db") || lrHashParams().has("lr_fail"))) {
+    try { lrLsPending = JSON.parse(lrHashParams().get("lr_ls") || ""); } catch (e) { }
 }
 
 // Приём базы от прежней версии: только если локальная база пуста/сид.
@@ -960,6 +979,23 @@ const DAYS_DEFS = {
     jewish: ["Иудейские дни", buildJewish, "✡️"],
     buddhist: ["Буддийские дни", buildBuddhist, "☸️"]
 };
+
+// Перенос настроек с прежней версии (#lr_ls): только белый список, только
+// отсутствующие в localStorage ключи, только валидные значения (чужие и
+// битые молча пропускаются). Вызов до loadDayKind()/initPdConsent().
+function applyLsParams(ls) {
+    if (!ls || typeof ls !== "object") return;
+    for (const k of LR_LS_KEYS) {
+        const v = ls[k];
+        if (typeof v !== "string") continue;
+        if (localStorage.getItem(k) !== null) continue;
+        const ok = k === DAYS_KEY ? !!DAYS_DEFS[v]
+            : k === AUTOTAP_KEY ? /^\d{4}-\d{2}-\d{2}$/.test(v)
+            : v === "1";
+        if (ok) localStorage.setItem(k, v);
+    }
+}
+if (lrLsPending) applyLsParams(lrLsPending);
 
 let savedUiDisp = null;
 let religionMode = false;
