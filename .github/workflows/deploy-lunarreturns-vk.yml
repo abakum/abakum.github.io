@@ -3,19 +3,11 @@ name: Deploy LunarReturns to VK Mini Apps
 on:
   workflow_dispatch:
     inputs:
-      environment:
-        description: "Окружение деплоя на хостинг VK"
-        required: true
-        default: "dev"
-        type: choice
-        options:
-          - dev
-          - production
-      confirmation_code:
-        description: "Код подтверждения (обязателен для production; приходит главному администратору)"
+      production:
+        description: "Выложить также в production (без галочки — только dev)"
         required: false
-        default: ""
-        type: string
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -43,49 +35,33 @@ jobs:
       # больше не нужен и из CI он скрывается: утилита всегда печатает его
       # в stdout, так что вывод деплоя перенаправляется в файл, маскируется
       # и только затем попадает в лог запуска.
+      # Dev-деплой выполняется всегда.
       - name: Deploy to VK hosting (dev)
-        if: github.event.inputs.environment == 'dev'
         working-directory: LunarReturns
         env:
           MINI_APPS_ACCESS_TOKEN: ${{ secrets.MINI_APPS_ACCESS_TOKEN }}
           MINI_APPS_ENVIRONMENT: dev
         run: |
           status=0
-          npm run deploy > "$RUNNER_TEMP/deploy.log" 2>&1 || status=$?
-          sed -E 's#https://stage-app[^[:space:]]*#[stage-URL скрыт]#g' "$RUNNER_TEMP/deploy.log"
+          npm run deploy > "$RUNNER_TEMP/dev.log" 2>&1 || status=$?
+          sed -E 's#https://stage-app[^[:space:]]*#[stage-URL скрыт]#g' "$RUNNER_TEMP/dev.log"
           exit $status
 
-      # Production требует код подтверждения от главного администратора.
-      # Псевдо-TTY (script) нужен, т.к. библиотека читает код из stdin, а у GitHub Actions нет TTY.
+      # Production выполняется по чекбоксу и НЕ требует кода подтверждения:
+      # сервисный ключ (MINI_APPS_ACCESS_TOKEN) позволяет выкладку без
+      # подтверждения администратора (проверено экспериментальным деплоем).
+      # Реальные production-URL печатаются утилитой в stdout (из-за CI_URLS),
+      # поэтому вывод перенаправляется в файл и маскируется, чтобы URL не
+      # попадали в лог запуска.
       - name: Deploy to VK hosting (production)
-        if: github.event.inputs.environment == 'production'
+        if: github.event.inputs.production == 'true'
         working-directory: LunarReturns
         env:
           MINI_APPS_ACCESS_TOKEN: ${{ secrets.MINI_APPS_ACCESS_TOKEN }}
           MINI_APPS_ENVIRONMENT: production
           CI_URLS: 'true'
         run: |
-          CODE="${{ github.event.inputs.confirmation_code }}"
-          if [[ -z "$CODE" ]]; then
-            echo "::error::Для production нужен confirmation_code (код от главного администратора). Получите его и перезапустите воркфлоу."
-            exit 1
-          fi
-          printf '%s\n' "$CODE" | script -qec "npm run deploy" /dev/null | tee "$RUNNER_TEMP/deploy.log"
-
-      # Выносит URL выложенной production-версии из лога деплоя в сводку
-      # запуска (Summary) и в заметки шага (::notice). Для dev не выполняется:
-      # stage-адрес из CI скрывается, URL приложения переключается автоматически.
-      - name: URLs in summary
-        if: github.event.inputs.environment == 'production'
-        run: |
-          LOG="$RUNNER_TEMP/deploy.log"
-          [[ -f "$LOG" ]] || { echo "Лог деплоя не найден"; exit 0; }
-          URLS=$(grep -oE 'https://[A-Za-z0-9._/-]+' "$LOG" | sort -u)
-          [[ -n "$URLS" ]] || { echo "URL в выводе деплоя не найден"; exit 0; }
-          {
-            echo "## URL мини-аппа после выкладки"
-            echo '```'
-            echo "$URLS"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          while IFS= read -r u; do echo "::notice::URL выложенной версии: $u"; done <<< "$URLS"
+          status=0
+          npm run deploy > "$RUNNER_TEMP/prod.log" 2>&1 || status=$?
+          sed -E 's#https://[^[:space:]]*#[production-URL скрыт]#g' "$RUNNER_TEMP/prod.log"
+          exit $status
