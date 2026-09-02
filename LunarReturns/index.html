@@ -184,7 +184,7 @@
             <button type="button" id="delBtn" onclick="deleteCurrent()" title="Удалить" style="display:none;">➖</button>
         </form>
         <div class="btnrow" id="cityRow">
-            <select id="fCity" style="flex:1 1 100%;"></select>
+            <select id="fCity" style="flex:1 1 100%;" onchange="updateCitySelectColor()"></select>
         </div>
         <div id="list"></div>
         <div id="orthodox" class="days" style="display:none;"></div>
@@ -301,8 +301,10 @@ let yandexToken = "";
 const vkminiapp = new URLSearchParams(location.search).has("vk_app_id");
 
 // ---- Тема (светлая/тёмная) ----
-// В VK-режиме приоритет у launch-параметра appearance (или легаси vk_theme):
-// класс на <html> перекрывает prefers-color-scheme. В вебе — только система.
+// Источник в VK-режиме — событие моста VKWebAppUpdateConfig (клиент ВК
+// присылает поле appearance: "light"/"dark" при старте и смене темы;
+// launch-параметр в вебвью не гарантирован). Класс на <html> перекрывает
+// prefers-color-scheme. В вебе — только система.
 const vkQuery = new URLSearchParams(location.search);
 const vkAppearance = (vkQuery.get("appearance") || vkQuery.get("vk_theme") || "").toLowerCase();
 let themeForced = null; // null = авто по системе
@@ -331,6 +333,17 @@ function applyTheme() {
 
 if (typeof themeMql.addEventListener === "function")
     themeMql.addEventListener("change", () => { if (themeForced === null) applyTheme(); });
+if (vkminiapp && window.vkBridge && typeof vkBridge.subscribe === "function") {
+    vkBridge.subscribe(ev => {
+        if (ev && ev.type === "VKWebAppUpdateConfig" && ev.detail) {
+            const a = (ev.detail.appearance || "").toLowerCase();
+            if (a === "dark" || a === "light") {
+                themeForced = a;
+                applyTheme();
+            }
+        }
+    });
+}
 applyTheme();
 
 // ---- Pull-to-Refresh (только VK-режим) ----
@@ -782,6 +795,7 @@ function submitRecord() {
     document.getElementById("fName").value = "";
     document.getElementById("fDate").value = "";
     document.getElementById("fCity").value = "";
+    updateCitySelectColor();
     status((note ? note + " • " : "") + "Записей: " + db.length + ", размер " + byteLen(JSON.stringify(db)) + "/" + QR_MAX_BYTES + " байт");
     renderList();
     refreshDbQr();
@@ -794,6 +808,7 @@ function startEdit(i) {
     document.getElementById("fHour").value = "h" in db[i] ? db[i].h : "";
     document.getElementById("fMin").value = "m" in db[i] ? db[i].m : "";
     document.getElementById("fCity").value = "";
+    updateCitySelectColor();
     const addBtn = document.getElementById("addBtn");
     addBtn.textContent = "💾";
     addBtn.title = "Сохранить";
@@ -809,6 +824,7 @@ function cancelEdit() {
     document.getElementById("fHour").value = "";
     document.getElementById("fMin").value = "";
     document.getElementById("fCity").value = "";
+    updateCitySelectColor();
 }
 
 function removeRecord(i) {
@@ -839,12 +855,18 @@ function hasTime(r) {
 
 const mskDiffLabel = m => "МСК" + (m === 0 ? "" : (m > 0 ? "+" : "−") + Math.abs(m));
 
+function updateCitySelectColor() {
+    // Пустое значение (подсказка) — приглушённым цветом, как даты в списке.
+    const sel = document.getElementById("fCity");
+    sel.style.color = sel.value ? "" : "var(--muted)";
+}
+
 function renderCitySelect() {
     const sel = document.getElementById("fCity");
     sel.innerHTML = "";
     const def = document.createElement("option");
     def.value = "";
-    def.textContent = "Город рождения — или время уже МСК";
+    def.textContent = "Место события — или время уже МСК";
     sel.appendChild(def);
     const groups = {};
     for (const c in CITY_ZONE) {
@@ -863,6 +885,7 @@ function renderCitySelect() {
         }
         sel.appendChild(og);
     }
+    updateCitySelectColor();
 }
 
 function timeLabel(r) {
