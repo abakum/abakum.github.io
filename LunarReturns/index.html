@@ -13,6 +13,7 @@
            классы .theme-dark/.theme-light на <html> (VK launch-параметр
            appearance/vk_theme приоритетнее системы) перекрывают медиазапрос. */
         :root {
+            color-scheme: light;
             --bg: #f9f9f9;
             --surface: #fff;
             --border: #ddd;
@@ -25,9 +26,10 @@
             --sel: #e8f5e9;
             --err: #c62828;
         }
-        :root.theme-light { --bg: #f9f9f9; --surface: #fff; --border: #ddd; --border2: #bbb; --btn: #f0f0f0; --btn-h: #e0e0e0; --muted: #555; --muted2: #777; --text: #1a1a1a; --sel: #e8f5e9; --err: #c62828; }
+        :root.theme-light { color-scheme: light; --bg: #f9f9f9; --surface: #fff; --border: #ddd; --border2: #bbb; --btn: #f0f0f0; --btn-h: #e0e0e0; --muted: #555; --muted2: #777; --text: #1a1a1a; --sel: #e8f5e9; --err: #c62828; }
         @media (prefers-color-scheme: dark) {
             :root:not(.theme-light) {
+                color-scheme: dark;
                 --bg: #17171a;
                 --surface: #232327;
                 --border: #333338;
@@ -42,6 +44,7 @@
             }
         }
         :root.theme-dark {
+            color-scheme: dark;
             --bg: #17171a;
             --surface: #232327;
             --border: #333338;
@@ -315,6 +318,8 @@ function applyTheme() {
     const dark = resolveDark();
     document.documentElement.classList.toggle("theme-dark", dark);
     document.documentElement.classList.toggle("theme-light", !dark);
+    // Нативные контролы (input[type=date] на Android игнорирует CSS color)
+    // красит color-scheme из блоков переменных выше.
     // theme-color = фактический фон body (статус-бар браузера/PWA).
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.content = dark ? "#17171a" : "#f9f9f9";
@@ -341,13 +346,47 @@ if (typeof themeMql.addEventListener === "function") {
         applyTheme();
     });
 }
+
+// Явный запрос актуальной конфигурации ВК (дешёвая страховка для Android WebView,
+// где стартовое VKWebAppUpdateConfig иногда теряется). Возвращает авторитетный
+// appearance/scheme; если клиент не поддержал событие — просто игнорируем.
+function refreshThemeFromBridge() {
+    if (!(vkminiapp && window.vkBridge && typeof vkBridge.send === "function")) return;
+    vkBridge.send("VKWebAppGetConfig")
+        .then(cfg => {
+            if (cfg && cfg.appearance) {
+                const a = String(cfg.appearance).toLowerCase();
+                // "light"/"dark" — явная тема ВК; "system"/пусто/иное — следовать системе.
+                themeForced = (a === "dark" || a === "light") ? a : null;
+                applyTheme();
+            }
+        })
+        .catch(() => { });
+}
+
+// Возврат в мини-апп после смены темы ВК (Android WebView не пересчитывает
+// prefers-color-scheme сам — до фокуса/поворота). НЕ сбрасываем themeForced
+// вслепую: это стёрло бы явную «ручную» тему ВК. Перечитываем авторитетный
+// конфиг, который сам выставит нужное значение.
+function refreshThemeOnReturn() {
+    refreshThemeFromBridge();
+    applyTheme();
+}
+
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshThemeOnReturn();
+});
+
 if (vkminiapp && window.vkBridge && typeof vkBridge.subscribe === "function") {
     vkBridge.subscribe(ev => {
-        if (ev && ev.type === "VKWebAppUpdateConfig" && ev.detail) {
+        if (!ev) return;
+        if (ev.type === "VKWebAppUpdateConfig" && ev.detail) {
             const a = String(ev.detail.appearance || "").toLowerCase();
             // "light"/"dark" — явная тема ВК; "system"/пусто/иное — следовать системе.
             themeForced = (a === "dark" || a === "light") ? a : null;
             applyTheme();
+        } else if (ev.type === "VKWebAppViewRestore") {
+            refreshThemeOnReturn(); // избыточно с visibilitychange, но безвредно
         }
     });
 }
@@ -2215,7 +2254,14 @@ if (vkminiapp) {
     // Мини-апп ВКонтакте: сервис-воркер и PWA не используются.
     // Инициализируем vk-bridge и включаем VK-интерфейс (тексты согласия,
     // скрытие 🔑 Яндекса и версии SW; пуши — ВК-нативные).
-    if (window.vkBridge) vkBridge.send("VKWebAppInit").then(applyTheme, applyTheme);
+    if (window.vkBridge) {
+        // После init явно перечитываем конфиг (страховка для Android WebView,
+        // где стартовое VKWebAppUpdateConfig иногда теряется).
+        vkBridge.send("VKWebAppInit").then(() => {
+            refreshThemeFromBridge();
+            applyTheme();
+        }, applyTheme);
+    }
     applyVkUi();
     if (lrMigrated) status("База перенесена со старой версии автоматически");
     vkPointerPut().catch(() => { });
