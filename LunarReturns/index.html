@@ -75,8 +75,11 @@
                 background: linear-gradient(180deg, #0c1220 0%, #1d2b4a 45%, #4a2f52 78%, #6e3b35 100%) fixed;
             }
         }
-        body {
-            font-family: sans-serif;
+        body { font-family: sans-serif; }
+        /* Колонка-обёртка: визуальные стили body вынесены сюда, чтобы PTR
+           трансформировал обёртку, а не body — иначе fixed-элементы неба
+           (#ptrMoon/#ptrStars) прилипают к трансформируемому предку. */
+        #ptrWrap {
             max-width: 640px;
             margin: 0 auto;
             padding: 12px;
@@ -149,7 +152,7 @@
         #ptrMoon {
             position: fixed; top: 4px;
             left: max(24px, calc(50% - 320px + 24px));
-            width: 48px; height: 48px;
+            width: 24px; height: 24px;
             pointer-events: none; z-index: -1; opacity: 0;
         }
         html.theme-dark #ptrMoon { opacity: 1; }
@@ -228,8 +231,9 @@
     </style>
 </head>
 <body>
-    <img id="ptrMoon" src="icons/icon-192.png" alt="" width="48" height="48">
+    <img id="ptrMoon" src="1f319.webp" alt="" width="24" height="24">
     <div id="ptrStars" aria-hidden="true"></div>
+    <div id="ptrWrap">
     <h1 id="titleH1"><img src="1f319.webp" alt="🌙" width="24" height="24" style="vertical-align:-3px;"> Лунно-солнечные юбилеи</h1>
 
 <div id="cols">
@@ -475,6 +479,9 @@ applyTheme();
 (function () {
     if (!vkminiapp) return;
     const THRESHOLD = 70;
+    // Тянем обёртку, а не body: у трансформированного предка fixed-дети неба
+    // (#ptrMoon/#ptrStars) прилипают к нему и красятся над его фоном.
+    const ptrBody = document.getElementById("ptrWrap");
     let startY = 0, pulling = false, dist = 0, armed = false, hapticDone = false;
 
     // Тактильный «толчок» при взводе PTR: taptic-ивент бриджа ВК
@@ -516,10 +523,10 @@ applyTheme();
     function ptrReset() {
         document.documentElement.classList.remove("ptr-moon");
         ptrSkyClear();
-        document.body.style.transition = "transform .2s";
-        document.body.style.transform = "";
+        ptrBody.style.transition = "transform .2s";
+        ptrBody.style.transform = "";
         setTimeout(() => {
-            document.body.style.transition = "";
+            ptrBody.style.transition = "";
         }, 210);
     }
 
@@ -549,8 +556,8 @@ applyTheme();
         dist = dy * 0.5; // сопротивление
         ptrSky(Math.min(dist / THRESHOLD, 1));
         if (dist >= THRESHOLD && !hapticDone) { hapticDone = true; ptrHaptic(); }
-        document.body.style.transition = "none";
-        document.body.style.transform = "translateY(" + Math.round(dist) + "px)";
+        ptrBody.style.transition = "none";
+        ptrBody.style.transform = "translateY(" + Math.round(dist) + "px)";
     }, { passive: false });
 
     function ptrEnd() {
@@ -561,8 +568,8 @@ applyTheme();
         if (dist >= THRESHOLD) {
             document.documentElement.classList.remove("ptr-moon");
             ptrSkyClear();
-            document.body.style.transition = "transform .2s";
-            document.body.style.transform = "";
+            ptrBody.style.transition = "transform .2s";
+            ptrBody.style.transform = "";
             setTimeout(() => location.reload(), 600);
         } else {
             ptrReset();
@@ -2450,5 +2457,6 @@ if (vkminiapp) {
     navigator.serviceWorker.addEventListener("controllerchange", () => renderSwVersion());
 }
 </script>
+    </div>
 </body>
 </html>
