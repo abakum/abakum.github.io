@@ -150,7 +150,7 @@
            body (max-width 640px, центрирована): над заголовочным 🌙 при любой
            ширине окна. Прозрачность по теме тяги — см. ptrSky() в JS. */
         #ptrMoon {
-            position: fixed; top: 4px;
+            position: fixed; top: 128px; /* середина звёздной полосы (280px) */
             left: max(24px, calc(50% - 320px + 24px));
             width: 24px; height: 24px;
             pointer-events: none; z-index: -1; opacity: 0;
@@ -160,8 +160,12 @@
             html:not(.theme-light) #ptrMoon { opacity: 1; }
         }
         #ptrStars {
-            position: fixed; top: 0; left: 0; right: 0; height: 140px;
+            position: fixed; top: 0; left: 0; right: 0; height: 280px;
             pointer-events: none; z-index: -1; opacity: 0;
+        }
+        html.theme-dark #ptrStars { opacity: 1; }
+        @media (prefers-color-scheme: dark) {
+            html:not(.theme-light) #ptrStars { opacity: 1; }
         }
         #ptrStars i {
             position: absolute; background: #fff; border-radius: 50%;
@@ -501,19 +505,20 @@ applyTheme();
             const s = document.createElement("i");
             const sz = i % 3 ? 2 : 1; // крупные и мелкие вперемешку
             s.style.cssText = "left:" + (Math.random() * 100).toFixed(2) + "%;"
-                + "top:" + Math.round(Math.random() * 110) + "px;"
+                + "top:" + Math.round(Math.random() * 250) + "px;"
                 + "width:" + sz + "px;height:" + sz + "px;";
             starsBox.appendChild(s);
         }
     }
 
-    // Прозрачность неба по прогрессу тяги t (0..1): светлая тема — месяц
-    // проявляется, звёзды выключены; тёмная — месяц непрозрачен, звёзды
-    // проявляются. Дефолты CSS дают состояние «без тяги».
+    // Прозрачность неба по прогрессу тяги t (0..1): светлая тема — месяц и
+    // звёзды проявляются к концу тяги; тёмная — месяц непрозрачен, звёзды
+    // светят с начала тяги и бледнеют к её концу. Дефолты CSS дают
+    // состояние «без тяги».
     function ptrSky(t) {
         const dark = resolveDark();
         document.getElementById("ptrMoon").style.opacity = dark ? "1" : String(t);
-        document.getElementById("ptrStars").style.opacity = dark ? String(t) : "0";
+        document.getElementById("ptrStars").style.opacity = dark ? String(1 - t) : String(t);
     }
     function ptrSkyClear() {
         document.getElementById("ptrMoon").style.opacity = "";
