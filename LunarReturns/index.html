@@ -448,7 +448,17 @@ applyTheme();
 (function () {
     if (!vkminiapp) return;
     const THRESHOLD = 70;
-    let startY = 0, pulling = false, dist = 0, armed = false;
+    let startY = 0, pulling = false, dist = 0, armed = false, hapticDone = false;
+
+    // Тактильный «толчок» при взводе PTR: taptic-ивент бриджа ВК
+    // (iOS — Taptic Engine, Android — вибрация), фолбэк — navigator.vibrate.
+    function ptrHaptic() {
+        if (window.vkBridge && typeof vkBridge.send === "function") {
+            vkBridge.send("VKWebAppTapticImpactOccurred", { style: "light" }).catch(() => {});
+        } else if (navigator.vibrate) {
+            try { navigator.vibrate(10); } catch (e) {}
+        }
+    }
 
     function ptrReset() {
         document.body.style.transition = "transform .2s";
@@ -466,6 +476,7 @@ applyTheme();
             startY = e.touches[0].clientY;
             pulling = false;
             dist = 0;
+            hapticDone = false;
         }
     }, { passive: true });
 
@@ -480,6 +491,7 @@ applyTheme();
         if (e.cancelable) e.preventDefault();
         pulling = true;
         dist = dy * 0.5; // сопротивление
+        if (dist >= THRESHOLD && !hapticDone) { hapticDone = true; ptrHaptic(); }
         document.body.style.transition = "none";
         document.body.style.transform = "translateY(" + Math.round(dist) + "px)";
     }, { passive: false });
