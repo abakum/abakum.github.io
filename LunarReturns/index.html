@@ -62,11 +62,18 @@
             --err: #ef9a9a;
         }
         /* Подложка (чек-лист ВК: цветная, не чёрная и не белая, видна при
-           подтягивании за верхний край): жёлтая, в тёмной — тёмное золото. */
-        html { background: #f7d774; }
-        html.theme-dark { background: #7a6425; }
+           подтягивании за верхний край): вечернее небо — от голубого к тёплому
+           горизонту; в тёмной — сумерки с тлеющим закатом у края. */
+        html {
+            background: linear-gradient(180deg, #4f7fb5 0%, #8fb0d1 45%, #e8b07e 80%, #c97b52 100%) fixed;
+        }
+        html.theme-dark {
+            background: linear-gradient(180deg, #0c1220 0%, #1d2b4a 45%, #4a2f52 78%, #6e3b35 100%) fixed;
+        }
         @media (prefers-color-scheme: dark) {
-            html:not(.theme-light) { background: #7a6425; }
+            html:not(.theme-light) {
+                background: linear-gradient(180deg, #0c1220 0%, #1d2b4a 45%, #4a2f52 78%, #6e3b35 100%) fixed;
+            }
         }
         body {
             font-family: sans-serif;
@@ -113,6 +120,12 @@
            Оверлей «Дата» — обычный HTML-текст над пустым полем; на десктопе
            скрыт, там работает нативный плейсхолдер. */
         #fDatePh { display: none; }
+        /* Непрозрачность подбирает вид нативного UA-плейсхолдера fName:
+           в светлой схеме он ~#757575 (#555 на ~72%), в тёмной — 54% от --muted. */
+        html.theme-dark #fDatePh { opacity: .54; }
+        @media (prefers-color-scheme: dark) {
+            html:not(.theme-light) #fDatePh { opacity: .54; }
+        }
         @media (hover: none) and (pointer: coarse) {
             #fDatePh {
                 position: absolute; inset: 0;
@@ -120,7 +133,7 @@
                 padding: 0 6px;
                 background: var(--surface);
                 color: var(--muted);
-                opacity: .54; /* как UA-плейсхолдер fName (цвет поля ~54%) */
+                opacity: .72;
                 pointer-events: none;
             }
             #dateWrap.filled #fDatePh { display: none; }
