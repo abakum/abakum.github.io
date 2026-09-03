@@ -99,6 +99,11 @@
             background: var(--surface);
             color: var(--muted);
         }
+        /* Плейсхолдер пустого дейт-инпута рисует нативный код WebView и CSS
+           color он игнорирует (красится по внутренним UA-стилям от color-scheme,
+           что даёт инверсию при расхождении схемы с темой страницы). Только
+           ::-webkit-datetime-edit перекрывает и его, и сегменты даты. */
+        input[type="date"]::-webkit-datetime-edit { color: var(--muted); }
         #list div.row, .days div.row {
             display: flex;
             align-items: center;
