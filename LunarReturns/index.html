@@ -3,6 +3,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Не отдаём launch-параметры VK (vk_* в URL) сторонним серверам
+         (Yandex Cloud/S3, oauth.yandex.ru) через заголовок Referer:
+         https://github.com/VKCOM/vk-apps-launch-params -->
+    <meta name="referrer" content="no-referrer">
     <title>Лунно-солнечные юбилеи</title>
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="theme-color" content="#f9f9f9">
