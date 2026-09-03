@@ -141,6 +141,29 @@
             #dateWrap.filled #fDatePh { display: none; }
             #dateWrap:focus-within #fDatePh { display: none; }
         }
+        /* Месяц и звёзды на небе-подложке: красятся после фона html (небо),
+           но до фона body (форма) — на десктопе закрыты формой, при PTR тело
+           сдвигается и открывает их. Горизонталь месяца привязана к колонке
+           body (max-width 640px, центрирована): над заголовочным 🌙 при любой
+           ширине окна. Прозрачность по теме тяги — см. ptrSky() в JS. */
+        #ptrMoon {
+            position: fixed; top: 4px;
+            left: max(24px, calc(50% - 320px + 24px));
+            width: 48px; height: 48px;
+            pointer-events: none; z-index: -1; opacity: 0;
+        }
+        html.theme-dark #ptrMoon { opacity: 1; }
+        @media (prefers-color-scheme: dark) {
+            html:not(.theme-light) #ptrMoon { opacity: 1; }
+        }
+        #ptrStars {
+            position: fixed; top: 0; left: 0; right: 0; height: 140px;
+            pointer-events: none; z-index: -1; opacity: 0;
+        }
+        #ptrStars i {
+            position: absolute; background: #fff; border-radius: 50%;
+        }
+        html.ptr-moon #titleH1 img { visibility: hidden; }
         #list div.row, .days div.row {
             display: flex;
             align-items: center;
@@ -205,6 +228,8 @@
     </style>
 </head>
 <body>
+    <img id="ptrMoon" src="icons/icon-192.png" alt="" width="48" height="48">
+    <div id="ptrStars" aria-hidden="true"></div>
     <h1 id="titleH1"><img src="1f319.webp" alt="🌙" width="24" height="24" style="vertical-align:-3px;"> Лунно-солнечные юбилеи</h1>
 
 <div id="cols">
@@ -462,7 +487,35 @@ applyTheme();
         }
     }
 
+    // Звёзды для ночной темы: ~25 случайных белых точек в верхней полосе неба.
+    const starsBox = document.getElementById("ptrStars");
+    if (starsBox) {
+        for (let i = 0; i < 25; i++) {
+            const s = document.createElement("i");
+            const sz = i % 3 ? 2 : 1; // крупные и мелкие вперемешку
+            s.style.cssText = "left:" + (Math.random() * 100).toFixed(2) + "%;"
+                + "top:" + Math.round(Math.random() * 110) + "px;"
+                + "width:" + sz + "px;height:" + sz + "px;";
+            starsBox.appendChild(s);
+        }
+    }
+
+    // Прозрачность неба по прогрессу тяги t (0..1): светлая тема — месяц
+    // проявляется, звёзды выключены; тёмная — месяц непрозрачен, звёзды
+    // проявляются. Дефолты CSS дают состояние «без тяги».
+    function ptrSky(t) {
+        const dark = resolveDark();
+        document.getElementById("ptrMoon").style.opacity = dark ? "1" : String(t);
+        document.getElementById("ptrStars").style.opacity = dark ? String(t) : "0";
+    }
+    function ptrSkyClear() {
+        document.getElementById("ptrMoon").style.opacity = "";
+        document.getElementById("ptrStars").style.opacity = "";
+    }
+
     function ptrReset() {
+        document.documentElement.classList.remove("ptr-moon");
+        ptrSkyClear();
         document.body.style.transition = "transform .2s";
         document.body.style.transform = "";
         setTimeout(() => {
@@ -492,7 +545,9 @@ applyTheme();
         }
         if (e.cancelable) e.preventDefault();
         pulling = true;
+        document.documentElement.classList.add("ptr-moon"); // 🌙 в заголовке гаснет сразу
         dist = dy * 0.5; // сопротивление
+        ptrSky(Math.min(dist / THRESHOLD, 1));
         if (dist >= THRESHOLD && !hapticDone) { hapticDone = true; ptrHaptic(); }
         document.body.style.transition = "none";
         document.body.style.transform = "translateY(" + Math.round(dist) + "px)";
@@ -504,6 +559,8 @@ applyTheme();
         if (!pulling) return;
         pulling = false;
         if (dist >= THRESHOLD) {
+            document.documentElement.classList.remove("ptr-moon");
+            ptrSkyClear();
             document.body.style.transition = "transform .2s";
             document.body.style.transform = "";
             setTimeout(() => location.reload(), 600);
@@ -2110,11 +2167,9 @@ function cloudLock(on, spinBtn) {
         const b = document.getElementById(id);
         if (!b) continue;
         b.disabled = on;
-        if (b === spinBtn) {
-            if (on) { b.dataset.label = b.textContent; b.textContent = "⟳"; b.classList.add("busy-spin"); }
-        } else if (!on && b.dataset.label !== undefined) {
-            b.textContent = b.dataset.label; delete b.dataset.label; b.classList.remove("busy-spin");
-        }
+        // Нажатая кнопка крутится целиком, со своей иконкой.
+        if (b === spinBtn && on) b.classList.add("busy-spin");
+        else if (!on) b.classList.remove("busy-spin");
     }
 }
 function cloudRun(op, spinBtn) {
