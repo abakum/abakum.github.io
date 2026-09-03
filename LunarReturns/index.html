@@ -102,6 +102,8 @@
             cursor: pointer;
         }
         button:hover { background: var(--btn-h); }
+        @keyframes lrSpin { to { transform: rotate(360deg); } }
+        .busy-spin { display: inline-block; animation: lrSpin 1s linear infinite; }
         input[type="text"], input[type="number"], input[type="date"], select, textarea {
             font: inherit;
             padding: 4px 6px;
@@ -240,8 +242,8 @@
             </span>
             <button id="pushBtn" onclick="togglePush()" title="Включить оповещения о днях">🔕</button>
             <button id="loginBtn" onclick="loginYandex()" title="Войти через Яндекс">🔑</button>
-            <button id="cloudPutBtn" onclick="cloudPut()" title="Сохранить базу в облако" style="display:none;">📤</button>
-            <button id="cloudGetBtn" onclick="cloudGet()" title="Загрузить базу из облака" style="display:none;">📥</button>
+            <button id="cloudPutBtn" onclick="cloudPut(this)" title="Сохранить базу в облако" style="display:none;">📤</button>
+            <button id="cloudGetBtn" onclick="cloudGet(this)" title="Загрузить базу из облака" style="display:none;">📥</button>
             <button onclick="clearDb()" title="Очистить всю базу">❌</button>
             <button onclick="pasteDb()" title="Вставить базу из буфера">📋</button>
             <button onclick="showDbQr()" title="Показать базу как QR">⛶</button>
@@ -1796,7 +1798,7 @@ function initPdConsent() {
         if (vkminiapp) {
             if (confirmAuto("Удалить ПДн из облака ВКонтакте? Локальная база сохранится.")) {
                 applyPdConsent();
-                vkDbClear();
+                cloudRun(() => vkDbClear());
             } else {
                 cb.checked = true;
                 localStorage.setItem(PD_CONSENT_KEY, "1");
@@ -1806,7 +1808,7 @@ function initPdConsent() {
             if (confirmAuto("Удалить ПДн из облака Яндекс? Локальная база сохранится.")) {
                 const token = yandexToken;
                 applyPdConsent();
-                cloudDelete(token);
+                cloudRun(() => cloudDelete(token));
             } else {
                 cb.checked = true;
             }
@@ -2100,26 +2102,50 @@ async function vkDbClear() {
     }
 }
 
-function cloudPut() {
-    if (vkminiapp) { vkDbPut(); return; }
-    cloudPresign("put").then(data =>
-        fetch(data.url, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(db)
-        })
-    ).then(resp => {
-        if (!resp.ok) return resp.text().then(t => {
-            throw new Error("S3 вернул " + resp.status + ": " + t.slice(0, 200));
-        });
-        status("База сохранена в облако. Записей: " + db.length);
-    }).catch(e => status("Ошибка сохранения: " + e.message, true));
+// ---- Блокировка облачных операций (гонка 📤/📥/отзыв согласия) ----
+let cloudBusy = false;
+function cloudLock(on, spinBtn) {
+    cloudBusy = on;
+    for (const id of ["cloudPutBtn", "cloudGetBtn", "pdConsent"]) {
+        const b = document.getElementById(id);
+        if (!b) continue;
+        b.disabled = on;
+        if (b === spinBtn) {
+            if (on) { b.dataset.label = b.textContent; b.textContent = "⟳"; b.classList.add("busy-spin"); }
+        } else if (!on && b.dataset.label !== undefined) {
+            b.textContent = b.dataset.label; delete b.dataset.label; b.classList.remove("busy-spin");
+        }
+    }
+}
+function cloudRun(op, spinBtn) {
+    if (cloudBusy) { status("Дождитесь завершения обмена с облаком", true); return; }
+    cloudLock(true, spinBtn);
+    return Promise.resolve(op()).finally(() => cloudLock(false));
 }
 
-function cloudGet() {
-    if (vkminiapp) { vkDbGet(); return; }
-    let presignBirthday = null;
-    cloudPresign("get").then(data => {
+function cloudPut(btn) {
+    cloudRun(async () => {
+        if (vkminiapp) { await vkDbPut(); return; }
+        await cloudPresign("put").then(data =>
+            fetch(data.url, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(db)
+            })
+        ).then(resp => {
+            if (!resp.ok) return resp.text().then(t => {
+                throw new Error("S3 вернул " + resp.status + ": " + t.slice(0, 200));
+            });
+            status("База сохранена в облако. Записей: " + db.length);
+        });
+    }, btn).catch(e => status("Ошибка сохранения: " + e.message, true));
+}
+
+function cloudGet(btn) {
+    cloudRun(async () => {
+        if (vkminiapp) { await vkDbGet(); return; }
+        let presignBirthday = null;
+        await cloudPresign("get").then(data => {
         presignBirthday = data.birthday || null;
         return fetch(data.url);
     }).then(resp => {
@@ -2165,7 +2191,8 @@ function cloudGet() {
                 ? "В облаке пусто и дата рождения в аккаунте не указана — заготовка: Ада"
                 : "В облаке пусто — загружена дата рождения из аккаунта Яндекса")
             : "База загружена из облака. Записей: " + db.length);
-    }).catch(e => status("Ошибка загрузки: " + e.message, true));
+    });
+    }, btn).catch(e => status("Ошибка загрузки: " + e.message, true));
 }
 
 function b64urlToUint8(b64) {
