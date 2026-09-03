@@ -1,4 +1,4 @@
-const CACHE = "lunarreturns-v9";
+const CACHE = "lunarreturns-v10";
 const INSTALL_URLS = [
     "./",
     "./index.html",

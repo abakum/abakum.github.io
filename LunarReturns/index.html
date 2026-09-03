@@ -91,7 +91,7 @@
             cursor: pointer;
         }
         button:hover { background: var(--btn-h); }
-        input[type="text"], input[type="number"], input[type="date"], select, textarea {
+        input[type="text"], input[type="number"], input[type="date"], select, textarea, #fDateBtn {
             font: inherit;
             padding: 4px 6px;
             border: 1px solid var(--border2);
@@ -174,10 +174,11 @@
     <section>
         <form id="recForm" class="btnrow" onsubmit="submitRecord(); return false;">
             <input type="text" id="fName" maxlength="64" placeholder="Имя" style="flex:1 1 8em;">
-            <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;" title="Дата — по времени места рождения">
-                <input type="date" id="fDate" style="width:9em;" title="Дата — по времени места рождения">
-                <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:3em;" title="Час — по времени места рождения">
-                <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:3em;" title="Минуты — по времени места рождения">
+            <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;" title="Дата — по времени места события">
+                <button type="button" id="fDateBtn" style="width:9em; display:none;" title="Дата — по времени места события">дд.мм.гггг</button>
+                <input type="date" id="fDate" style="width:9em;" title="Дата — по времени места события">
+                <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:3em;" title="Час — по времени места события">
+                <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:3em;" title="Минуты — по времени места события">
             </span>
             <button id="addBtn" type="submit" title="Добавить">➕</button>
             <button type="button" id="delBtn" onclick="deleteCurrent()" title="Удалить" style="display:none;">➖</button>
@@ -254,8 +255,8 @@
 </p>
 <div id="pushlog" style="display:none; font-size:0.85em; color:var(--muted2); white-space:pre-line;"></div>
 <div id="swver" style="font-size:0.85em; color:var(--muted2); min-height:1.2em;">
+    <a href="https://github.com/abakum/LunarReturns/issues" target="_blank" rel="noopener" style="color:var(--muted);">Сообщить об ошибке</a>
     <span id="swverText"></span>
-    <a href="https://github.com/abakum/LunarReturns/issues" target="_blank" rel="noopener" style="color:var(--muted); margin-left:6px;">Сообщить об ошибке</a>
 </div>
 
 <!-- vk-bridge @3.0.2, локальная копия: https://unpkg.com/@vkontakte/vk-bridge@3.0.2/dist/browser.min.js -->
@@ -298,6 +299,12 @@ let yandexToken = "";
 // VK Mini App определяется по параметру vk_app_id в URL, который VK всегда
 // добавляет при запуске мини-аппа (см. dev.vk.com/mini-apps/development/launch-params).
 const vkminiapp = new URLSearchParams(location.search).has("vk_app_id");
+// Версия VK-сборки — прямо из origin хостинга (см. LR_ORIGIN_RE):
+// https://prod-app54746591-4ff53da5fb4c.pages.vk-apps.com → "prod-4ff53da5fb4c".
+const vkBuildVersion = (() => {
+    const m = location.hostname.match(/^(stage|prod)-app\d+-([a-z0-9]+)/);
+    return m ? m[1] + "-" + m[2] : "";
+})();
 
 // ---- Тема (светлая/тёмная) ----
 // Источник темы — prefers-color-scheme: в вебвью ВК он отражает тему приложения
@@ -776,13 +783,32 @@ function readNum(id, max) {
 
 const sortDb = () => db.sort((a, b) => a.d.localeCompare(b.d) || ((a.h ?? 12) - (b.h ?? 12)) || ((a.m ?? 0) - (b.m ?? 0)));
 
+// confirm() в песочнице без allow-modals (iframe-предпросмотры) молча возвращает
+// false, не показывая диалог. Если страница в same-origin iframe, отсутствие
+// токена allow-modals видно прямо в атрибуте sandbox — считаем подтверждённым.
+// Для cross-origin песочниц (frameElement недоступен) — фолбэк на тайминг:
+// заблокированный вызов возвращается мгновенно, живой диалог дольше 10 мс.
+function confirmAuto(msg) {
+    try {
+        const sandbox = window.frameElement && window.frameElement.getAttribute("sandbox");
+        if (sandbox && !/\ballow-modals\b/.test(sandbox)) return true;
+    } catch (e) { }
+    const t0 = performance.now();
+    const ok = confirm(msg);
+    return ok || performance.now() - t0 < 10;
+}
+
 function submitRecord() {
     const n = document.getElementById("fName").value.trim();
     const d = document.getElementById("fDate").value;
     const h = readNum("fHour", 23);
     const m = readNum("fMin", 59);
     if (!n || !/^\d{4}-\d{2}-\d{2}$/.test(d)) {
-        status("Укажите имя и дату рождения", true);
+        status("Укажите имя и дату события", true);
+        // Фокус в первое незаполненное поле (пустая дата скрыта за кнопкой-заглушкой).
+        if (!n) document.getElementById("fName").focus();
+        else if (fDateBtn.style.display !== "none") fDateBtn.focus();
+        else fDateEl.focus();
         return;
     }
     if (h === null || m === null) {
@@ -827,6 +853,7 @@ function submitRecord() {
     }
     document.getElementById("fName").value = "";
     document.getElementById("fDate").value = "";
+    syncDateBtn();
     document.getElementById("fCity").value = "";
     updateCitySelectColor();
     status((note ? note + " • " : "") + "Записей: " + db.length + ", размер " + byteLen(JSON.stringify(db)) + "/" + QR_MAX_BYTES + " байт");
@@ -838,6 +865,7 @@ function startEdit(i) {
     editingIdx = i;
     document.getElementById("fName").value = db[i].n;
     document.getElementById("fDate").value = db[i].d;
+    syncDateBtn();
     document.getElementById("fHour").value = "h" in db[i] ? db[i].h : "";
     document.getElementById("fMin").value = "m" in db[i] ? db[i].m : "";
     document.getElementById("fCity").value = "";
@@ -854,6 +882,7 @@ function cancelEdit() {
     addBtn.title = "Добавить";
     document.getElementById("fName").value = "";
     document.getElementById("fDate").value = "";
+    syncDateBtn();
     document.getElementById("fHour").value = "";
     document.getElementById("fMin").value = "";
     document.getElementById("fCity").value = "";
@@ -861,7 +890,7 @@ function cancelEdit() {
 }
 
 function removeRecord(i) {
-    if (!confirm("Удалить " + db[i].n + " " + db[i].d + "?")) return;
+    if (!confirmAuto("Удалить " + db[i].n + " " + db[i].d + "?")) return;
     db.splice(i, 1);
     if (db.length === 0) adaSeeded = false;
     if (!saveDb()) { renderList(); refreshDbQr(); return; }
@@ -893,6 +922,48 @@ function updateCitySelectColor() {
     const sel = document.getElementById("fCity");
     sel.style.color = sel.value ? "" : "var(--muted)";
 }
+
+const fDateEl = document.getElementById("fDate");
+const fDateBtn = document.getElementById("fDateBtn");
+
+// Плейсхолдер пустого дейт-инпута на Android WebView/Chrome рисуется нативным
+// кодом мимо CSS-псевдоэлементов, поэтому пустое поле — кнопка-заглушка;
+// клик возвращает инпут и открывает системный пикер (showPicker, Chromium ≥99).
+function syncDateBtn() {
+    const empty = !fDateEl.value;
+    fDateBtn.style.display = empty ? "" : "none";
+    fDateEl.style.display = empty ? "none" : "";
+}
+
+// Текст заглушки — как у нативного пустого дейт-инпута: тот следует локали
+// браузера (дд.мм.гггг в ru, mm/dd/yyyy в en-US), порядок и разделитель
+// берём из Intl.DateTimeFormat текущей локали.
+function datePlaceholderLabel() {
+    try {
+        const loc = (new Intl.DateTimeFormat().resolvedOptions().locale || "ru").toLowerCase();
+        const cyr = /^(ru|be|uk|kk|ky|bg|sr|mk)/.test(loc);
+        const map = cyr ? { day: "дд", month: "мм", year: "гггг" }
+                        : { day: "dd", month: "mm", year: "yyyy" };
+        return new Intl.DateTimeFormat().formatToParts(new Date(2026, 10, 22))
+            .map(p => p.type === "literal" ? p.value : (map[p.type] || ""))
+            .join("");
+    } catch (e) {
+        return "дд.мм.гггг";
+    }
+}
+fDateBtn.textContent = datePlaceholderLabel();
+
+fDateBtn.addEventListener("click", () => {
+    fDateBtn.style.display = "none";
+    fDateEl.style.display = "";
+    fDateEl.focus();
+    if (fDateEl.showPicker) {
+        // Промис showPicker разрешается при закрытии пикера: не выбрали дату —
+        // вернуть кнопку-заглушку (нативный плейсхолдер на Android контраста не даёт).
+        requestAnimationFrame(() => fDateEl.showPicker().then(syncDateBtn, syncDateBtn));
+    }
+});
+["input", "change", "blur"].forEach(ev => fDateEl.addEventListener(ev, syncDateBtn));
 
 function renderCitySelect() {
     const sel = document.getElementById("fCity");
@@ -1329,10 +1400,10 @@ async function idbGetKey(key) {
 
 async function renderSwVersion() {
     const el = document.getElementById("swverText");
-    const ver = await idbGetKey("swver");
-    el.textContent = typeof ver === "string"
-        ? "Версия приложения (SW): " + ver.replace(/^lunarreturns-/, "")
-        : "Версия приложения (SW): …";
+    // В мини-аппе показываем версию VK-сборки (prod-<hash>/stage-<hash>),
+    // в браузере — версию сервис-воркера из IDB.
+    const ver = vkminiapp ? vkBuildVersion : await idbGetKey("swver");
+    el.textContent = typeof ver === "string" && ver ? " " + ver.replace(/^lunarreturns-/, "") : "";
 }
 
 async function renderPushLog() {
@@ -1505,7 +1576,7 @@ function showDbQr() {
 
 function clearDb() {
     if (db.length === 0) { status("База уже пуста", true); return; }
-    if (!confirm("Удалить ВСЕ записи (" + db.length + ")?")) return;
+    if (!confirmAuto("Удалить ВСЕ записи (" + db.length + ")?")) return;
     db = [];
     adaSeeded = false;
     localStorage.setItem(DB_KEY, JSON.stringify(db));
@@ -1540,7 +1611,7 @@ function importDbText(text) {
         status("Неверный формат базы", true);
         return;
     }
-    const replace = confirm("OK — заменить текущую базу (" + incoming.length + " зап.), Отмена — объединить");
+    const replace = confirmAuto("OK — заменить текущую базу (" + incoming.length + " зап.), Отмена — объединить");
     const merged = replace ? incoming : db.concat(incoming).filter((r, i, a) =>
         a.findIndex(x => x.n === r.n && x.d === r.d) === i);
     const backup = db;
@@ -1608,7 +1679,7 @@ function initPushConsent() {
             return;
         }
         const subscribed = localStorage.getItem(VKPUSH_KEY) === "1";
-        if (subscribed && !confirm("Отозвать согласие и удалить подписку на оповещения из облака Яндекса?")) {
+        if (subscribed && !confirmAuto("Отозвать согласие и удалить подписку на оповещения из облака Яндекса?")) {
             cb.checked = true;
             return;
         }
@@ -1637,8 +1708,8 @@ function applyVkUi() {
     if (t) t.textContent = "Разрешаю хранить📤 персональные данные (ПДн: названия событий и даты) в облаке ВКонтакте согласно 152-ФЗ и GDPR.";
     const w = document.getElementById("pdWithdrawNote");
     if (w) w.textContent = "Отзыв согласия удаляет ПДн из облака ВКонтакте.";
-    const sw = document.getElementById("swver");
-    if (sw) sw.style.display = "none";
+    // Строку версии не прячем: в мини-аппе вместо версии SW показывается
+    // версия VK-сборки (см. renderSwVersion / LR_VK_BUILD).
 }
 
 function applyPdConsent() {
@@ -1703,7 +1774,7 @@ function initPdConsent() {
         }
         localStorage.removeItem(PD_CONSENT_KEY);
         if (vkminiapp) {
-            if (confirm("Удалить ПДн из облака ВКонтакте? Локальная база сохранится.")) {
+            if (confirmAuto("Удалить ПДн из облака ВКонтакте? Локальная база сохранится.")) {
                 applyPdConsent();
                 vkDbClear();
             } else {
@@ -1712,7 +1783,7 @@ function initPdConsent() {
                 applyPdConsent();
             }
         } else if (yandexToken) {
-            if (confirm("Удалить ПДн из облака Яндекс? Локальная база сохранится.")) {
+            if (confirmAuto("Удалить ПДн из облака Яндекс? Локальная база сохранится.")) {
                 const token = yandexToken;
                 applyPdConsent();
                 cloudDelete(token);
@@ -1979,7 +2050,7 @@ async function vkDbGet() {
         if (!incoming.every(validRecord)) {
             throw new Error("неверный формат базы в облаке ВКонтакте");
         }
-        const replace = confirm("OK — заменить текущую базу (" + incoming.length + " зап.), Отмена — объединить");
+        const replace = confirmAuto("OK — заменить текущую базу (" + incoming.length + " зап.), Отмена — объединить");
         const merged = replace ? incoming : db.concat(incoming).filter((r, i, a) =>
             a.findIndex(x => x.n === r.n && x.d === r.d) === i);
         const backup = db;
@@ -2057,7 +2128,7 @@ function cloudGet() {
         if (!Array.isArray(incoming) || !incoming.every(validRecord)) {
             throw new Error("неверный формат базы в облаке");
         }
-        const replace = confirm("OK — заменить текущую базу (" + incoming.length + " зап.), Отмена — объединить");
+        const replace = confirmAuto("OK — заменить текущую базу (" + incoming.length + " зап.), Отмена — объединить");
         const merged = replace ? incoming : db.concat(incoming).filter((r, i, a) =>
             a.findIndex(x => x.n === r.n && x.d === r.d) === i);
         const backup = db;
@@ -2247,6 +2318,7 @@ renderList();
 renderNow();
 idbPutDays();
 renderCitySelect();
+syncDateBtn();
 initPdConsent();
 initPushConsent();
 checkOAuthHash();
