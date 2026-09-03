@@ -148,16 +148,13 @@
            но до фона body (форма) — на десктопе закрыты формой, при PTR тело
            сдвигается и открывает их. Горизонталь месяца привязана к колонке
            body (max-width 640px, центрирована): над заголовочным 🌙 при любой
-           ширине окна. Прозрачность по теме тяги — см. ptrSky() в JS. */
+           ширине окна. Прозрачность статична по теме: месяц всегда непрозрачен,
+           звёзды видны только на тёмной теме (см. генерацию точек в JS). */
         #ptrMoon {
-            position: fixed; top: 128px; /* середина звёздной полосы (280px) */
+            position: fixed; top: 16px;
             left: max(24px, calc(50% - 320px + 24px));
             width: 24px; height: 24px;
-            pointer-events: none; z-index: -1; opacity: 0;
-        }
-        html.theme-dark #ptrMoon { opacity: 1; }
-        @media (prefers-color-scheme: dark) {
-            html:not(.theme-light) #ptrMoon { opacity: 1; }
+            pointer-events: none; z-index: -1; opacity: 1;
         }
         #ptrStars {
             position: fixed; top: 0; left: 0; right: 0; height: 280px;
@@ -481,6 +478,22 @@ applyTheme();
 // location.reload(): подтянуть свежую версию кода после деплоя (чек-лист ВК
 // «обновления без выхода из приложения»). Облако ВК намеренно не перечитывается.
 (function () {
+    // Звёзды для ночной темы: ~25 случайных белых точек в верхней полосе неба.
+    // Создаются на всех платформах (не только в VK): на десктопе в тёмной теме
+    // они должны быть видны слева и справа от колонки формы. Сама тяга PTR —
+    // только для VK (см. ранний return ниже), а небо со звёздами нужно всем.
+    const starsBox = document.getElementById("ptrStars");
+    if (starsBox) {
+        for (let i = 0; i < 25; i++) {
+            const s = document.createElement("i");
+            const sz = i % 3 ? 2 : 1; // крупные и мелкие вперемешку
+            s.style.cssText = "left:" + (Math.random() * 100).toFixed(2) + "%;"
+                + "top:" + Math.round(Math.random() * 250) + "px;"
+                + "width:" + sz + "px;height:" + sz + "px;";
+            starsBox.appendChild(s);
+        }
+    }
+
     if (!vkminiapp) return;
     const THRESHOLD = 70;
     // Тянем обёртку, а не body: у трансформированного предка fixed-дети неба
@@ -498,36 +511,8 @@ applyTheme();
         }
     }
 
-    // Звёзды для ночной темы: ~25 случайных белых точек в верхней полосе неба.
-    const starsBox = document.getElementById("ptrStars");
-    if (starsBox) {
-        for (let i = 0; i < 25; i++) {
-            const s = document.createElement("i");
-            const sz = i % 3 ? 2 : 1; // крупные и мелкие вперемешку
-            s.style.cssText = "left:" + (Math.random() * 100).toFixed(2) + "%;"
-                + "top:" + Math.round(Math.random() * 250) + "px;"
-                + "width:" + sz + "px;height:" + sz + "px;";
-            starsBox.appendChild(s);
-        }
-    }
-
-    // Прозрачность неба по прогрессу тяги t (0..1): светлая тема — месяц и
-    // звёзды проявляются к концу тяги; тёмная — месяц непрозрачен, звёзды
-    // светят с начала тяги и бледнеют к её концу. Дефолты CSS дают
-    // состояние «без тяги».
-    function ptrSky(t) {
-        const dark = resolveDark();
-        document.getElementById("ptrMoon").style.opacity = dark ? "1" : String(t);
-        document.getElementById("ptrStars").style.opacity = dark ? String(1 - t) : String(t);
-    }
-    function ptrSkyClear() {
-        document.getElementById("ptrMoon").style.opacity = "";
-        document.getElementById("ptrStars").style.opacity = "";
-    }
-
     function ptrReset() {
         document.documentElement.classList.remove("ptr-moon");
-        ptrSkyClear();
         ptrBody.style.transition = "transform .2s";
         ptrBody.style.transform = "";
         setTimeout(() => {
@@ -559,7 +544,6 @@ applyTheme();
         pulling = true;
         document.documentElement.classList.add("ptr-moon"); // 🌙 в заголовке гаснет сразу
         dist = dy * 0.5; // сопротивление
-        ptrSky(Math.min(dist / THRESHOLD, 1));
         if (dist >= THRESHOLD && !hapticDone) { hapticDone = true; ptrHaptic(); }
         ptrBody.style.transition = "none";
         ptrBody.style.transform = "translateY(" + Math.round(dist) + "px)";
@@ -572,7 +556,6 @@ applyTheme();
         pulling = false;
         if (dist >= THRESHOLD) {
             document.documentElement.classList.remove("ptr-moon");
-            ptrSkyClear();
             ptrBody.style.transition = "transform .2s";
             ptrBody.style.transform = "";
             setTimeout(() => location.reload(), 600);
