@@ -108,6 +108,22 @@
            что даёт инверсию при расхождении схемы с темой страницы). Только
            ::-webkit-datetime-edit перекрывает и его, и сегменты даты. */
         input[type="date"]::-webkit-datetime-edit { color: var(--muted); }
+        /* Мобильные WebView (VK) рисуют плейсхолдер пустого дейт-инпута
+           нативным слоем мимо CSS (белый на белом / чёрный на чёрном).
+           Оверлей «Дата» — обычный HTML-текст над пустым полем; на десктопе
+           скрыт, там работает нативный плейсхолдер. */
+        #fDatePh { display: none; }
+        @media (hover: none) and (pointer: coarse) {
+            #fDatePh {
+                position: absolute; inset: 0;
+                display: flex; align-items: center;
+                padding: 0 6px;
+                background: var(--surface);
+                color: var(--muted);
+                pointer-events: none;
+            }
+            #dateWrap.filled #fDatePh { display: none; }
+        }
         #list div.row, .days div.row {
             display: flex;
             align-items: center;
@@ -179,7 +195,10 @@
         <form id="recForm" class="btnrow" onsubmit="submitRecord(); return false;">
             <input type="text" id="fName" maxlength="64" placeholder="Имя" style="flex:1 1 8em;">
             <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;" title="Дата — по времени места события">
-                <input type="date" id="fDate" style="width:9em;" title="Дата — по времени места события">
+                <span id="dateWrap" style="position:relative;">
+                    <input type="date" id="fDate" style="width:9em;" title="Дата — по времени места события">
+                    <span id="fDatePh" aria-hidden="true">Дата</span>
+                </span>
                 <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:3em;" title="Час — по времени места события">
                 <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:3em;" title="Минуты — по времени места события">
             </span>
@@ -855,6 +874,7 @@ function submitRecord() {
     }
     document.getElementById("fName").value = "";
     document.getElementById("fDate").value = "";
+    syncDatePh();
     document.getElementById("fCity").value = "";
     updateCitySelectColor();
     status((note ? note + " • " : "") + "Записей: " + db.length + ", размер " + byteLen(JSON.stringify(db)) + "/" + QR_MAX_BYTES + " байт");
@@ -866,6 +886,7 @@ function startEdit(i) {
     editingIdx = i;
     document.getElementById("fName").value = db[i].n;
     document.getElementById("fDate").value = db[i].d;
+    syncDatePh();
     document.getElementById("fHour").value = "h" in db[i] ? db[i].h : "";
     document.getElementById("fMin").value = "m" in db[i] ? db[i].m : "";
     document.getElementById("fCity").value = "";
@@ -882,6 +903,7 @@ function cancelEdit() {
     addBtn.title = "Добавить";
     document.getElementById("fName").value = "";
     document.getElementById("fDate").value = "";
+    syncDatePh();
     document.getElementById("fHour").value = "";
     document.getElementById("fMin").value = "";
     document.getElementById("fCity").value = "";
@@ -923,6 +945,12 @@ function updateCitySelectColor() {
 }
 
 const fDateEl = document.getElementById("fDate");
+
+function syncDatePh() {
+    document.getElementById("dateWrap").classList.toggle("filled", !!fDateEl.value);
+}
+["input", "change"].forEach(ev => fDateEl.addEventListener(ev, syncDatePh));
+syncDatePh();
 
 function renderCitySelect() {
     const sel = document.getElementById("fCity");
