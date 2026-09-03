@@ -21,10 +21,11 @@
             --btn-h: #e0e0e0;
             --muted: #555;
             --muted2: #777;
+            --text: #1a1a1a;
             --sel: #e8f5e9;
             --err: #c62828;
         }
-        :root.theme-light { --bg: #f9f9f9; --surface: #fff; --border: #ddd; --border2: #bbb; --btn: #f0f0f0; --btn-h: #e0e0e0; --muted: #555; --muted2: #777; --sel: #e8f5e9; --err: #c62828; }
+        :root.theme-light { --bg: #f9f9f9; --surface: #fff; --border: #ddd; --border2: #bbb; --btn: #f0f0f0; --btn-h: #e0e0e0; --muted: #555; --muted2: #777; --text: #1a1a1a; --sel: #e8f5e9; --err: #c62828; }
         @media (prefers-color-scheme: dark) {
             :root:not(.theme-light) {
                 --bg: #17171a;
@@ -35,6 +36,7 @@
                 --btn-h: #3a3a41;
                 --muted: #a0a0a8;
                 --muted2: #8a8a92;
+                --text: #e6e6ea;
                 --sel: #274232;
                 --err: #ef9a9a;
             }
@@ -48,11 +50,12 @@
             --btn-h: #3a3a41;
             --muted: #a0a0a8;
             --muted2: #8a8a92;
+            --text: #e6e6ea;
             --sel: #274232;
             --err: #ef9a9a;
         }
         /* Подложка (чек-лист ВК: цветная, не чёрная и не белая, видна при
-           подтягивании за верхний край): жёлтая как 🌙, в тёмной — тёмное золото. */
+           подтягивании за верхний край): жёлтая, в тёмной — тёмное золото. */
         html { background: #f7d774; }
         html.theme-dark { background: #7a6425; }
         @media (prefers-color-scheme: dark) {
@@ -64,6 +67,7 @@
             margin: 0 auto;
             padding: 12px;
             background: var(--bg);
+            color: var(--text);
         }
         h1 { font-size: 1.4em; }
         h2 { font-size: 1.1em; margin-bottom: 6px; }
@@ -84,13 +88,13 @@
             cursor: pointer;
         }
         button:hover { background: var(--btn-h); }
-        input[type="text"], input[type="date"], select {
+        input[type="text"], input[type="number"], input[type="date"], select, textarea {
             font: inherit;
             padding: 4px 6px;
             border: 1px solid var(--border2);
             border-radius: 6px;
             background: var(--surface);
-            color: inherit;
+            color: var(--muted);
         }
         #list div.row, .days div.row {
             display: flex;
@@ -102,7 +106,7 @@
         #list div.row { cursor: pointer; }
         #list div.row:hover, .days div.row:hover { background: var(--btn); }
         #list div.row.selected { background: var(--sel); }
-        #list span.n, .days span.n { flex: 1; }
+        #list span.n, .days span.n { flex: 1; color: var(--muted); }
         #list span.d, .days span.d { color: var(--muted); }
         #resultText {
             width: 100%;
@@ -153,19 +157,6 @@
             #cols { display: flex; gap: 12px; align-items: flex-start; }
             #cols > section { flex: 1 1 0; min-width: 0; margin-bottom: 12px; }
         }
-        /* Индикатор Pull-to-Refresh (VK-режим): 🌙 над контентом. */
-        #ptrInd {
-            position: fixed;
-            top: 0;
-            left: 50%;
-            font-size: 22px;
-            line-height: 40px;
-            opacity: 0;
-            z-index: 90;
-            transform: translateX(-50%);
-        }
-        #ptrInd.spin { animation: ptrSpin 0.6s linear infinite; }
-        @keyframes ptrSpin { to { transform: translateX(-50%) rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -363,30 +354,18 @@ if (vkminiapp && window.vkBridge && typeof vkBridge.subscribe === "function") {
 applyTheme();
 
 // ---- Pull-to-Refresh (только VK-режим) ----
-// Жест подтягивания при scrollY==0: контент следует за пальцем, над ним
-// крутится 🌙 на жёлтой подложке. Порог ~70px — location.reload():
-// подтянуть свежую версию кода после деплоя (чек-лист ВК «обновления
-// без выхода из приложения»). Облако ВК намеренно не перечитывается.
+// Жест подтягивания при scrollY==0: контент следует за пальцем. Порог ~70px —
+// location.reload(): подтянуть свежую версию кода после деплоя (чек-лист ВК
+// «обновления без выхода из приложения»). Облако ВК намеренно не перечитывается.
 (function () {
     if (!vkminiapp) return;
     const THRESHOLD = 70;
     let startY = 0, pulling = false, dist = 0, armed = false;
-    const ind = document.createElement("div");
-    ind.id = "ptrInd";
-    ind.textContent = "🌙";
-    // В <html>, а не в <body>: transform на body делает fixed-детей body
-    // относительными body, индикатор же должен остаться на месте.
-    document.documentElement.appendChild(ind);
 
     function ptrReset() {
-        ind.classList.remove("spin");
-        ind.style.transition = "transform .2s, opacity .2s";
         document.body.style.transition = "transform .2s";
-        ind.style.opacity = "0";
-        ind.style.transform = "translateX(-50%)";
         document.body.style.transform = "";
         setTimeout(() => {
-            ind.style.transition = "";
             document.body.style.transition = "";
         }, 210);
     }
@@ -413,11 +392,7 @@ applyTheme();
         if (e.cancelable) e.preventDefault();
         pulling = true;
         dist = dy * 0.5; // сопротивление
-        ind.style.transition = "none";
         document.body.style.transition = "none";
-        ind.style.opacity = String(Math.min(1, dist / THRESHOLD));
-        ind.style.transform = "translateX(-50%) translateY(" + Math.min(THRESHOLD, dist) + "px)"
-            + " rotate(" + Math.round(dist * 3) + "deg)";
         document.body.style.transform = "translateY(" + Math.round(dist) + "px)";
     }, { passive: false });
 
@@ -427,8 +402,6 @@ applyTheme();
         if (!pulling) return;
         pulling = false;
         if (dist >= THRESHOLD) {
-            ind.style.transform = "translateX(-50%) translateY(" + THRESHOLD + "px)";
-            ind.classList.add("spin");
             document.body.style.transition = "transform .2s";
             document.body.style.transform = "";
             setTimeout(() => location.reload(), 600);
