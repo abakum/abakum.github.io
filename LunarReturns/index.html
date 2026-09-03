@@ -301,18 +301,27 @@ let yandexToken = "";
 const vkminiapp = new URLSearchParams(location.search).has("vk_app_id");
 
 // ---- Тема (светлая/тёмная) ----
-// Источник в VK-режиме — событие моста VKWebAppUpdateConfig (клиент ВК
-// присылает поле appearance: "light"/"dark" при старте и смене темы;
-// launch-параметр в вебвью не гарантирован). Класс на <html> перекрывает
-// prefers-color-scheme. В вебе — только система.
+// Источник темы — prefers-color-scheme: в вебвью ВК он отражает тему приложения
+// и меняется в реальном времени и в вебе, и в нативных клиентах. Явная тема от
+// VKWebAppUpdateConfig (appearance: "light"/"dark") используется как приоритет и
+// стартовая подсказка, но не блокирует живое обновление по медиазапросу (нативные
+// клиенты не пересылают конфиг при смене темы — отсюда «в браузере работает,
+// в клиенте нет»). launch-параметр в вебвью не гарантирован.
 const vkQuery = new URLSearchParams(location.search);
 const vkAppearance = (vkQuery.get("appearance") || vkQuery.get("vk_theme") || "").toLowerCase();
-let themeForced = null; // null = авто по системе
-if (vkminiapp && (vkAppearance === "dark" || vkAppearance === "light")) themeForced = vkAppearance;
+// "light"/"dark" — стартовая подсказка из launch-параметра (до первого события
+// VKWebAppUpdateConfig); null/"system" — следовать системной теме.
+let themeForced = (vkAppearance === "dark" || vkAppearance === "light") ? vkAppearance : null;
 const themeMql = matchMedia("(prefers-color-scheme: dark)");
 
+function resolveDark() {
+    if (themeForced === "dark") return true;
+    if (themeForced === "light") return false;
+    return themeMql.matches; // "system"/пусто/нет данных → живая системная тема
+}
+
 function applyTheme() {
-    const dark = themeForced ? themeForced === "dark" : themeMql.matches;
+    const dark = resolveDark();
     document.documentElement.classList.toggle("theme-dark", dark);
     document.documentElement.classList.toggle("theme-light", !dark);
     // theme-color = фактический фон body (статус-бар браузера/PWA).
@@ -331,16 +340,23 @@ function applyTheme() {
     }
 }
 
-if (typeof themeMql.addEventListener === "function")
-    themeMql.addEventListener("change", () => { if (themeForced === null) applyTheme(); });
+// Живое обновление темы. Нативные клиенты ВК НЕ пересылают VKWebAppUpdateConfig
+// при смене темы (в браузере — пересылают), зато prefers-color-scheme в вебвью
+// отражает тему приложения ВК и меняется в реальном времени. Поэтому медиазапрос —
+// основной источник, а явную тему снимаем, чтобы она не блокировала обновление.
+if (typeof themeMql.addEventListener === "function") {
+    themeMql.addEventListener("change", () => {
+        themeForced = null; // допускаем живое обновление по системной/приложенческой теме
+        applyTheme();
+    });
+}
 if (vkminiapp && window.vkBridge && typeof vkBridge.subscribe === "function") {
     vkBridge.subscribe(ev => {
         if (ev && ev.type === "VKWebAppUpdateConfig" && ev.detail) {
-            const a = (ev.detail.appearance || "").toLowerCase();
-            if (a === "dark" || a === "light") {
-                themeForced = a;
-                applyTheme();
-            }
+            const a = String(ev.detail.appearance || "").toLowerCase();
+            // "light"/"dark" — явная тема ВК; "system"/пусто/иное — следовать системе.
+            themeForced = (a === "dark" || a === "light") ? a : null;
+            applyTheme();
         }
     });
 }
