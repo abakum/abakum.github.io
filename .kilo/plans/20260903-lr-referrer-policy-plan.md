@@ -1,33 +1,26 @@
-# План: запрет утечки launch-параметров VK через Referer
+# План: убрать кнопку-заглушку #fDateBtn перед дейт-инпутом
 
 ## Контекст
 
-`LunarReturns/index.html` — VK Mini App: launch-параметры (`vk_app_id`, `sign` и др.) находятся в `location.search` весь срок жизни страницы. При кросс-origin запросах браузер прикрепляет заголовок `Referer`; в WebView со старой политикой по умолчанию (`no-referrer-when-downgrade`) уходит полный URL вместе с параметрами. Получатель (Yandex Cloud / S3 / любой сторонний сервер) сможет подделать подпись launch-параметров.
+Пустой `input[type=date]` (#fDate) прячется, а вместо него показывается кнопка `#fDateBtn` с текстом «дд.мм.гггг» — обход нестилизуемого нативного плейсхолдера дейт-инпута на Android WebView/Chrome. Плейсхолдер и сегменты даты теперь красятся CSS-правилом `input[type="date"]::-webkit-datetime-edit { color: var(--muted); }` (index.html:102–106), поэтому кнопка стала избыточной. Решено всегда показывать сам инпут.
 
-Кросс-origin запросы в коде, куда сейчас может утекать Referer:
-- `FUNCTION_URL`, `PUSH_URL` → `functions.yandexcloud.net` (index.html:266–267, fetch на 1895, 2186)
-- presigned-URL'ы Yandex Object Storage: `fetch(data.url)` (index.html:1753, 2086, 2104)
-- навигация на `oauth.yandex.ru` (index.html:1811)
+## Изменения (все в LunarReturns/index.html)
 
-Мета-тег `referrer` / заголовок `Referrer-Policy` в проекте отсутствует (проверено grep'ом по `LunarReturns/`). `sw.js` делает fetch только same-origin — не затрагивается.
+1. **HTML (строка 182):** удалить `<button type="button" id="fDateBtn" ...>дд.мм.гггг</button>`.
 
-## Изменение
+2. **CSS (строка 98):** убрать селектор `#fDateBtn` из списка `input[type="text"], ..., #fDateBtn {` (остальные селекторы не трогать).
 
-1. В `<head>` файла `LunarReturns/index.html` (после `<meta name="viewport">`, строка 5) добавить:
+3. **JS:**
+   - Строки 810–815 (`submitRecord`, ветка фокуса в незаполненное поле): упростить до `else fDateEl.focus();` — убрать проверку `fDateBtn.style.display`. Внимание: `fDateEl` объявлен ниже (строка 930) как `const`, но вызов идёт в runtime-обработчике после инициализации — как сейчас работает через ГЛОБАЛЬНЫЙ `fDateEl`, так и останется.
+   - Удалить вызовы `syncDateBtn();` в строках 860, 872, 889 и 2325.
+   - Удалить строки 930–970 целиком: `const fDateBtn = ...`, функцию `syncDateBtn`, функцию `datePlaceholderLabel`, присваивание текста кнопке, click-listener кнопки (с `showPicker`) и listeners `["input","change","blur"]` на `fDateEl`. Оставить `const fDateEl = document.getElementById("fDate");` (строка 930) — используется в `submitRecord`.
+   - Вместе с listener'ами `showPicker` пропадает автооткрытие пикера по клику на заглушку — пользователь открывает пикер кликом по самому инпуту (стандартное поведение).
 
-```html
-<meta name="referrer" content="no-referrer">
-```
-
-Это рекомендация из https://github.com/VKCOM/vk-apps-launch-params («Запретите передавать параметры запуска через Referer»). `no-referrer`, а не `origin`, чтобы не отдавать даже origin stage-сборок.
-
-## Совместимость (проверено, рисков нет)
-
-- OAuth Яндекса (`location = "https://oauth.yandex.ru/..."`) не требует Referer.
-- Presigned S3-URL и Yandex Cloud Functions не требуют Referer.
-- vk-bridge использует postMessage/схему приложения, не HTTP — не затрагивается.
+4. **Комментарий** у CSS-правила `::-webkit-datetime-edit` (строки 102–105) не требует правок: он описывает покраску нативных сегментов, которая остаётся актуальной.
 
 ## Валидация
 
-1. Открыть страницу, в DevTools → Network убедиться, что запросы к `functions.yandexcloud.net` уходят без заголовка `Referer`.
-2. Прогнать существующие сценарии: `cloudPut`/`cloudGet` (📥/📤), вход через Яндекс (🔑), включение пушей (🔔) — должны работать как раньше.
+1. Открыть страницу: пустой дейт-инпут виден сразу, плейсхолдер приглушённого цвета (тёмная и светлая темы), кнопки «дд.мм.гггг» нет.
+2. Сценарий «Укажите имя и дату события»: с пустым именем фокус в имя; с именем, но пустой датой — фокус в дейт-инпут.
+3. Добавление/редактирование записи: после submit и после отмены поле даты просто очищается, инпут остаётся видимым.
+4. Grep по `fDateBtn|syncDateBtn|datePlaceholderLabel` — 0 совпадений.

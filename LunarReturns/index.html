@@ -95,7 +95,7 @@
             cursor: pointer;
         }
         button:hover { background: var(--btn-h); }
-        input[type="text"], input[type="number"], input[type="date"], select, textarea, #fDateBtn {
+        input[type="text"], input[type="number"], input[type="date"], select, textarea {
             font: inherit;
             padding: 4px 6px;
             border: 1px solid var(--border2);
@@ -179,7 +179,6 @@
         <form id="recForm" class="btnrow" onsubmit="submitRecord(); return false;">
             <input type="text" id="fName" maxlength="64" placeholder="Имя" style="flex:1 1 8em;">
             <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;" title="Дата — по времени места события">
-                <button type="button" id="fDateBtn" style="width:9em; display:none;" title="Дата — по времени места события">дд.мм.гггг</button>
                 <input type="date" id="fDate" style="width:9em;" title="Дата — по времени места события">
                 <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:3em;" title="Час — по времени места события">
                 <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:3em;" title="Минуты — по времени места события">
@@ -809,9 +808,8 @@ function submitRecord() {
     const m = readNum("fMin", 59);
     if (!n || !/^\d{4}-\d{2}-\d{2}$/.test(d)) {
         status("Укажите имя и дату события", true);
-        // Фокус в первое незаполненное поле (пустая дата скрыта за кнопкой-заглушкой).
+        // Фокус в первое незаполненное поле.
         if (!n) document.getElementById("fName").focus();
-        else if (fDateBtn.style.display !== "none") fDateBtn.focus();
         else fDateEl.focus();
         return;
     }
@@ -857,7 +855,6 @@ function submitRecord() {
     }
     document.getElementById("fName").value = "";
     document.getElementById("fDate").value = "";
-    syncDateBtn();
     document.getElementById("fCity").value = "";
     updateCitySelectColor();
     status((note ? note + " • " : "") + "Записей: " + db.length + ", размер " + byteLen(JSON.stringify(db)) + "/" + QR_MAX_BYTES + " байт");
@@ -869,7 +866,6 @@ function startEdit(i) {
     editingIdx = i;
     document.getElementById("fName").value = db[i].n;
     document.getElementById("fDate").value = db[i].d;
-    syncDateBtn();
     document.getElementById("fHour").value = "h" in db[i] ? db[i].h : "";
     document.getElementById("fMin").value = "m" in db[i] ? db[i].m : "";
     document.getElementById("fCity").value = "";
@@ -886,7 +882,6 @@ function cancelEdit() {
     addBtn.title = "Добавить";
     document.getElementById("fName").value = "";
     document.getElementById("fDate").value = "";
-    syncDateBtn();
     document.getElementById("fHour").value = "";
     document.getElementById("fMin").value = "";
     document.getElementById("fCity").value = "";
@@ -928,46 +923,6 @@ function updateCitySelectColor() {
 }
 
 const fDateEl = document.getElementById("fDate");
-const fDateBtn = document.getElementById("fDateBtn");
-
-// Плейсхолдер пустого дейт-инпута на Android WebView/Chrome рисуется нативным
-// кодом мимо CSS-псевдоэлементов, поэтому пустое поле — кнопка-заглушка;
-// клик возвращает инпут и открывает системный пикер (showPicker, Chromium ≥99).
-function syncDateBtn() {
-    const empty = !fDateEl.value;
-    fDateBtn.style.display = empty ? "" : "none";
-    fDateEl.style.display = empty ? "none" : "";
-}
-
-// Текст заглушки — как у нативного пустого дейт-инпута: тот следует локали
-// браузера (дд.мм.гггг в ru, mm/dd/yyyy в en-US), порядок и разделитель
-// берём из Intl.DateTimeFormat текущей локали.
-function datePlaceholderLabel() {
-    try {
-        const loc = (new Intl.DateTimeFormat().resolvedOptions().locale || "ru").toLowerCase();
-        const cyr = /^(ru|be|uk|kk|ky|bg|sr|mk)/.test(loc);
-        const map = cyr ? { day: "дд", month: "мм", year: "гггг" }
-                        : { day: "dd", month: "mm", year: "yyyy" };
-        return new Intl.DateTimeFormat().formatToParts(new Date(2026, 10, 22))
-            .map(p => p.type === "literal" ? p.value : (map[p.type] || ""))
-            .join("");
-    } catch (e) {
-        return "дд.мм.гггг";
-    }
-}
-fDateBtn.textContent = datePlaceholderLabel();
-
-fDateBtn.addEventListener("click", () => {
-    fDateBtn.style.display = "none";
-    fDateEl.style.display = "";
-    fDateEl.focus();
-    if (fDateEl.showPicker) {
-        // Промис showPicker разрешается при закрытии пикера: не выбрали дату —
-        // вернуть кнопку-заглушку (нативный плейсхолдер на Android контраста не даёт).
-        requestAnimationFrame(() => fDateEl.showPicker().then(syncDateBtn, syncDateBtn));
-    }
-});
-["input", "change", "blur"].forEach(ev => fDateEl.addEventListener(ev, syncDateBtn));
 
 function renderCitySelect() {
     const sel = document.getElementById("fCity");
@@ -2322,7 +2277,6 @@ renderList();
 renderNow();
 idbPutDays();
 renderCitySelect();
-syncDateBtn();
 initPdConsent();
 initPushConsent();
 checkOAuthHash();
