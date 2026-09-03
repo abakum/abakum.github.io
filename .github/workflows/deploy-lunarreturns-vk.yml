@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       production:
-        description: "Выложить также в production (без галочки — только dev)"
+        description: "production"
         required: false
         default: false
         type: boolean
