@@ -120,9 +120,11 @@
                 padding: 0 6px;
                 background: var(--surface);
                 color: var(--muted);
+                opacity: .54; /* как UA-плейсхолдер fName (цвет поля ~54%) */
                 pointer-events: none;
             }
             #dateWrap.filled #fDatePh { display: none; }
+            #dateWrap:focus-within #fDatePh { display: none; }
         }
         #list div.row, .days div.row {
             display: flex;
@@ -829,7 +831,13 @@ function submitRecord() {
         status("Укажите имя и дату события", true);
         // Фокус в первое незаполненное поле.
         if (!n) document.getElementById("fName").focus();
-        else fDateEl.focus();
+        else {
+            fDateEl.focus();
+            // На touch дату нельзя набрать цифрами — открываем календарь.
+            if (fDateEl.showPicker && matchMedia("(hover: none) and (pointer: coarse)").matches) {
+                try { fDateEl.showPicker().catch(() => {}); } catch (e) {}
+            }
+        }
         return;
     }
     if (h === null || m === null) {
