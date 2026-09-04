@@ -187,6 +187,14 @@
             position: absolute; background: #fff; border-radius: 50%;
         }
         html.ptr-moon #titleH1 img { visibility: hidden; }
+        /* Требования ВК к мини-аппам (класс .vk ставит JS в VK-режиме):
+           картинки/иконки некликабельны, тексты не выделяются, кнопки/ссылки
+           без подчёркивания и без тап-подсветки. */
+        .vk img, .vk canvas { pointer-events: none; -webkit-touch-callout: none; }
+        .vk * { -webkit-user-select: none; user-select: none; }
+        .vk input, .vk textarea { -webkit-user-select: text; user-select: text; }
+        .vk button, .vk a { -webkit-tap-highlight-color: transparent; text-decoration: none; }
+        .vk button:hover, .vk a:hover { text-decoration: none; }
         #list div.row, .days div.row {
             display: flex;
             align-items: center;
@@ -444,6 +452,10 @@ let yandexToken = "";
 // VK Mini App определяется по параметру vk_app_id в URL, который VK всегда
 // добавляет при запуске мини-аппа (см. dev.vk.com/mini-apps/development/launch-params).
 const vkminiapp = new URLSearchParams(location.search).has("vk_app_id");
+// В VK-режиме вешаем класс .vk на <html>: он включает требования ВК к UX
+// (некликабельные картинки, невыделяемые тексты, кнопки/ссылки без подчёркивания
+// и тап-подсветки). Вне ВК класс не ставится — поведение не меняется.
+if (vkminiapp) document.documentElement.classList.add("vk");
 // Версия VK-сборки — прямо из origin хостинга (см. LR_ORIGIN_RE):
 // https://prod-app54746591-4ff53da5fb4c.pages.vk-apps.com → "prod-4ff53da5fb4c".
 const vkBuildVersion = (() => {
@@ -575,7 +587,7 @@ applyTheme();
     // Тянем обёртку, а не body: у трансформированного предка fixed-дети неба
     // (#ptrMoon/#ptrStars) прилипают к нему и красятся над его фоном.
     const ptrBody = document.getElementById("ptrWrap");
-    let startY = 0, pulling = false, dist = 0, armed = false, hapticDone = false;
+    let startY = 0, startX = 0, pulling = false, dist = 0, armed = false, hapticDone = false;
 
     // Тактильный «толчок» при взводе PTR: taptic-ивент бриджа ВК
     // (iOS — Taptic Engine, Android — вибрация), фолбэк — navigator.vibrate.
@@ -602,6 +614,7 @@ applyTheme();
             && !(overlay && overlay.classList.contains("open"));
         if (armed) {
             startY = e.touches[0].clientY;
+            startX = e.touches[0].clientX;
             pulling = false;
             dist = 0;
             hapticDone = false;
@@ -611,14 +624,21 @@ applyTheme();
     addEventListener("touchmove", e => {
         if (!armed) return;
         const dy = e.touches[0].clientY - startY;
-        if (dy <= 0 || scrollY > 0) {
+        const dx = e.touches[0].clientX - startX;
+        if (scrollY > 0) {
             if (pulling) ptrReset();
             armed = false;
             return;
         }
-        if (e.cancelable) e.preventDefault();
-        pulling = true;
-        document.documentElement.classList.add("ptr-moon"); // 🌙 в заголовке гаснет сразу
+        if (!pulling) {
+            // ждём явного вертикального намерения: горизонтальный свайп с края
+            // (iOS Swipe Back) не должен съедаться preventDefault
+            if (dy < 8 || dy <= Math.abs(dx)) return;
+            if (e.cancelable) e.preventDefault();
+            pulling = true;
+            document.documentElement.classList.add("ptr-moon"); // 🌙 в заголовке гаснет сразу
+        }
+        if (dy <= 0) { ptrReset(); armed = false; return; }
         dist = dy * 0.5; // сопротивление
         if (dist >= THRESHOLD && !hapticDone) { hapticDone = true; ptrHaptic(); }
         ptrBody.style.transition = "none";
