@@ -48,14 +48,14 @@
         })();
     </script>
     <!-- Ранняя установка --colW до первого кадра: без неё #ptrWrap стартует с
-         CSS-фолбэка 414px и при reload/PTR дёргается (широкая обёртка → более
+         CSS-фолбэка 336px и при reload/PTR дёргается (широкая обёртка → более
          узкая колонка). Если сохранённая ширина есть в localStorage — обёртка
          следует за ней (как на прошлой сессии); если нет — подгоняем под экран
          той же формулой, что initColSplitter() в конце body (иначе рассинхрон).
          Числа продублированы отсюда: COL_MIN/COL_W_KEY/WRAP_PAD живут ниже. -->
     <script>
         (function () {
-            var MIN = 280, PAD = 24, DEF = 414;
+            var MIN = 288, PAD = 24, DEF = 336;
             var saved = null;
             try { saved = parseFloat(localStorage.getItem("lunarreturns.colw")); } catch (e) {}
             var w;
@@ -68,7 +68,10 @@
                 // не значит «новая версия».
                 window.__lrFreshOrigin = true;
                 var iw = window.innerWidth;
-                w = Math.max(MIN, Math.min(iw - PAD, DEF));
+                // #ptrWrap — content-box (padding не входит в width), его внешняя
+                // ширина = colW + 2·отступ(12px). Чтобы не было горизонтального
+                // скролла, отнимаем оба отступа (2·PAD), а не один.
+                w = Math.max(MIN, Math.min(iw - 2 * PAD, DEF));
             }
             // Персистим ширину даже на первом заходе: наличие ключа = «origin уже
             // инициализирован» и переживает очистку БД, чтобы возврат не залип
@@ -152,7 +155,7 @@
                в одну колонку обёртка не подстраивается под ширину окна. В две
                колонки класс .two-col растягивает обёртку почти на всю ширину окна
                (см. ниже). */
-            width: var(--colW, 414px);
+            width: var(--colW, 336px);
             margin: 0 auto;
             padding: 12px;
             position: relative;
@@ -231,14 +234,14 @@
            тёмной теме (см. генерацию точек в JS). */
         #ptrMoon {
             position: fixed; top: 34px;
-            left: max(12px, calc(50% - var(--colW, 414px) / 2 + 12px));
+            left: max(12px, calc(50% - var(--colW, 336px) / 2 + 12px));
             width: 24px; height: 24px;
             pointer-events: none; z-index: -1; opacity: 1;
         }
         /* В двух колонках заголовочный 🌙 — в начале левой колонки ширины
            --colW, а обёртка растянута до 2*--colW. */
         #ptrWrap.two-col #ptrMoon {
-            left: max(12px, calc(50% - var(--colW, 414px) + 12px));
+            left: max(12px, calc(50% - var(--colW, 336px) + 12px));
         }
         #ptrStars {
             position: fixed; top: 0; left: 0; right: 0; height: 280px;
@@ -289,12 +292,12 @@
            (--colW): иначе она сжималась бы по содержимому и настроенная ширина
            терялась бы при переходе из двухколоночного режима. Не меняется при
            изменении ширины окна — только перетаскиванием разделителя. */
-        #cols > section:first-of-type { width: var(--colW, 414px); }
+        #cols > section:first-of-type { width: var(--colW, 336px); }
         /* В одну колонку вторая колонка той же ширины, что и первая (--colW),
            чтобы она следовала за обёрткой; margin-top компенсирует убранный
            горизонтальный разделитель между секциями (в двухколоночном режиме
            правило перекрывается flex-раскладкой .two-col #resultSec). */
-        #resultSec { width: var(--colW, 414px); margin-top: 12px; }
+        #resultSec { width: var(--colW, 336px); margin-top: 12px; }
         #pasteOverlay {
             display: none;
             position: fixed;
@@ -355,7 +358,7 @@
            ширины первой. */
         #ptrWrap.two-col { width: calc(100% - 48px); max-width: 100%; }
         #ptrWrap.two-col #cols { display: flex; gap: 12px; align-items: flex-start; }
-        #ptrWrap.two-col #cols > section:first-of-type { flex: 0 0 var(--colW, 414px); min-width: 0; margin-bottom: 12px; }
+        #ptrWrap.two-col #cols > section:first-of-type { flex: 0 0 var(--colW, 336px); min-width: 0; margin-bottom: 12px; }
         #ptrWrap.two-col #resultSec { flex: 1 1 0; min-width: 0; margin-bottom: 12px; }
         #ptrWrap.two-col #colSplitter {
             position: static; height: auto;
@@ -375,11 +378,11 @@
             <input type="text" id="fName" maxlength="64" placeholder="Имя" style="flex:1 1 8em;">
             <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;" title="Дата — по времени места события">
                 <span id="dateWrap" style="position:relative;">
-                    <input type="date" id="fDate" style="width:9em;" title="Дата — по времени места события">
+                    <input type="date" id="fDate" style="width:7em;" title="Дата — по времени места события">
                     <span id="fDatePh" aria-hidden="true">Дата</span>
                 </span>
-                <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:3em;" title="Час — по времени места события">
-                <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:3em;" title="Минуты — по времени места события">
+                <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:2em;padding:4px 2px;" title="Час — по времени места события">
+                <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:2em;padding:4px 2px;" title="Минуты — по времени места события">
             </span>
             <button id="addBtn" type="submit" title="Добавить">➕</button>
             <button type="button" id="delBtn" onclick="deleteCurrent()" title="Удалить" style="display:none;">➖</button>
@@ -2664,7 +2667,7 @@ function refreshPushBtn() {
 // SPLITTER_EXTRA, а вторая flex-заполняет остаток
 // innerWidth - colW - (WRAP_MARGIN + WRAP_PAD + SPLITTER_EXTRA).
 const COL_W_KEY = "lunarreturns.colw";
-const COL_MIN = 280;
+const COL_MIN = 288;
 const SPLITTER_EXTRA = 24; // flex-gap 12px + разделитель 12px
 const WRAP_MARGIN = 24;    // поля по бокам обёртки в две колонки (12+12)
 const WRAP_PAD = 24;       // padding #ptrWrap (12+12)
@@ -2676,11 +2679,11 @@ function colWMax() {
 }
 // --colW задаётся на :root (html), чтобы её видели и #ptrWrap (родитель), и
 // #cols, и #ptrMoon: кастомные свойства наследуются только от предков, поэтому
-// инлайн-стиль на #cols был невидим для обёртки (откат к 414px после смены
+// инлайн-стиль на #cols был невидим для обёртки (откат к 336px после смены
 // режима). Всё, что использует var(--colW), теперь наследует актуальное значение.
 function currentColW() {
     const raw = getComputedStyle(document.documentElement).getPropertyValue("--colW").trim();
-    return raw ? parseFloat(raw) : 414;
+    return raw ? parseFloat(raw) : 336;
 }
 function setColW(px, save) {
     document.documentElement.style.setProperty("--colW", px + "px");
@@ -2707,12 +2710,13 @@ function recalcLayout() {
     // Применяем сохранённую ширину при загрузке как есть: ширина первой колонки
     // меняется ТОЛЬКО перетаскиванием разделителя, поэтому не корректируем её
     // под текущее окно. Если сохранённого значения нет — подгоняем под экран:
-    // обёртка (colW + WRAP_PAD padding) умещается с минимальными отступами,
-    // на широких экранах не шире типовых 414px. Затем решаем режим раскладки.
+    // #ptrWrap content-box (внешняя ширина = colW + WRAP_PAD padding), поэтому
+    // отнимаем оба отступа (2·WRAP_PAD), чтобы без горизонтального скролла;
+    // на широких экранах не шире типовых 336px. Затем решаем режим раскладки.
     let saved = NaN;
     try { saved = parseFloat(localStorage.getItem(COL_W_KEY)); } catch (e) {}
     if (!Number.isFinite(saved))
-        saved = Math.max(COL_MIN, Math.min(window.innerWidth - WRAP_PAD, 414));
+        saved = Math.max(COL_MIN, Math.min(window.innerWidth - 2 * WRAP_PAD, 336));
     setColW(saved, false);
     recalcLayout();
 
@@ -2731,10 +2735,10 @@ function recalcLayout() {
         // ширина колонки; сверху ограничиваем (colWMax), чтобы не схлопнуть
         // вторую. Одна колонка: обёртка центрирована (margin: 0 auto), поэтому
         // правый край колонки отслеживает курсор как w = 2·(x − W/2); сверху
-        // ограничиваем шириной окна минус поля обёртки.
+        // ограничиваем шириной окна минус оба отступа обёртки (content-box).
         const w = isTwoCol()
             ? Math.max(COL_MIN, Math.min(e.clientX - cols.getBoundingClientRect().left, colWMax()))
-            : Math.max(COL_MIN, Math.min(2 * (e.clientX - window.innerWidth / 2), window.innerWidth - WRAP_PAD));
+            : Math.max(COL_MIN, Math.min(2 * (e.clientX - window.innerWidth / 2), window.innerWidth - 2 * WRAP_PAD));
         setColW(w, true);
     });
     const endDrag = () => {
