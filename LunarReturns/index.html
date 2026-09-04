@@ -496,7 +496,7 @@
 </p>
 <div id="pushlog" style="display:none; font-size:0.85em; color:var(--muted2); white-space:pre-line;"></div>
 <div id="swver" style="font-size:0.85em; color:var(--muted2); min-height:1.2em;">
-    <a href="https://github.com/abakum/LunarReturns/issues" target="_blank" rel="noopener" style="color:var(--muted);">Сообщить об ошибке</a>
+    <a id="bugLink" href="https://github.com/abakum/LunarReturns/issues" target="_blank" rel="noopener" style="color:var(--muted);">Сообщить об ошибке</a>
     <span id="swverText"></span>
 </div>
 
@@ -789,7 +789,11 @@ const LR_ORIGIN_RE = /^https:\/\/(stage|prod)-app54746591-[a-z0-9]+\.pages\.vk-a
 // Production-версия мини-аппа: только на prod-origin хостинга ВК.
 // В dev/stage-версиях (и на локальном туннеле) ВК-уведомления запрещены
 // платформой («untrusted apps») — чекбокс согласия и 🔔 там не показываем.
-const vkProdApp = vkminiapp && /^https:\/\/prod-/.test(location.origin);
+// TEMP(публикация): временно false, чтобы при публикации не было ошибок от
+// prod-фич (подписка на пуши). Вернуть исходное выражение после отладки
+// подписки на опубликованном приложении:
+//   const vkProdApp = vkminiapp && /^https:\/\/prod-/.test(location.origin);
+const vkProdApp = false;
 const LR_MIGRATE_MAX_TRIES = 3;
 let lrMigrated = false;
 
@@ -2056,6 +2060,9 @@ function applyVkUi() {
     if (w) w.textContent = "Отзыв согласия удаляет ПДн из облака ВКонтакте.";
     // Строку версии не прячем: в мини-аппе вместо версии SW показывается
     // версия VK-сборки (см. renderSwVersion / LR_VK_BUILD).
+    // Внешняя ссылка на GitHub-issues нерелевантна внутри нативного клиента — прячем.
+    const bug = document.getElementById("bugLink");
+    if (bug) bug.style.display = "none";
 }
 
 // Строки согласия ПДн имеют смысл только на «домашних» адресах: каноническом
