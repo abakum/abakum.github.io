@@ -90,6 +90,7 @@
             width: var(--colW, 414px);
             margin: 0 auto;
             padding: 12px;
+            position: relative;
             background: var(--bg);
             color: var(--text);
         }
@@ -217,9 +218,10 @@
            изменении ширины окна — только перетаскиванием разделителя. */
         #cols > section:first-of-type { width: var(--colW, 414px); }
         /* В одну колонку вторая колонка той же ширины, что и первая (--colW),
-           чтобы она следовала за обёрткой; в двухколоночном режиме правило
-           перекрывается flex-раскладкой (.two-col #resultSec). */
-        #resultSec { width: var(--colW, 414px); }
+           чтобы она следовала за обёрткой; margin-top компенсирует убранный
+           горизонтальный разделитель между секциями (в двухколоночном режиме
+           правило перекрывается flex-раскладкой .two-col #resultSec). */
+        #resultSec { width: var(--colW, 414px); margin-top: 12px; }
         #pasteOverlay {
             display: none;
             position: fixed;
@@ -251,16 +253,27 @@
         #pasteDialog .btnrow {
             justify-content: center;
         }
-        /* Разделитель колонок: в одноколоночном режиме — горизонтальная линия
-           между формой и результатом; в двухколоночном — вертикальная
-           перетаскиваемая полоска (ширину формы меняет JS). */
+        /* Разделитель колонок: в обоих режимах — вертикальная перетаскиваемая
+           полоска (ширину колонки меняет JS). В одну колонку она прижата к
+           правому краю #ptrWrap (position: absolute), в двухколоночном —
+           становится flex-разделителем между колонками (.two-col). */
         #colSplitter {
-            height: 6px;
-            margin: 0 0 12px;
-            border-radius: 3px;
-            background: var(--border2);
+            position: absolute;
+            top: 0; bottom: 0; right: 0;
+            width: 12px;
+            cursor: col-resize;
+            background: transparent;
             touch-action: none;
+            display: flex; align-items: center; justify-content: center;
         }
+        #colSplitter::after {
+            content: "";
+            width: 4px; height: 100%;
+            background: var(--border2);
+            border-radius: 2px;
+            transition: background .15s;
+        }
+        #colSplitter:hover::after, #colSplitter.dragging::after { background: var(--btn-h); }
         /* Двухколоночный режим (класс .two-col на #ptrWrap ставит JS):
            включается, когда ширина окна вмещает первую колонку (--colW), зазор,
            разделитель и вторую колонку не уже минимума — см. recalcLayout().
@@ -272,19 +285,9 @@
         #ptrWrap.two-col #cols > section:first-of-type { flex: 0 0 var(--colW, 414px); min-width: 0; margin-bottom: 12px; }
         #ptrWrap.two-col #resultSec { flex: 1 1 0; min-width: 0; margin-bottom: 12px; }
         #ptrWrap.two-col #colSplitter {
-            width: 12px; height: auto;
-            margin: 0; flex: 0 0 12px; align-self: stretch;
-            cursor: col-resize; background: transparent;
-            display: flex; align-items: center; justify-content: center;
+            position: static; height: auto;
+            flex: 0 0 12px; align-self: stretch;
         }
-        #ptrWrap.two-col #colSplitter::after {
-            content: "";
-            width: 4px; height: 100%;
-            background: var(--border2);
-            border-radius: 2px;
-            transition: background .15s;
-        }
-        #ptrWrap.two-col #colSplitter:hover::after, #ptrWrap.two-col #colSplitter.dragging::after { background: var(--btn-h); }
     </style>
 </head>
 <body>
@@ -353,7 +356,9 @@
     <section id="resultSec" style="display:none;">
         <textarea id="resultText" rows="12" readonly></textarea>
         <div class="btnrow">
+            <button type="button" id="srcBtn" onclick="scrollToSourceRow()" title="К строке источника" style="display:none;">⬉</button>
             <button type="button" id="detailBtn" onclick="toggleDetail()" title="Сжато">⋯</button>
+            <button type="button" id="qrBtn" onclick="toggleResultQr()" title="Показать QR результата">⛶</button>
             <button onclick="copyResult()" title="Копировать текст">⎘</button>
         </div>
         <div class="qr" id="resultQr"></div>
@@ -1009,6 +1014,7 @@ function submitRecord() {
             + (rec.d !== d ? " " + rec.d : "");
     }
     const sel = selectedIdx >= 0 ? db[selectedIdx] : null;
+    const wasEdit = editingIdx >= 0;
     if (editingIdx >= 0) {
         const old = db[editingIdx];
         db[editingIdx] = rec;
@@ -1035,6 +1041,20 @@ function submitRecord() {
     status((note ? note + " • " : "") + "Записей: " + db.length + ", размер " + byteLen(JSON.stringify(db)) + "/" + QR_MAX_BYTES + " байт");
     renderList();
     refreshDbQr();
+    if (wasEdit) {
+        // Редактирование: форма очищена — очищаем и результат с выделением строки.
+        selectedIdx = -1;
+        hideResult();
+        renderList();
+    } else {
+        // Добавление: выделяем новую запись, показываем её результат и
+        // подъезжаем к строке в списке.
+        selectedIdx = db.indexOf(rec);
+        renderList();
+        renderResult();
+        const row = document.getElementById("list").children[selectedIdx];
+        if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
 }
 
 function startEdit(i) {
@@ -1193,11 +1213,35 @@ function renderResult() {
     const lineH = parseFloat(getComputedStyle(ta).lineHeight);
     ta.style.height = (detailMode ? full : Math.ceil(full - lineH) - 2) + "px";
     ta.scrollTop = 0;
-    showQr(document.getElementById("resultQr"), text);
+    updateResultQr(text);
+    document.getElementById("srcBtn").style.display = "";
 }
 
 function hideResult() {
     document.getElementById("resultSec").style.display = "none";
+}
+
+// QR результата скрыт по умолчанию; показывается кнопкой ⛶. Текст храним,
+// чтобы при включении сгенерировать QR из актуального результата.
+let resultQrShown = false;
+let resultQrText = "";
+function updateResultQr(text) {
+    resultQrText = text;
+    const el = document.getElementById("resultQr");
+    el.style.display = resultQrShown ? "block" : "none";
+    if (resultQrShown) showQr(el, text);
+}
+function toggleResultQr() {
+    resultQrShown = !resultQrShown;
+    document.getElementById("qrBtn").title = resultQrShown ? "Скрыть QR результата" : "Показать QR результата";
+    updateResultQr(resultQrText);
+}
+
+// Кнопка ⤶ в результатах: скроллит к строке списка, из которой построен
+// результат. Показывается только когда результат пришёл из строки (не «Сейчас»).
+function scrollToSourceRow() {
+    const row = document.getElementById("list").children[selectedIdx];
+    if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 function renderNow() {
@@ -1212,7 +1256,8 @@ function renderNow() {
     ta.style.height = "";
     ta.rows = text.split("\n").length;
     ta.scrollTop = 0;
-    showQr(document.getElementById("resultQr"), text);
+    updateResultQr(text);
+    document.getElementById("srcBtn").style.display = "none";
 }
 
 function gregToJdn(y, m, d) {
@@ -2527,9 +2572,13 @@ function recalcLayout() {
 
     // Применяем сохранённую ширину при загрузке как есть: ширина первой колонки
     // меняется ТОЛЬКО перетаскиванием разделителя, поэтому не корректируем её
-    // под текущее окно. Затем решаем режим раскладки.
-    let saved = 414;
-    try { saved = parseFloat(localStorage.getItem(COL_W_KEY)) || 414; } catch (e) {}
+    // под текущее окно. Если сохранённого значения нет — подгоняем под экран:
+    // обёртка (colW + WRAP_PAD padding) умещается с минимальными отступами,
+    // на широких экранах не шире типовых 414px. Затем решаем режим раскладки.
+    let saved = NaN;
+    try { saved = parseFloat(localStorage.getItem(COL_W_KEY)); } catch (e) {}
+    if (!Number.isFinite(saved))
+        saved = Math.max(COL_MIN, Math.min(window.innerWidth - WRAP_PAD, 414));
     setColW(saved, false);
     recalcLayout();
 
@@ -2537,7 +2586,6 @@ function recalcLayout() {
     window.addEventListener("orientationchange", () => setTimeout(recalcLayout, 120));
 
     splitter.addEventListener("pointerdown", e => {
-        if (!isTwoCol()) return;
         dragging = true;
         splitter.classList.add("dragging");
         try { splitter.setPointerCapture(e.pointerId); } catch (err) {}
@@ -2545,10 +2593,14 @@ function recalcLayout() {
     });
     splitter.addEventListener("pointermove", e => {
         if (!dragging) return;
-        const left = cols.getBoundingClientRect().left;
-        // Разделитель всегда справа от первой колонки: его позиция и есть
-        // ширина колонки. Сверху ограничиваем, чтобы не схлопнуть в одну.
-        const w = Math.max(COL_MIN, Math.min(e.clientX - left, colWMax()));
+        // Две колонки: разделитель справа от первой колонки, его позиция и есть
+        // ширина колонки; сверху ограничиваем (colWMax), чтобы не схлопнуть
+        // вторую. Одна колонка: обёртка центрирована (margin: 0 auto), поэтому
+        // правый край колонки отслеживает курсор как w = 2·(x − W/2); сверху
+        // ограничиваем шириной окна минус поля обёртки.
+        const w = isTwoCol()
+            ? Math.max(COL_MIN, Math.min(e.clientX - cols.getBoundingClientRect().left, colWMax()))
+            : Math.max(COL_MIN, Math.min(2 * (e.clientX - window.innerWidth / 2), window.innerWidth - WRAP_PAD));
         setColW(w, true);
     });
     const endDrag = () => {
