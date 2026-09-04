@@ -47,6 +47,36 @@
             if (meta) meta.content = isDark ? "#17171a" : "#f9f9f9";
         })();
     </script>
+    <!-- Ранняя установка --colW до первого кадра: без неё #ptrWrap стартует с
+         CSS-фолбэка 414px и при reload/PTR дёргается (широкая обёртка → более
+         узкая колонка). Если сохранённая ширина есть в localStorage — обёртка
+         следует за ней (как на прошлой сессии); если нет — подгоняем под экран
+         той же формулой, что initColSplitter() в конце body (иначе рассинхрон).
+         Числа продублированы отсюда: COL_MIN/COL_W_KEY/WRAP_PAD живут ниже. -->
+    <script>
+        (function () {
+            var MIN = 280, PAD = 24, DEF = 414;
+            var saved = null;
+            try { saved = parseFloat(localStorage.getItem("lunarreturns.colw")); } catch (e) {}
+            var w;
+            if (Number.isFinite(saved)) {
+                w = Math.round(saved);
+            } else {
+                // Нет сохранённой ширины → это свежий origin (база ещё не жила).
+                // Здесь взводим флаг запуска миграции, а не по «пустоте» БД:
+                // пользователь мог очистить базу без смены версии — пустая БД
+                // не значит «новая версия».
+                window.__lrFreshOrigin = true;
+                var iw = window.innerWidth;
+                w = Math.max(MIN, Math.min(iw - PAD, DEF));
+            }
+            // Персистим ширину даже на первом заходе: наличие ключа = «origin уже
+            // инициализирован» и переживает очистку БД, чтобы возврат не залип
+            // «свежим». Колонка так же не дёргается между загрузками.
+            try { localStorage.setItem("lunarreturns.colw", String(Math.round(w))); } catch (e) {}
+            document.documentElement.style.setProperty("--colW", w + "px");
+        })();
+    </script>
     <style>
         /* Цвета вынесены в переменные: тёмная тема — по prefers-color-scheme,
            классы .theme-dark/.theme-light на <html> (VK launch-параметр
@@ -2248,10 +2278,13 @@ async function vkPointerPut() {
     for (const p of list.slice(9)) await vkStorageSet(LR_ORIGIN_PREFIX + p.date, "");
 }
 
-// Запуск миграции: база пуста/сид → перейти за ней на свежий непробованный origin.
+// Запуск миграции: только на свежем origin → перейти за базой на свежий
+// непробованный origin. Триггер взводится в head при отсутствии сохранённой
+// ширины колонки (lunarreturns.colw), а НЕ по «пустоте» БД: пользователь мог
+// очистить базу без смены версии — очистка не должна тащить старые данные.
 async function maybeMigrateDb() {
     if (!window.vkBridge) return;
-    if (db.length !== 0 && !(db.length === 1 && adaSeeded)) return;
+    if (!window.__lrFreshOrigin) return;
     let list = [];
     try { list = await vkPointerGet(); } catch (e) { return; }
     const others = list.filter(p => p.origin !== location.origin);
