@@ -329,6 +329,29 @@
         #pasteDialog .btnrow {
             justify-content: center;
         }
+        /* Диалог подтверждения вместо блокирующего браузерного confirm(). */
+        #confirmOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.4);
+            z-index: 101;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+        }
+        #confirmOverlay.open { display: flex; }
+        #confirmDialog {
+            background: var(--surface);
+            border: 1px solid var(--border2);
+            border-radius: 8px;
+            padding: 12px;
+            max-width: 360px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        #confirmMsg { margin-bottom: 10px; }
+        #confirmDialog .btnrow { justify-content: center; }
         /* Разделитель колонок: в обоих режимах — вертикальная перетаскиваемая
            полоска (ширину колонки меняет JS). В одну колонку она прижата к
            правому краю #ptrWrap (position: absolute), в двухколоночном —
@@ -423,6 +446,16 @@
             <div class="btnrow">
                 <button type="button" onclick="pasteFallbackImport()" title="Вставить и импортировать">📋</button>
                 <button type="button" onclick="hidePasteDialog()" title="Отмена">❌</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmOverlay" onclick="if(event.target===this)closeConfirm(false)">
+        <div id="confirmDialog" role="alertdialog" aria-modal="true">
+            <div id="confirmMsg"></div>
+            <div class="btnrow">
+                <button type="button" id="confirmOk" onclick="closeConfirm(true)" title="Да">✅</button>
+                <button type="button" id="confirmCancel" onclick="closeConfirm(false)" title="Нет">❌</button>
             </div>
         </div>
     </div>
@@ -1058,19 +1091,26 @@ function readNum(id, max) {
 
 const sortDb = () => db.sort((a, b) => a.d.localeCompare(b.d) || ((a.h ?? 12) - (b.h ?? 12)) || ((a.m ?? 0) - (b.m ?? 0)));
 
-// confirm() в песочнице без allow-modals (iframe-предпросмотры) молча возвращает
-// false, не показывая диалог. Если страница в same-origin iframe, отсутствие
-// токена allow-modals видно прямо в атрибуте sandbox — считаем подтверждённым.
-// Для cross-origin песочниц (frameElement недоступен) — фолбэк на тайминг:
-// заблокированный вызов возвращается мгновенно, живой диалог дольше 10 мс.
+// Кастомный диалог подтверждения вместо блокирующего браузерного confirm():
+// в песочницах без allow-modals confirm() молча возвращает false, а кастомный
+// оверлей работает всегда и не блокирует поток. Возвращает Promise<boolean>,
+// вызывается через await в async-функциях/обработчиках.
+let confirmResolve = null;
 function confirmAuto(msg) {
-    try {
-        const sandbox = window.frameElement && window.frameElement.getAttribute("sandbox");
-        if (sandbox && !/\ballow-modals\b/.test(sandbox)) return true;
-    } catch (e) { }
-    const t0 = performance.now();
-    const ok = confirm(msg);
-    return ok || performance.now() - t0 < 10;
+    return new Promise(resolve => {
+        document.getElementById("confirmMsg").textContent = msg;
+        confirmResolve = resolve;
+        const ov = document.getElementById("confirmOverlay");
+        ov.style.display = "flex";
+        ov.classList.add("open");
+        document.getElementById("confirmOk").focus();
+    });
+}
+function closeConfirm(result) {
+    const ov = document.getElementById("confirmOverlay");
+    ov.style.display = "none";
+    ov.classList.remove("open");
+    if (confirmResolve) { const r = confirmResolve; confirmResolve = null; r(result); }
 }
 
 function submitRecord() {
@@ -1185,8 +1225,8 @@ function cancelEdit() {
     updateCitySelectColor();
 }
 
-function removeRecord(i) {
-    if (!confirmAuto("Удалить " + db[i].n + " " + db[i].d + "?")) return;
+async function removeRecord(i) {
+    if (!await confirmAuto("Удалить " + db[i].n + " " + db[i].d + "?")) return;
     db.splice(i, 1);
     if (db.length === 0) adaSeeded = false;
     if (!saveDb()) { renderList(); refreshDbQr(); return; }
@@ -1880,9 +1920,9 @@ function showDbQr() {
     status("QR базы: " + byteLen(json) + "/" + QR_MAX_BYTES + " байт, записей: " + db.length);
 }
 
-function clearDb() {
+async function clearDb() {
     if (db.length === 0) { status("База уже пуста", true); return; }
-    if (!confirmAuto("Удалить ВСЕ записи (" + db.length + ")?")) return;
+    if (!await confirmAuto("Удалить ВСЕ записи (" + db.length + ")?")) return;
     db = [];
     adaSeeded = false;
     localStorage.setItem(DB_KEY, JSON.stringify(db));
@@ -1905,7 +1945,7 @@ function pasteDb() {
     }
 }
 
-function importDbText(text) {
+async function importDbText(text) {
     let incoming;
     try {
         incoming = JSON.parse(text);
@@ -1917,9 +1957,9 @@ function importDbText(text) {
         status("Неверный формат базы", true);
         return;
     }
-    const replace = confirmAuto("OK — заменить текущую базу (" + incoming.length + " зап.), Отмена — объединить");
-    const merged = replace ? incoming : db.concat(incoming).filter((r, i, a) =>
-        a.findIndex(x => x.n === r.n && x.d === r.d) === i);
+    const doMerge = await confirmAuto("✅ — объединить (" + incoming.length + " зап.), ❌ — заменить текущую базу");
+    const merged = doMerge ? db.concat(incoming).filter((r, i, a) =>
+        a.findIndex(x => x.n === r.n && x.d === r.d) === i) : incoming;
     const backup = db;
     db = merged;
     sortDb();
@@ -1977,7 +2017,7 @@ function initPushConsent() {
     const note = document.getElementById("pdPushWithdrawNote");
     cb.checked = pushConsentGiven();
     note.style.display = cb.checked ? "" : "none";
-    cb.addEventListener("change", () => {
+    cb.addEventListener("change", async () => {
         if (cb.checked) {
             localStorage.setItem(PD_PUSH_CONSENT_KEY, "1");
             note.style.display = "";
@@ -1985,7 +2025,7 @@ function initPushConsent() {
             return;
         }
         const subscribed = localStorage.getItem(VKPUSH_KEY) === "1";
-        if (subscribed && !confirmAuto("Отозвать согласие и удалить подписку на оповещения из облака Яндекса?")) {
+        if (subscribed && !await confirmAuto("Отозвать согласие и удалить подписку на оповещения из облака Яндекса?")) {
             cb.checked = true;
             return;
         }
@@ -2088,7 +2128,7 @@ function cloudDelete(token) {
 function initPdConsent() {
     const cb = document.getElementById("pdConsent");
     cb.checked = pdConsentGiven();
-    cb.addEventListener("change", () => {
+    cb.addEventListener("change", async () => {
         if (cb.checked) {
             localStorage.setItem(PD_CONSENT_KEY, "1");
             applyPdConsent();
@@ -2096,7 +2136,7 @@ function initPdConsent() {
         }
         localStorage.removeItem(PD_CONSENT_KEY);
         if (vkminiapp) {
-            if (confirmAuto("Удалить ПДн из облака ВКонтакте? Локальная база сохранится.")) {
+            if (await confirmAuto("Удалить ПДн из облака ВКонтакте? Локальная база сохранится.")) {
                 applyPdConsent();
                 cloudRun(() => vkDbClear());
             } else {
@@ -2105,7 +2145,7 @@ function initPdConsent() {
                 applyPdConsent();
             }
         } else if (yandexToken) {
-            if (confirmAuto("Удалить ПДн из облака Яндекс? Локальная база сохранится.")) {
+            if (await confirmAuto("Удалить ПДн из облака Яндекс? Локальная база сохранится.")) {
                 const token = yandexToken;
                 applyPdConsent();
                 cloudRun(() => cloudDelete(token));
@@ -2375,9 +2415,9 @@ async function vkDbGet() {
         if (!incoming.every(validRecord)) {
             throw new Error("неверный формат базы в облаке ВКонтакте");
         }
-        const replace = confirmAuto("OK — заменить текущую базу (" + incoming.length + " зап.), Отмена — объединить");
-        const merged = replace ? incoming : db.concat(incoming).filter((r, i, a) =>
-            a.findIndex(x => x.n === r.n && x.d === r.d) === i);
+        const doMerge = await confirmAuto("✅ — объединить (" + incoming.length + " зап.), ❌ — заменить текущую базу");
+        const merged = doMerge ? db.concat(incoming).filter((r, i, a) =>
+            a.findIndex(x => x.n === r.n && x.d === r.d) === i) : incoming;
         const backup = db;
         db = merged;
         sortDb();
@@ -2455,7 +2495,7 @@ function cloudGet(btn) {
             throw new Error("S3 вернул " + resp.status + ": " + t.slice(0, 200));
         });
         return resp.text();
-    }).then(text => {
+    }).then(async text => {
         let incoming;
         let seeded = false;
         if (text === null) {
@@ -2475,9 +2515,9 @@ function cloudGet(btn) {
         if (!Array.isArray(incoming) || !incoming.every(validRecord)) {
             throw new Error("неверный формат базы в облаке");
         }
-        const replace = confirmAuto("OK — заменить текущую базу (" + incoming.length + " зап.), Отмена — объединить");
-        const merged = replace ? incoming : db.concat(incoming).filter((r, i, a) =>
-            a.findIndex(x => x.n === r.n && x.d === r.d) === i);
+        const doMerge = await confirmAuto("✅ — объединить (" + incoming.length + " зап.), ❌ — заменить текущую базу");
+        const merged = doMerge ? db.concat(incoming).filter((r, i, a) =>
+            a.findIndex(x => x.n === r.n && x.d === r.d) === i) : incoming;
         const backup = db;
         db = merged;
         sortDb();
@@ -2752,6 +2792,11 @@ function recalcLayout() {
     splitter.addEventListener("pointerup", endDrag);
     splitter.addEventListener("pointercancel", endDrag);
 })();
+
+// Escape закрывает диалог подтверждения как отмена.
+document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && document.getElementById("confirmOverlay").style.display === "flex") closeConfirm(false);
+});
 
 loadDb();
 loadDayKind();
