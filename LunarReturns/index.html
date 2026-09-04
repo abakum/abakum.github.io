@@ -1044,7 +1044,7 @@ function renderCitySelect() {
     sel.innerHTML = "";
     const def = document.createElement("option");
     def.value = "";
-    def.textContent = "Место события — или время уже МСК";
+    def.textContent = "Место события — если не МСК";
     sel.appendChild(def);
     const groups = {};
     for (const c in CITY_ZONE) {
@@ -1054,11 +1054,12 @@ function renderCitySelect() {
     }
     for (const g of Object.keys(groups).map(Number).sort((a, b) => (a === 0) - (b === 0) || a - b)) {
         const og = document.createElement("optgroup");
-        og.label = g === 0 ? "Сейчас в МСК (раньше в другом поясе)" : mskDiffLabel(g);
+        og.label = g === 0 ? "Сейчас в МСК раньше нет" : mskDiffLabel(g);
         for (const c of groups[g].sort((a, b) => a.localeCompare(b, "ru"))) {
             const o = document.createElement("option");
             o.value = c;
-            o.textContent = c + " (" + mskDiffLabel(g) + ")";
+            o.textContent = c ;
+            // + " (" + mskDiffLabel(g) + ")";
             og.appendChild(o);
         }
         sel.appendChild(og);
