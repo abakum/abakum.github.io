@@ -1,129 +1,101 @@
-# План: двухколоночный режим по ширине окна относительно ширины колонки
+# План: двухколоночный режим — первая колонка задаёт ширину, остальное следует
 
 **Дата:** 2026-09-04
-**Файлы:** `LunarReturns/index.html`
-**Статус:** Реализовано и проверено в браузере; коммит не создан.
+**Файл:** `LunarReturns/index.html`
+**Статус:** Реализовано; валидация пользователем в браузере пройдена; `TEMP-DEBUG` удалён; коммит не создан.
 
-## Задача
+## Требования
 
-Двухколоночный режим раньше включался медиазапросом по **пропорции экрана**
-(`@media (min-aspect-ratio: 1/1)` и `matchMedia("(min-aspect-ratio: 1/1)")`).
-Нужно определять режим по **ширине колонки**, которую задаёт разделитель
-справа от первой колонки (`--colW`):
+Ширину первой колонки задаёт разделитель справа от неё (`--colW`). Она —
+единственный источник ширины раскладки:
 
-- ширина обёртки `#ptrWrap` = ширине колонки (`--colW`) в одну колонку и
-  `2 * --colW` в две;
-- две колонки — когда ширина окна больше удвоенной ширины колонки плюс зазор
-  и разделитель: `window.innerWidth > 2 * --colW + 24` (24 = flex-gap 12px +
-  разделитель 12px), чтобы не было горизонтального скролла;
-- на портретной ориентации (телефон в руках) — принудительно одна колонка.
+1. **Одна колонка:** `#ptrWrap` принудительно равен ширине первой колонки
+   (`--colW`); остальные элементы следуют за обёрткой и не могут её расширять.
+   Ширина первой колонки **не меняется** при изменении ширины окна.
+2. **Две колонки:** `#ptrWrap` растягивается почти на всю ширину окна
+   (по 12px поля с каждой стороны); вторая колонка flex-заполняет остаток и не
+   зависит от значения `--colW`.
+3. Ширина первой колонки меняется **только** перетаскиванием разделителя в
+   двухколоночном режиме.
 
-Такой порог нельзя выразить чистым CSS-медиазапросом (зависит от перетаскиваемого
-`--colW`), поэтому режим переключает JS через класс `.two-col` на `#ptrWrap`.
+## Ключевая проблема (корневая причина)
+
+`--colW` задавался инлайн-стилем на `#cols` (`document.getElementById("cols")`),
+а `#ptrWrap` — родитель `#cols`. Кастомные свойства наследуются только от предков
+к потомкам, поэтому `width: var(--colW, …)` на `#ptrWrap` (и формула `#ptrMoon`)
+не видели установленное значение и откатывались к дефолту при смене режима.
+Исправлено: `--colW` теперь задаётся на `document.documentElement` (`:root`), и
+её видят `#ptrWrap`, `#cols` и `#ptrMoon`.
 
 ## Изменения
 
-### 1. CSS — колонка управляет шириной обёртки
+### CSS
 
-Базовый `#ptrWrap` вместо фиксированных `640px`:
+- `#ptrWrap`: `width: var(--colW, 414px)` вместо `width: fit-content`; убран
+  `max-width: 100%` — обёртка держит ширину первой колонки и не «усаживается»
+  при сужении окна. `margin: 0 auto; padding: 12px`.
+- `section`: добавлен `box-sizing: border-box` — `width: var(--colW)` = полная
+  видимая ширина колонки, совпадающая с измерением разделителя при перетаскивании.
+- `#cols > section:first-of-type` и `#resultSec`: `width: var(--colW, 414px)`;
+  убран `max-width: 100%`. В одну колонку обе колонки равны `--colW`.
+- `#ptrWrap.two-col { width: calc(100% - 48px); max-width: 100%; }` — обёртка
+  почти во всю ширину окна (border-box = `100% − 24`, по 12px поля). Вторая
+  колонка `.two-col #resultSec { flex: 1 1 0; min-width: 0 }` — заполняет остаток.
 
-```css
-#ptrWrap { max-width: var(--colW, 400px); }
-```
+### JS (разделитель и режим)
 
-Медиазапрос `@media (min-aspect-ratio: 1/1)` удалён, вместо него правила по классу:
+- Константы: `SPLITTER_EXTRA = 24` (gap 12 + разделитель 12), `WRAP_MARGIN = 24`
+  (поля обёртки), `WRAP_PAD = 24` (padding `#ptrWrap`), `COL_MAX_EXTRA = 72`.
+  `COL_MIN = 280`.
+- `currentColW()`/`setColW()` работают с `document.documentElement`.
+- `colWMax() = max(COL_MIN, floor(innerWidth − COL_MAX_EXTRA − COL_MIN) − 1)` —
+  максимум ширины колонки, при котором вторая колонка ещё `≥ COL_MIN`.
+- `recalcLayout()`: две колонки, если не портрет И
+  `innerWidth > currentColW() + COL_MAX_EXTRA + COL_MIN`.
+- `initColSplitter()`: применяет сохранённую ширину как есть
+  (`setColW(saved, false)`, без корректировки под окно — ширину меняет только
+  драг); обработчики `resize`/`orientationchange`/`endDrag` вызывают
+  `recalcLayout()`. Драг ограничивает `colWMax()`.
+- Дефолтная ширина колонки — **414px** (CSS-фолбэки, `currentColW()`, стартовое
+  `saved`).
 
-```css
-#ptrWrap.two-col { max-width: calc(2 * var(--colW, 400px)); }
-#ptrWrap.two-col #cols { display: flex; gap: 12px; align-items: flex-start; }
-#ptrWrap.two-col #cols > section:first-of-type { flex: 0 0 var(--colW, 400px); min-width: 0; margin-bottom: 12px; }
-#ptrWrap.two-col #resultSec { flex: 1 1 0; min-width: 0; margin-bottom: 12px; }
-/* #colSplitter — вертикальный перетаскиваемый, ::after, hover/dragging */
-```
+### Диагностика
 
-Базовые `#cols { display: block }` и горизонтальный `#colSplitter` остаются для
-одноколоночного режима.
-
-### 2. JS — состояние по классу и recalcLayout
-
-- `TWO_COL_MQL` (matchMedia по пропорции) заменён состоянием:
-  `let twoColActive`, `isTwoCol()` возвращает флаг, `setTwoCol(on)` вешает
-  класс `.two-col` на `#ptrWrap`.
-- Добавлен `PORTRAIT_MQL = matchMedia("(orientation: portrait)")`.
-- Новая `recalcLayout()`:
-
-```js
-function recalcLayout() {
-    setTwoCol(!PORTRAIT_MQL.matches && window.innerWidth > 2 * currentColW() + SPLITTER_EXTRA);
-}
-```
-
-- Вспомогательные функции `currentColW()`/`setColW()` и константы
-  `COL_W_KEY`, `COL_MIN`, `SPLITTER_EXTRA` подняты на уровень модуля.
-  Старый `clampW`/`COL_MAX_RATIO` (для контейнера 1200px) заменены на
-  `colWMax() = max(COL_MIN, floor((innerWidth − 24)/2) − 1)` — максимум
-  ширины колонки, при котором ещё помещаются две колонки без скролла и
-  без схлопывания по условию выше.
-- В `initColSplitter()` `recalcLayout()` вызывается: при загрузке (после
-  применения сохранённой `--colW`), на `resize`, `orientationchange` и по
-  завершении перетаскивания (`endDrag`). Во время драга — без пересчёта,
-  чтобы не мигал макет. Позиция разделителя (слева от него первая колонка)
-  задаёт `--colW`, поэтому порог адаптируется после драга.
-- `selectRecord()` уже использовал `isTwoCol()` для `scrollIntoView` — работает
-  по новому состоянию без изменений.
-
-### 3. Небо — месяц снова над заголовочным 🌙
-
-Горизонталь `#ptrMoon` была жёстко привязана к прежней колонке 640px
-(`calc(50% - 320px + 12px)`) и после перевода на `--colW` перестала попадать
-над заголовком. Заменена на привязку к `--colW`:
-
-```css
-#ptrMoon { left: max(12px, calc(50% - var(--colW, 400px) / 2 + 12px)); }
-#ptrWrap.two-col #ptrMoon { left: max(12px, calc(50% - var(--colW, 400px) + 12px)); }
-```
-
-В двух колонках заголовок живёт в начале левой колонки ширины `--colW`, поэтому
-смещение иное.
-
-## Почему это работает
-
-- В одну колонку обёртка ровно по `--colW` → заголовок по центру, месяц
-  `calc(50% - --colW/2 + 12px)` совпадает с ним.
-- В две колонки обёртка `2*--colW`, первая колонка слева → месяц
-  `calc(50% - --colW + 12px)` совпадает с началом левой колонки.
-- Порог `innerWidth > 2*--colW + 24` гарантирует, что внешняя ширина обёртки
-  (`2*--colW` контент + padding 24) умещается во вьюпорт без горизонтального
-  скролла; вторая колонка получает остаток.
-- Портретный телефон вынужденно одноколоночный, даже если `innerWidth`
-  превышает порог (узкий по факту).
+Во время валидации в `recalcLayout()` выводилась ширина колонки в `#status`
+(`TEMP colW=…px | win=…px | two=yes/no`). После подтверждения удалена.
 
 ## Валидация
 
-1. Синтаксис инлайн-скрипта: `node --check` — OK.
-2. Браузер, ландшафт 1200×900 (колонка 400): две колонки; ошибок в консоли нет.
-3. Браузер, портрет 900×1200: одна колонка (несмотря на `innerWidth > 824`).
-4. Браузер, узкое ландшафтное окно < 824px: одна колонка.
-5. Месяц `#ptrMoon` выровнен над заголовочным 🌙 в обоих режимах (формула
-   привязана к `--colW`); ссылок на старую ширину 640/320 в раскладке нет.
+1. Одна колонка: `#ptrWrap` = первой колонке; сужение окна не меняет `colW`;
+   вторая колонка (при показе) той же ширины.
+2. Две колонки: `#ptrWrap` почти на всю ширину окна; вторая колонка
+   flex-заполняет остаток, не зависит от `--colW`.
+3. Переключение 2→1 колонка сохраняет `--colW` (нет отката к дефолту).
+4. Порог: перетаскивание `--colW` вправо до упора не схлопывает вторую колонку;
+   при превышении — честный переход в одну колонку.
+5. Портретный телефон — принудительно одна колонка.
 
 ## Коммит
 
-Сообщение коммита (готово, не создан):
-
 ```
-fix(layout): toggle columns by window width relative to column width
+fix(layout): keep column width as single source of width
 
-The two-column layout is now driven by a .two-col class on #ptrWrap,
-enabled when the window is wider than twice the column width plus gap
-and splitter (window.innerWidth > 2*--colW + 24). The column width is
-set by the splitter to the right of the first column (--colW).
+The splitter to the right of the first column sets --colW, which now
+drives the layout width instead of content fitting.
 
-- CSS: base #ptrWrap max-width = var(--colW, 400px); .two-col sets
-  calc(2 * var(--colW)); removed @media (min-aspect-ratio: 1/1).
-- JS: replaced matchMedia/aspect-ratio with twoColActive state and
-  recalcLayout(); two columns forcibly disabled in portrait orientation;
-  helper functions hoisted to module scope; recalcLayout runs on load,
-  resize, orientationchange and after splitter drag.
-- Sky: #ptrMoon anchored to --colW (single column) and to the start of
-  the left column in two-column mode, keeping it above the header moon.
+- Root cause: --colW was set inline on #cols (a child), invisible to the
+  parent #ptrWrap due to custom-property inheritance direction; it fell
+  back to the default after switching modes. Now set on :root so #ptrWrap,
+  #cols and #ptrMoon all see the real value.
+- Single column: #ptrWrap width = var(--colW) (was width: fit-content);
+  removed max-width:100% from wrapper and columns so the first column keeps
+  its width regardless of window size. sections use box-sizing: border-box
+  so --colW is the full visible column width, matching splitter dragging.
+- Two columns: #ptrWrap spans nearly the whole window (width calc(100% - 48px)),
+  the second column flex-fills the remainder independently of --colW.
+- JS: hoisted constants (SPLITTER_EXTRA/WRAP_MARGIN/WRAP_PAD/COL_MAX_EXTRA);
+  recalcLayout() enables two columns when innerWidth > colW + COL_MAX_EXTRA
+  + COL_MIN; colWMax() keeps the second column above COL_MIN. Applied saved
+  --colW as-is on load (only splitter dragging changes it). Default column
+  width changed 400 -> 414px.
+```

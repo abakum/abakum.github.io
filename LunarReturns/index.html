@@ -80,10 +80,14 @@
            трансформировал обёртку, а не body — иначе fixed-элементы неба
            (#ptrMoon/#ptrStars) прилипают к трансформируемому предку. */
         #ptrWrap {
-            /* В одну колонку обёртка ровно по ширине колонки (задаёт разделитель
-               --colW, см. initColSplitter); в двухколоночном режиме — класс
-               .two-col расширяет её до 2*--colW (см. ниже). */
-            max-width: var(--colW, 400px);
+            /* Обёртка всегда равна ширине первой колонки (--colW, задаёт
+               разделитель): остальные элементы (заголовок, текст, вторая колонка)
+               следуют за обёрткой и не могут расширять или сжимать её. Ширина
+               первой колонки меняется ТОЛЬКО перетаскиванием разделителя, поэтому
+               в одну колонку обёртка не подстраивается под ширину окна. В две
+               колонки класс .two-col растягивает обёртку почти на всю ширину окна
+               (см. ниже). */
+            width: var(--colW, 414px);
             margin: 0 auto;
             padding: 12px;
             background: var(--bg);
@@ -92,6 +96,10 @@
         h1 { font-size: 1.4em; }
         h2 { font-size: 1.1em; margin-bottom: 6px; }
         section {
+            /* border-box: width/var(--colW) колонки = полная видимая ширина,
+               совпадающая с измерением разделителя при перетаскивании и с
+               шириной обёртки #ptrWrap в одну колонку. */
+            box-sizing: border-box;
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 8px;
@@ -157,14 +165,14 @@
            тёмной теме (см. генерацию точек в JS). */
         #ptrMoon {
             position: fixed; top: 34px;
-            left: max(12px, calc(50% - var(--colW, 400px) / 2 + 12px));
+            left: max(12px, calc(50% - var(--colW, 414px) / 2 + 12px));
             width: 24px; height: 24px;
             pointer-events: none; z-index: -1; opacity: 1;
         }
         /* В двух колонках заголовочный 🌙 — в начале левой колонки ширины
            --colW, а обёртка растянута до 2*--colW. */
         #ptrWrap.two-col #ptrMoon {
-            left: max(12px, calc(50% - var(--colW, 400px) + 12px));
+            left: max(12px, calc(50% - var(--colW, 414px) + 12px));
         }
         #ptrStars {
             position: fixed; top: 0; left: 0; right: 0; height: 280px;
@@ -203,6 +211,15 @@
         #status.error { color: var(--err); }
         .btnrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
         #cols { display: block; }
+        /* В одну колонку первая колонка сохраняет ширину, заданную разделителем
+           (--colW): иначе она сжималась бы по содержимому и настроенная ширина
+           терялась бы при переходе из двухколоночного режима. Не меняется при
+           изменении ширины окна — только перетаскиванием разделителя. */
+        #cols > section:first-of-type { width: var(--colW, 414px); }
+        /* В одну колонку вторая колонка той же ширины, что и первая (--colW),
+           чтобы она следовала за обёрткой; в двухколоночном режиме правило
+           перекрывается flex-раскладкой (.two-col #resultSec). */
+        #resultSec { width: var(--colW, 414px); }
         #pasteOverlay {
             display: none;
             position: fixed;
@@ -245,12 +262,14 @@
             touch-action: none;
         }
         /* Двухколоночный режим (класс .two-col на #ptrWrap ставит JS):
-           включается, когда ширина окна больше удвоенной ширины колонки
-           (--colW) плюс зазор и разделитель — см. recalcLayout(). Обёртка
-           при этом расширяется ровно до 2*--colW. */
-        #ptrWrap.two-col { max-width: calc(2 * var(--colW, 400px)); }
+           включается, когда ширина окна вмещает первую колонку (--colW), зазор,
+           разделитель и вторую колонку не уже минимума — см. recalcLayout().
+           Обёртка растягивается почти на всю ширину окна (по 12px поля с каждой
+           стороны), а вторая колонка flex-заполняет остаток и не зависит от
+           ширины первой. */
+        #ptrWrap.two-col { width: calc(100% - 48px); max-width: 100%; }
         #ptrWrap.two-col #cols { display: flex; gap: 12px; align-items: flex-start; }
-        #ptrWrap.two-col #cols > section:first-of-type { flex: 0 0 var(--colW, 400px); min-width: 0; margin-bottom: 12px; }
+        #ptrWrap.two-col #cols > section:first-of-type { flex: 0 0 var(--colW, 414px); min-width: 0; margin-bottom: 12px; }
         #ptrWrap.two-col #resultSec { flex: 1 1 0; min-width: 0; margin-bottom: 12px; }
         #ptrWrap.two-col #colSplitter {
             width: 12px; height: auto;
@@ -2461,22 +2480,31 @@ function refreshPushBtn() {
 
 // ── Разделитель колонок и двухколоночный режим ──
 // Ширина первой колонки задаётся разделителем справа от неё (--colW).
-// Двухколоночный режим активен, когда окно шире удвоенной ширины колонки
-// плюс зазор и сам разделитель: window.innerWidth > 2*--colW + SPLITTER_EXTRA.
+// Двухколоночный режим: #ptrWrap растягивается почти на всю ширину окна
+// (width: calc(100% - 48px)), первая колонка --colW, зазор+разделитель
+// SPLITTER_EXTRA, а вторая flex-заполняет остаток
+// innerWidth - colW - (WRAP_MARGIN + WRAP_PAD + SPLITTER_EXTRA).
 const COL_W_KEY = "lunarreturns.colw";
 const COL_MIN = 280;
 const SPLITTER_EXTRA = 24; // flex-gap 12px + разделитель 12px
-// Максимум ширины колонки, при котором ещё помещаются две колонки без
-// горизонтального скролла и без схлопывания в одну по условию выше.
+const WRAP_MARGIN = 24;    // поля по бокам обёртки в две колонки (12+12)
+const WRAP_PAD = 24;       // padding #ptrWrap (12+12)
+const COL_MAX_EXTRA = SPLITTER_EXTRA + WRAP_MARGIN + WRAP_PAD; // = 72
+// Максимум ширины колонки, при котором вторая колонка ещё не схлопывается
+// ниже COL_MIN без горизонтального скролла (см. recalcLayout).
 function colWMax() {
-    return Math.max(COL_MIN, Math.floor((window.innerWidth - SPLITTER_EXTRA) / 2) - 1);
+    return Math.max(COL_MIN, Math.floor(window.innerWidth - COL_MAX_EXTRA - COL_MIN) - 1);
 }
+// --colW задаётся на :root (html), чтобы её видели и #ptrWrap (родитель), и
+// #cols, и #ptrMoon: кастомные свойства наследуются только от предков, поэтому
+// инлайн-стиль на #cols был невидим для обёртки (откат к 414px после смены
+// режима). Всё, что использует var(--colW), теперь наследует актуальное значение.
 function currentColW() {
-    const raw = getComputedStyle(document.getElementById("cols")).getPropertyValue("--colW").trim();
-    return raw ? parseFloat(raw) : 400;
+    const raw = getComputedStyle(document.documentElement).getPropertyValue("--colW").trim();
+    return raw ? parseFloat(raw) : 414;
 }
 function setColW(px, save) {
-    document.getElementById("cols").style.setProperty("--colW", px + "px");
+    document.documentElement.style.setProperty("--colW", px + "px");
     if (save) {
         try { localStorage.setItem(COL_W_KEY, String(Math.round(px))); } catch (e) {}
     }
@@ -2485,11 +2513,11 @@ function setColW(px, save) {
 // выключен, даже если ширина окна больше порога — там и так одна колонка.
 const PORTRAIT_MQL = matchMedia("(orientation: portrait)");
 // Пересчёт двухколоночного режима: две колонки только на не-портретной
-// ориентации И когда ширина окна больше удвоенной ширины колонки плюс зазор
-// и разделитель. Вызывается при загрузке, resize, повороте и после
-// перетаскивания разделителя.
+// ориентации И когда окно вмещает первую колонку (--colW), зазор, разделитель
+// и вторую колонку не уже COL_MIN: innerWidth > colW + COL_MAX_EXTRA + COL_MIN.
+// Вызывается при загрузке, resize, повороте и после перетаскивания разделителя.
 function recalcLayout() {
-    setTwoCol(!PORTRAIT_MQL.matches && window.innerWidth > 2 * currentColW() + SPLITTER_EXTRA);
+    setTwoCol(!PORTRAIT_MQL.matches && window.innerWidth > currentColW() + COL_MAX_EXTRA + COL_MIN);
 }
 
 (function initColSplitter() {
@@ -2497,9 +2525,11 @@ function recalcLayout() {
     const splitter = document.getElementById("colSplitter");
     let dragging = false;
 
-    // Применяем сохранённую ширину при загрузке и решаем режим раскладки.
-    let saved = 400;
-    try { saved = parseFloat(localStorage.getItem(COL_W_KEY)) || 400; } catch (e) {}
+    // Применяем сохранённую ширину при загрузке как есть: ширина первой колонки
+    // меняется ТОЛЬКО перетаскиванием разделителя, поэтому не корректируем её
+    // под текущее окно. Затем решаем режим раскладки.
+    let saved = 414;
+    try { saved = parseFloat(localStorage.getItem(COL_W_KEY)) || 414; } catch (e) {}
     setColW(saved, false);
     recalcLayout();
 
