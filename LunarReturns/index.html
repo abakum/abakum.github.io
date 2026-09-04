@@ -12,6 +12,27 @@
     <meta name="theme-color" content="#f9f9f9">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <script src="qr/qrcode.js"></script>
+    <!-- Защита от «промелькивания» светлой темы при загрузке/reload в тёмной.
+         До первой отрисовки синхронно выставляем класс темы на <html>, чтобы
+         блоки theme-dark/theme-light и медиазапрос prefers-color-scheme ниже
+         применились сразу (основной скрипт в конце body исполняется уже после
+         первого кадра). Источник: launch-параметр appearance/vk_theme
+         (приоритет) либо системная схема — как в resolveDark() ниже. -->
+    <script>
+        (function () {
+            var q = new URLSearchParams(location.search);
+            var a = (q.get("appearance") || q.get("vk_theme") || "").toLowerCase();
+            var dark = a === "dark" ? true : a === "light" ? false
+                : matchMedia("(prefers-color-scheme: dark)").matches;
+            var root = document.documentElement;
+            root.classList.toggle("theme-dark", dark);
+            root.classList.toggle("theme-light", !dark);
+            // Статус-бар/адресная строка красим сразу под тему (далее это же
+            // делает applyTheme() в конце body — повтор безопасен/идемпотентен).
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.content = dark ? "#17171a" : "#f9f9f9";
+        })();
+    </script>
     <style>
         /* Цвета вынесены в переменные: тёмная тема — по prefers-color-scheme,
            классы .theme-dark/.theme-light на <html> (VK launch-параметр
