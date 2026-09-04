@@ -16,21 +16,35 @@
          До первой отрисовки синхронно выставляем класс темы на <html>, чтобы
          блоки theme-dark/theme-light и медиазапрос prefers-color-scheme ниже
          применились сразу (основной скрипт в конце body исполняется уже после
-         первого кадра). Источник: launch-параметр appearance/vk_theme
-         (приоритет) либо системная схема — как в resolveDark() ниже. -->
+         первого кадра — страница успела бы отрисоваться светлой целиком).
+         Приоритет источника: сохранённая тема из localStorage (её пишет
+         applyTheme() на каждой смене; гарантирует тёмный первый кадр при
+         PTR-reload даже когда launch-параметр отсутствует и prefers-color-scheme
+         в WebView ещё светлый) → launch-параметр appearance/vk_theme →
+         системная схема (как в resolveDark() ниже). -->
     <script>
         (function () {
-            var q = new URLSearchParams(location.search);
-            var a = (q.get("appearance") || q.get("vk_theme") || "").toLowerCase();
-            var dark = a === "dark" ? true : a === "light" ? false
-                : matchMedia("(prefers-color-scheme: dark)").matches;
+            var dark;
+            // 1) Сохранённая тема — самый надёжный сигнал до первого кадра.
+            try { dark = localStorage.getItem("lunarreturns.theme"); } catch (e) { dark = null; }
+            if (dark !== "dark" && dark !== "light") {
+                // 2) Launch-параметр VK.
+                var q = new URLSearchParams(location.search);
+                var a = (q.get("appearance") || q.get("vk_theme") || "").toLowerCase();
+                dark = a === "dark" ? "dark" : a === "light" ? "light" : null;
+            }
+            if (dark !== "dark" && dark !== "light") {
+                // 3) Системная схема.
+                dark = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+            }
+            var isDark = dark === "dark";
             var root = document.documentElement;
-            root.classList.toggle("theme-dark", dark);
-            root.classList.toggle("theme-light", !dark);
+            root.classList.toggle("theme-dark", isDark);
+            root.classList.toggle("theme-light", !isDark);
             // Статус-бар/адресная строка красим сразу под тему (далее это же
             // делает applyTheme() в конце body — повтор безопасен/идемпотентен).
             var meta = document.querySelector('meta[name="theme-color"]');
-            if (meta) meta.content = dark ? "#17171a" : "#f9f9f9";
+            if (meta) meta.content = isDark ? "#17171a" : "#f9f9f9";
         })();
     </script>
     <style>
@@ -433,8 +447,11 @@ const PD_CONSENT_KEY = "lunarreturns.pdConsent";
 const PD_PUSH_CONSENT_KEY = "lunarreturns.pdPushConsent";
 const AUTOTAP_KEY = "lunarreturns.autotap";
 const VKPUSH_KEY = "lunarreturns.vkpush";
+// Тема ("dark"/"light"): пишется applyTheme(), читается ранним скриптом в head
+// до первого кадра — убирает светлую вспышку при PTR-reload в нативном клиенте.
+const THEME_KEY = "lunarreturns.theme";
 // Настройки, переносимые между версиями ВК-хостинга через #lr_ls (не ПДн).
-const LR_LS_KEYS = [DAYS_KEY, PD_CONSENT_KEY, PD_PUSH_CONSENT_KEY, VKPUSH_KEY, AUTOTAP_KEY];
+const LR_LS_KEYS = [DAYS_KEY, PD_CONSENT_KEY, PD_PUSH_CONSENT_KEY, VKPUSH_KEY, AUTOTAP_KEY, THEME_KEY];
 const QR_MAX_BYTES = 2953;
 const SPACE = "\u2002\u2004";
 const WIDE_SPACE = "\u2003\u2004";
@@ -508,6 +525,11 @@ function applyTheme() {
     const dark = resolveDark();
     document.documentElement.classList.toggle("theme-dark", dark);
     document.documentElement.classList.toggle("theme-light", !dark);
+    // Персистентность темы: ранний скрипт в head на следующей загрузке (в т.ч.
+    // PTR-reload) берёт её из localStorage ДО первого кадра, чтобы не отрисовать
+    // страницу светлой в тёмном режиме (prefers-color-scheme в WebView на старте
+    // ещё светлый, launch-параметр не гарантирован).
+    try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch (e) { }
     // Нативные контролы (input[type=date] на Android игнорирует CSS color)
     // красит color-scheme из блоков переменных выше.
     // theme-color = фактический фон body (статус-бар браузера/PWA).
@@ -1552,6 +1574,9 @@ function applyLsParams(ls) {
             if (DAYS_DEFS[v]) localStorage.setItem(k, v);
         } else if (k === AUTOTAP_KEY) {
             if (/^\d{4}-\d{2}-\d{2}$/.test(v)) localStorage.setItem(k, v);
+        } else if (k === THEME_KEY) {
+            // Тема переносится только валидным явным значением ("dark"/"light").
+            if (v === "dark" || v === "light") localStorage.setItem(k, v);
         } else if (v === "1") {
             localStorage.setItem(k, v);
         }
