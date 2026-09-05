@@ -14,12 +14,16 @@ PTR в VK-режиме самописный (IIFE, index.html:448–506): жес
 1. Добавить хелпер (внутрь PTR-IIFE, до листенеров):
 
 ```js
-// Тактильный «толчок» при взводе PTR: taptic-ивент бриджа ВК
-// (iOS — Taptic Engine, Android — вибрация), фолбэк — navigator.vibrate.
+// Тактильный «толчок» при взводе PTR: taptic-ивент бриджа ВК (iOS) И
+// navigator.vibrate (Android). Вызовы независимы: в VK-контексте vkBridge
+// есть всегда, но taptic-ивент Android-клиент не поддержает, поэтому
+// else-if оставлял реальную вибрацию недостижимой на Android. iOS же не
+// имеет navigator.vibrate — двойного отклика не будет.
 function ptrHaptic() {
     if (window.vkBridge && typeof vkBridge.send === "function") {
         vkBridge.send("VKWebAppTapticImpactOccurred", { style: "light" }).catch(() => {});
-    } else if (navigator.vibrate) {
+    }
+    if (typeof navigator.vibrate === "function") {
         try { navigator.vibrate(10); } catch (e) {}
     }
 }

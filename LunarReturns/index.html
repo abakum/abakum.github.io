@@ -229,14 +229,18 @@
            сдвигается и открывает их. Горизонталь месяца привязана к первой
            колонке (--colW, центрирована) над заголовочным 🌙 при любой ширине
            окна: в одной колонке обёртка равна --colW, в двух — заголовок живёт
-           в левой колонке, поэтому смещение иное (см. .two-col). Прозрачность
-           статична по теме: месяц всегда непрозрачен, звёзды видны только на
-           тёмной теме (см. генерацию точек в JS). */
+           в левой колонке, поэтому смещение иное (см. .two-col). На светлой
+           теме месяц слегка прозрачен (не перегружает небо); звёзды видны
+           только на тёмной теме (см. генерацию точек в JS). */
         #ptrMoon {
             position: fixed; top: 34px;
             left: max(12px, calc(50% - var(--colW, 336px) / 2 + 12px));
             width: 24px; height: 24px;
             pointer-events: none; z-index: -1; opacity: 1;
+        }
+        :root.theme-light #ptrMoon { opacity: .6; }
+        @media (prefers-color-scheme: light) {
+            :root:not(.theme-dark) #ptrMoon { opacity: .6; }
         }
         /* В двух колонках заголовочный 🌙 — в начале левой колонки ширины
            --colW, а обёртка растянута до 2*--colW. */
@@ -434,9 +438,12 @@
             <button id="cloudGetBtn" onclick="cloudGet(this)" title="Загрузить базу из облака" style="display:none;">📥</button>
             <button onclick="clearDb()" title="Очистить всю базу">❌</button>
             <button onclick="pasteDb()" title="Вставить базу из буфера">📋</button>
-            <button onclick="showDbQr()" title="Показать базу как QR">⛶</button>
             <button onclick="copyDb()" title="Скопировать базу">⎘</button>
+            <button onclick="showDbQr()" title="Показать базу как QR">⛶</button>
+            <button type="button" id="daysCopyBtn" onclick="copyDays()" title="Скопировать дни" style="display:none;">⎘</button>
+            <button type="button" id="daysQrBtn" onclick="showDaysQr()" title="Показать дни как QR" style="display:none;">⛶</button>
         </div>
+        <div id="daysQr" class="qr"></div>
         <div id="dbQr" class="qr"></div>
     </section>
 
@@ -467,8 +474,8 @@
         <div class="btnrow">
             <button type="button" id="srcBtn" onclick="scrollToSourceRow()" title="К строке источника" style="display:none;">⬉</button>
             <button type="button" id="detailBtn" onclick="toggleDetail()" title="Сжато">⋯</button>
-            <button type="button" id="qrBtn" onclick="toggleResultQr()" title="Показать QR результата">⛶</button>
             <button onclick="copyResult()" title="Копировать текст">⎘</button>
+            <button type="button" id="qrBtn" onclick="toggleResultQr()" title="Показать QR результата">⛶</button>
         </div>
         <div class="qr" id="resultQr"></div>
     </section>
@@ -698,12 +705,16 @@ applyTheme();
     const ptrBody = document.getElementById("ptrWrap");
     let startY = 0, startX = 0, pulling = false, dist = 0, armed = false, hapticDone = false;
 
-    // Тактильный «толчок» при взводе PTR: taptic-ивент бриджа ВК
-    // (iOS — Taptic Engine, Android — вибрация), фолбэк — navigator.vibrate.
+    // Тактильный «толчок» при взводе PTR: taptic-ивент бриджа ВК (iOS) И
+    // navigator.vibrate (Android). Вызовы независимы: в VK-контексте vkBridge
+    // есть всегда, но taptic-ивент Android-клиент не поддержает, поэтому
+    // else-if оставлял реальную вибрацию недостижимой на Android. iOS же не
+    // имеет navigator.vibrate — двойного отклика не будет.
     function ptrHaptic() {
         if (window.vkBridge && typeof vkBridge.send === "function") {
             vkBridge.send("VKWebAppTapticImpactOccurred", { style: "light" }).catch(() => {});
-        } else if (navigator.vibrate) {
+        }
+        if (typeof navigator.vibrate === "function") {
             try { navigator.vibrate(10); } catch (e) {}
         }
     }
@@ -1672,7 +1683,7 @@ function toggleReligionBtns() {
         savedUiDisp = [];
         const els = [document.getElementById("recForm"), document.getElementById("cityRow"), document.getElementById("list"),
             document.getElementById("pdConsentLabel"), document.getElementById("pdPushConsentLabel"), document.getElementById("pdLocalNote")]
-            .concat([...document.getElementById("toolbar").children].filter(c => c !== rb && c.id !== "eggBtn" && c.id !== "pushBtn"));
+            .concat([...document.getElementById("toolbar").children].filter(c => c !== rb && c.id !== "eggBtn" && c.id !== "pushBtn" && c.id !== "daysQrBtn" && c.id !== "daysCopyBtn"));
         for (const el of els) { savedUiDisp.push([el, el.style.display]); el.style.display = "none"; }
         rb.style.display = "inline";
         hideResult();
@@ -1683,6 +1694,7 @@ function toggleReligionBtns() {
         rb.style.display = "none";
         if (dayKind) hideDaysDiv(dayKind);
     }
+    updateReligionActions();
     renderTitle();
 }
 
@@ -1835,6 +1847,7 @@ function toggleDays(kind) {
         hideDaysDiv(kind);
         renderTitle();
         saveDayKind();
+        updateReligionActions();
         return;
     }
     if (dayKind) hideDaysDiv(dayKind);
@@ -1845,6 +1858,7 @@ function toggleDays(kind) {
     renderDays(kind, items);
     renderTitle();
     saveDayKind();
+    updateReligionActions();
 }
 
 function religionDates() {
@@ -1855,6 +1869,41 @@ function religionDates() {
         if (!out.includes(md)) out.push(md);
     }
     return out;
+}
+
+// ⎘/⛶ для выбранных религиозных дней: текстовые строки списка дней.
+// Кнопки показываются только в режиме религии при выбранном календаре.
+let daysQrShown = false;
+function daysText() {
+    if (!dayKind) return "";
+    const lines = buildDays(dayKind).map(([j, name]) => {
+        const [y, m, d] = jdnToGreg(j);
+        const date = y + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+        return date + " " + name;
+    });
+    return [DAYS_DEFS[dayKind][0], ...lines].join("\n");
+}
+function copyDays() {
+    if (!dayKind) { status("Религия не выбрана", true); return; }
+    copyText(daysText());
+}
+function showDaysQr() {
+    daysQrShown = !daysQrShown;
+    const el = document.getElementById("daysQr");
+    if (!daysQrShown || !dayKind) { el.style.display = "none"; el.innerHTML = ""; return; }
+    el.style.display = "block";
+    showQr(el, daysText());
+}
+function updateReligionActions() {
+    const show = !!(religionMode && dayKind);
+    document.getElementById("daysQrBtn").style.display = show ? "" : "none";
+    document.getElementById("daysCopyBtn").style.display = show ? "" : "none";
+    if (!show) {
+        daysQrShown = false;
+        const q = document.getElementById("daysQr");
+        q.style.display = "none";
+        q.innerHTML = "";
+    }
 }
 
 function allPushDates() {
