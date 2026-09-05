@@ -685,7 +685,7 @@ applyTheme();
     // Звёзды для ночной темы: ~25 случайных белых точек в верхней полосе неба.
     // Создаются на всех платформах (не только в VK): на десктопе в тёмной теме
     // они должны быть видны слева и справа от колонки формы. Сама тяга PTR —
-    // только для VK (см. ранний return ниже), а небо со звёздами нужно всем.
+    // только для touch-устройств (VK и мобильные браузеры), небо нужно всем.
     const starsBox = document.getElementById("ptrStars");
     if (starsBox) {
         for (let i = 0; i < 25; i++) {
@@ -698,7 +698,11 @@ applyTheme();
         }
     }
 
-    if (!vkminiapp) return;
+    // Кастомный PTR активен на любом touch-устройстве (VK WebView и мобильные
+    // браузеры): это позволяет тестировать отклик (navigator.vibrate) вне
+    // клиента ВК, например в Chrome на Android. На десктопе (мышь) — отключён.
+    const isTouch = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+    if (!isTouch) return;
     const THRESHOLD = 70;
     // Тянем обёртку, а не body: у трансформированного предка fixed-дети неба
     // (#ptrMoon/#ptrStars) прилипают к нему и красятся над его фоном.
