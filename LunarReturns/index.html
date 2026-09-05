@@ -134,6 +134,9 @@
            горизонту; в тёмной — сумерки с тлеющим закатом у края. */
         html {
             background: linear-gradient(180deg, #4f7fb5 0%, #8fb0d1 45%, #e8b07e 80%, #c97b52 100%) fixed;
+            /* Отключаем нативный pull-to-refresh браузера (Chrome/Android), иначе
+               он перехватывает свайп раньше кастомного PTR (который даёт отклик). */
+            overscroll-behavior-y: none;
         }
         html.theme-dark {
             background: linear-gradient(180deg, #0c1220 0%, #1d2b4a 45%, #4a2f52 78%, #6e3b35 100%) fixed;
@@ -143,7 +146,7 @@
                 background: linear-gradient(180deg, #0c1220 0%, #1d2b4a 45%, #4a2f52 78%, #6e3b35 100%) fixed;
             }
         }
-        body { font-family: sans-serif; }
+        body { font-family: sans-serif; overscroll-behavior-y: none; }
         /* Колонка-обёртка: визуальные стили body вынесены сюда, чтобы PTR
            трансформировал обёртку, а не body — иначе fixed-элементы неба
            (#ptrMoon/#ptrStars) прилипают к трансформируемому предку. */
@@ -707,13 +710,15 @@ applyTheme();
     // Тянем обёртку, а не body: у трансформированного предка fixed-дети неба
     // (#ptrMoon/#ptrStars) прилипают к нему и красятся над его фоном.
     const ptrBody = document.getElementById("ptrWrap");
-    let startY = 0, startX = 0, pulling = false, dist = 0, armed = false, hapticDone = false;
+    let startY = 0, startX = 0, pulling = false, dist = 0, armed = false;
 
-    // Тактильный «толчок» при взводе PTR: taptic-ивент бриджа ВК (iOS) И
+    // Тактильный «толчок» при PTR: taptic-ивент бриджа ВК (iOS) И
     // navigator.vibrate (Android). Вызовы независимы: в VK-контексте vkBridge
     // есть всегда, но taptic-ивент Android-клиент не поддержает, поэтому
     // else-if оставлял реальную вибрацию недостижимой на Android. iOS же не
-    // имеет navigator.vibrate — двойного отклика не будет.
+    // имеет navigator.vibrate — двойного отклика не будет. Вызывается ТОЛЬКО
+    // на touchend: там гарантирована user activation для navigator.vibrate
+    // (touchmove её не даёт, вибрация могла игнорироваться).
     function ptrHaptic() {
         if (window.vkBridge && typeof vkBridge.send === "function") {
             vkBridge.send("VKWebAppTapticImpactOccurred", { style: "light" }).catch(() => {});
@@ -741,7 +746,6 @@ applyTheme();
             startX = e.touches[0].clientX;
             pulling = false;
             dist = 0;
-            hapticDone = false;
         }
     }, { passive: true });
 
@@ -764,7 +768,6 @@ applyTheme();
         }
         if (dy <= 0) { ptrReset(); armed = false; return; }
         dist = dy * 0.5; // сопротивление
-        if (dist >= THRESHOLD && !hapticDone) { hapticDone = true; ptrHaptic(); }
         ptrBody.style.transition = "none";
         ptrBody.style.transform = "translateY(" + Math.round(dist) + "px)";
     }, { passive: false });
@@ -778,6 +781,7 @@ applyTheme();
             document.documentElement.classList.remove("ptr-moon");
             ptrBody.style.transition = "transform .2s";
             ptrBody.style.transform = "";
+            ptrHaptic(); // отклик ТОЛЬКО на touchend (user activation гарантирована)
             setTimeout(() => location.reload(), 600);
         } else {
             ptrReset();
