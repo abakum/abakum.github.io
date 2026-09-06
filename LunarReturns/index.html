@@ -25,11 +25,11 @@
     <script>
         (function () {
             var dark;
+            var q = new URLSearchParams(location.search);
             // 1) Сохранённая тема — самый надёжный сигнал до первого кадра.
             try { dark = localStorage.getItem("lunarreturns.theme"); } catch (e) { dark = null; }
             if (dark !== "dark" && dark !== "light") {
                 // 2) Launch-параметр VK.
-                var q = new URLSearchParams(location.search);
                 var a = (q.get("appearance") || q.get("vk_theme") || "").toLowerCase();
                 dark = a === "dark" ? "dark" : a === "light" ? "light" : null;
             }
@@ -41,6 +41,14 @@
             var root = document.documentElement;
             root.classList.toggle("theme-dark", isDark);
             root.classList.toggle("theme-light", !isDark);
+            // Ранние классы VK: до первого кадра, чтобы оверлей «Дата» не
+            // промелькивал при reload в нативных клиентах ВК (см. ниже
+            // html.vk:not(.vk-mweb)). mobile_web определяется по URL так же,
+            // как в vk-bridge.
+            if (q.has("vk_app_id")) {
+                root.classList.add("vk");
+                if (q.get("vk_platform") === "mobile_web") root.classList.add("vk-mweb");
+            }
             // Статус-бар/адресная строка красим сразу под тему (далее это же
             // делает applyTheme() в конце body — повтор безопасен/идемпотентен).
             var meta = document.querySelector('meta[name="theme-color"]');
@@ -206,11 +214,11 @@
            что даёт инверсию при расхождении схемы с темой страницы). Только
            ::-webkit-datetime-edit перекрывает и его, и сегменты даты. */
         input[type="date"]::-webkit-datetime-edit { color: var(--muted); }
-        /* Мобильные WebView (VK) рисуют плейсхолдер пустого дейт-инпута
-           нативным слоем мимо CSS (белый на белом / чёрный на чёрном).
-           Оверлей «Дата» — обычный HTML-текст над пустым полем; на десктопе
-           скрыт, там работает нативный плейсхолдер. Только для мобильных
-           браузеров вне VK: в VK WebView нативный плейсхолдер виден и сам. */
+        /* Мобильные WebView рисуют плейсхолдер пустого дейт-инпута нативным
+           слоем мимо CSS (белый на белом / чёрный на чёрном). Оверлей «Дата» —
+           обычный HTML-текст над пустым полем; на десктопе скрыт, там работает
+           нативный плейсхолдер. Оверлей — для touch-браузеров вне нативных
+           приложений ВК (Android Chrome, mobile_web и т.п.). */
         #fDatePh { display: none; }
         /* Непрозрачность подбирает вид нативного UA-плейсхолдера fName:
            в светлой схеме он ~#757575 (#555 на ~72%), в тёмной — 54% от --muted. */
@@ -231,9 +239,11 @@
             #dateWrap.filled #fDatePh { display: none; }
             #dateWrap:focus-within #fDatePh { display: none; }
         }
-        /* В VK WebView нативный плейсхолдер дейт-инпута виден и контрастен —
-           оверлей «Дата» там не нужен (без него текст не двоится). */
-        html.vk #fDatePh { display: none; }
+        /* В webview нативных приложений ВК (android/iphone) нативный плейсхолдер
+           дейт-инпута виден и контрастен — оверлей «Дата» там не нужен (иначе
+           текст двоится). В mobile_web (мини-апп в мобильном браузере)
+           плейсхолдер не контрастный — оверлей оставляем, как вне VK. */
+        html.vk:not(.vk-mweb) #fDatePh { display: none; }
         /* Месяц и звёзды на небе-подложке: красятся после фона html (небо),
            но до фона body (форма) — на десктопе закрыты формой, при PTR тело
            сдвигается и открывает их. Горизонталь месяца привязана к первой
@@ -573,10 +583,8 @@ let yandexToken = "";
 // VK Mini App определяется по параметру vk_app_id в URL, который VK всегда
 // добавляет при запуске мини-аппа (см. dev.vk.com/mini-apps/development/launch-params).
 const vkminiapp = new URLSearchParams(location.search).has("vk_app_id");
-// В VK-режиме вешаем класс .vk на <html>: он включает требования ВК к UX
-// (некликабельные картинки, невыделяемые тексты, кнопки/ссылки без подчёркивания
-// и тап-подсветки). Вне ВК класс не ставится — поведение не меняется.
-if (vkminiapp) document.documentElement.classList.add("vk");
+// Классы .vk/.vk-mweb уже выставлены ранним скриптом в head (до первого кадра).
+// Здесь используется только флаг vkminiapp для логики (vkBridge, PTR, push).
 // Версия VK-сборки — прямо из origin хостинга (см. LR_ORIGIN_RE):
 // https://prod-app54746591-4ff53da5fb4c.pages.vk-apps.com → "prod-4ff53da5fb4c".
 const vkBuildVersion = (() => {
