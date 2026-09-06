@@ -1,0 +1,62 @@
+# План: чекбокс согласия на VK-пуши — только в нативных клиентах VK
+
+## Постановка
+`VKWebAppAllowNotifications` всегда отклоняется в браузерных клиентах ВК (`mobile_web`, `desktop_web`) — ограничение платформы (см. README «Ограничения»/«Push»-раздел). Сейчас чекбокс согласия на пуш-подписку (`pdPushConsent`) показывается по условию origin (`vkProdApp`), а в браузерных клиентах origin тот же prod-хостинг — чекбокс виден, но подписка через него невозможна. Показывать согласие (и кнопку 🔔) нужно только там, где подписка реально работает: в нативных приложениях ВК (`vk_platform=android|iphone`).
+
+## Обоснование (по доке и коду)
+Официальная дока недоступна для автозагрузки (dev.vk.com — SPA). Факты из кода:
+- vk-bridge (master, `packages/core/src/bridge.ts`) включает `VKWebAppAllowNotifications` в `DESKTOP_METHODS`, т.е. web-клиент vk.ru **декларирует** поддержку метода; отказ («Unsupported platform. Notifications are not allowed for untrusted apps») выдаёт закрытая реализация vk.ru. Текст отказа в нашем README зафиксирован эмпирически при внедрении (план 20260902).
+- Следствие: гейт по `vk_platform` основан на наблюдении, а не на документе. Поэтому:
+  1. гейт делаем одной константой `vkNativeApp` (легко снять, когда ВК включит web-уведомления);
+  2. в валидацию добавляем эмпирическую проверку в m.vk.com/vk.ru ДО выката;
+  3. в рантайме доступна перепроверка `vkBridge.supportsAsync("VKWebAppAllowNotifications")` (3.x, отвечает на основе `SetSupportedHandlers` от родительского фрейма) — использовать при отладке, не как основной гейт (показ согласия не должен зависеть от async-пробы, которая на web может вернуть true при фактическом отказе).
+
+
+## Текущее состояние (точки правки, `LunarReturns/index.html`)
+- `vkminiapp` — index.html:581-584 (конец body).
+- `initPushConsent()` — index.html:2089-2091: `if (!vkProdApp) return;` — единственный гейт чекбокса.
+- Отзыв согласия при снятии чекбокса — index.html:2096-2116 (не трогаем).
+- `togglePushVk()` — index.html:2679-2683: гейт `!vkProdApp || !pushConsentGiven()`.
+- `updatePushDates()` — index.html:2710-2717: повторный `vk_subscribe` при `vkProdApp && flag && consent`.
+- `refreshPushBtn()` — index.html:2762-2770: кнопка при `PUSH_URL && vkProdApp && pushConsentGiven()`.
+- Грань `vk-mweb` (mobile_web) уже ставится ранним head-скриптом (index.html:25-56) — но для `desktop_web` класса нет.
+
+## Изменения (один файл `LunarReturns/index.html`)
+
+1. **Рядом с `vkminiapp` (после index.html:584) добавить:**
+
+```js
+// Нативный клиент ВК (android/iphone): только там VKWebAppAllowNotifications
+// может выдать разрешение; в браузерных клиентах (mobile_web, desktop_web) оно
+// всегда отклоняется — там не показываем согласие/кнопку пушей. Отсутствие
+// vk_platform (подделка URL, старые клиенты) — безопасный дефолт «не нативный».
+const vkPlatform = new URLSearchParams(location.search).get("vk_platform");
+const vkNativeApp = vkminiapp && (vkPlatform === "android" || vkPlatform === "iphone");
+```
+
+2. **`initPushConsent()` (index.html:2090):** условие выхода `if (!vkProdApp || !vkNativeApp) return;`.
+
+3. **`refreshPushBtn()` (index.html:2765):** в VK-ветке добавить `!vkNativeApp` в условие скрытия: `if (!PUSH_URL || !vkProdApp || !vkNativeApp || !pushConsentGiven()) { btn.style.display = "none"; return; }`.
+
+4. **`togglePushVk()` (index.html:2680):** defensive-гейт не обязателен (кнопка скрыта, согласие не получить), но для единообразия добавить `|| !vkNativeApp` к условию сообщения «требуется согласие… доступно только в production-версии». Сообщение не меняем — ветка недостижима из UI.
+
+`updatePushDates()` не трогаем: его условие требует `pushConsentGiven()`, которое в браузерных клиентах выставить нельзя (чекбокс скрыт) — ветка недостижима.
+
+## Поведение после правки
+- Нативное приложение ВК (android/iphone, prod): чекбокс и 🔔 видны — без изменений.
+- mobile_web (m.vk.com в мобильном браузере), desktop_web (vk.ru в Chrome): чекбокс и 🔔 скрыты; существующая подписка не трогается, но управлять ею из этих клиентов нельзя.
+- `vk_app_id` без `vk_platform` (скриншот-бот, подделка): скрыто (безопасный дефолт).
+- GitHub-режим: не задет (ветка не VK, веб-подписка своя).
+
+## Риски
+- Пользователь, ранее подписавшийся в нативном приложении, открыв мини-апп через m.vk.com, не увидит 🔔 и не сможет отключить подписку из этого клиента — управление вернётся при открытии в приложении. Приемлемо: подписка серверная, не дублируется.
+- Если ВК когда-нибудь включит уведомления в web-клиентах, гейт придётся снять (условие локализовано в одной константе `vkNativeApp`).
+
+## Валидация
+1. DevTools: локально проверить вычисление `vkNativeApp` для `vk_platform=android|iphone|desktop_web|mobile_web|отсутствует` (консоль; `vkProdApp` по origin — локально не воспроизводится, важен только флаг).
+2. До выката — эмпирическая проверка гипотезы «web-клиенты не дают подписаться» (дока недоступна, README — наблюдение):
+   - в прод-мини-аппе открыть m.vk.com/app54746591 в мобильном браузере и vk.ru/app54746591 на десктопе;
+   - в консоли: `await vkBridge.supportsAsync("VKWebAppAllowNotifications")` и `await vkBridge.send("VKWebAppAllowNotifications")` — если вдруг вернётся `{result:true}` и уведомления реально включаются, гейт по `vkNativeApp` НЕ выкатывать, вместо этого пересмотреть решение;
+   - если отказ (`Unsupported platform…` / `result:false`) — гипотеза подтверждена, выкатывать.
+3. После выката: в нативном приложении ВК — чекбокс и 🔔 на месте, вкл/выкл подписки работают; в m.vk.com с телефона и в vk.ru на десктопе — чекбокс и 🔔 скрыты, регресса UI нет.
+4. Отзыв первого чекбокса (база) и логика `applyVkUi` не затронуты.

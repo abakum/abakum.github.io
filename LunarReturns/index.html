@@ -583,6 +583,12 @@ let yandexToken = "";
 // VK Mini App определяется по параметру vk_app_id в URL, который VK всегда
 // добавляет при запуске мини-аппа (см. dev.vk.com/mini-apps/development/launch-params).
 const vkminiapp = new URLSearchParams(location.search).has("vk_app_id");
+// Нативный клиент ВК (android/iphone): только там VKWebAppAllowNotifications
+// может выдать разрешение; в браузерных клиентах (mobile_web, desktop_web) оно
+// всегда отклоняется — там не показываем согласие/кнопку пушей. Отсутствие
+// vk_platform (подделка URL, старые клиенты) — безопасный дефолт «не нативный».
+const vkPlatform = new URLSearchParams(location.search).get("vk_platform");
+const vkNativeApp = vkminiapp && (vkPlatform === "android" || vkPlatform === "iphone");
 // Классы .vk/.vk-mweb уже выставлены ранним скриптом в head (до первого кадра).
 // Здесь используется только флаг vkminiapp для логики (vkBridge, PTR, push).
 // Версия VK-сборки — прямо из origin хостинга (см. LR_ORIGIN_RE):
@@ -2087,7 +2093,7 @@ function pushConsentGiven() {
 }
 
 function initPushConsent() {
-    if (!vkProdApp) return;
+    if (!vkProdApp || !vkNativeApp) return;
     document.getElementById("pdPushConsentLabel").style.display = "block";
     const cb = document.getElementById("pdPushConsent");
     const note = document.getElementById("pdPushWithdrawNote");
@@ -2677,7 +2683,7 @@ function vkLaunchParams() {
 }
 
 async function togglePushVk() {
-    if (!vkProdApp || !pushConsentGiven()) {
+    if (!vkProdApp || !vkNativeApp || !pushConsentGiven()) {
         status("Для оповещений требуется согласие (чекбокс под списком; доступно только в production-версии)", true);
         return;
     }
@@ -2762,7 +2768,7 @@ async function togglePush() {
 function refreshPushBtn() {
     const btn = document.getElementById("pushBtn");
     if (vkminiapp) {
-        if (!PUSH_URL || !vkProdApp || !pushConsentGiven()) { btn.style.display = "none"; return; }
+        if (!PUSH_URL || !vkProdApp || !vkNativeApp || !pushConsentGiven()) { btn.style.display = "none"; return; }
         btn.style.display = "";
         const on = localStorage.getItem(VKPUSH_KEY) === "1";
         btn.textContent = on ? "🔔" : "🔕";
