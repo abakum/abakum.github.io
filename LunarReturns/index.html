@@ -88,6 +88,18 @@
             document.documentElement.style.setProperty("--colW", w + "px");
         })();
     </script>
+    <!-- Ранняя установка сдвига #ptrWrap по ?ptr=N до первого кадра: имитация
+         тяги PTR для скриншотов (headless Chrome без тача, где кастомный PTR
+         отключён). Сдвиг через --ptrShift в правиле #ptrWrap, луна в заголовке
+         гаснет классом ptr-moon — как при реальной тяге (см. touchmove ниже). -->
+    <script>
+        (function () {
+            var ptr = parseInt(new URLSearchParams(location.search).get("ptr"), 10);
+            if (!(ptr > 0)) return;
+            document.documentElement.style.setProperty("--ptrShift", ptr + "px");
+            document.documentElement.classList.add("ptr-moon");
+        })();
+    </script>
     <style>
         /* Цвета вынесены в переменные: тёмная тема — по prefers-color-scheme,
            классы .theme-dark/.theme-light на <html> (VK launch-параметр
@@ -173,6 +185,10 @@
             margin: 0 auto;
             padding: 12px;
             position: relative;
+            /* ?ptr=N: сдвиг обёртки вниз (имитация тяги PTR для скриншотов).
+               Инлайновый transform реальной тяги его перекрывает, после
+               ptrReset() сдвиг по параметру снова вступает в силу. */
+            transform: translateY(var(--ptrShift, 0px));
             background: var(--bg);
             color: var(--text);
         }
@@ -245,27 +261,21 @@
            плейсхолдер не контрастный — оверлей оставляем, как вне VK. */
         html.vk:not(.vk-mweb) #fDatePh { display: none; }
         /* Месяц и звёзды на небе-подложке: красятся после фона html (небо),
-           но до фона body (форма) — на десктопе закрыты формой, при PTR тело
-           сдвигается и открывает их. Горизонталь месяца привязана к первой
-           колонке (--colW, центрирована) над заголовочным 🌙 при любой ширине
-           окна: в одной колонке обёртка равна --colW, в двух — заголовок живёт
-           в левой колонке, поэтому смещение иное (см. .two-col). На светлой
-           теме месяц слегка прозрачен (не перегружает небо); звёзды видны
-           только на тёмной теме (см. генерацию точек в JS). */
+            но до фона body (форма) — на десктопе закрыты формой, при PTR тело
+            сдвигается и открывает их. Месяц — юникод текущей фазы, стоит бок
+            о бок с боксом зодиака (140px по центру): сразу слева от него,
+            по вертикали по центру бокса (top 8 + 140/2 − 80/2 = 38px).
+            На светлой теме месяц слегка прозрачен (не перегружает небо);
+            звёзды видны только на тёмной теме (см. генерацию точек в JS). */
         #ptrMoon {
-            position: fixed; top: 34px;
-            left: max(12px, calc(50% - var(--colW, 336px) / 2 + 12px));
-            width: 24px; height: 24px;
+            position: fixed; top: 38px;
+            left: calc(50% - 218px);
+            font-size: 80px; line-height: 1;
             pointer-events: none; z-index: -1; opacity: 1;
         }
         :root.theme-light #ptrMoon { opacity: .6; }
         @media (prefers-color-scheme: light) {
             :root:not(.theme-dark) #ptrMoon { opacity: .6; }
-        }
-        /* В двух колонках заголовочный 🌙 — в начале левой колонки ширины
-           --colW, а обёртка растянута до 2*--colW. */
-        #ptrWrap.two-col #ptrMoon {
-            left: max(12px, calc(50% - var(--colW, 336px) + 12px));
         }
         #ptrStars {
             position: fixed; top: 0; left: 0; right: 0; height: 280px;
@@ -277,6 +287,28 @@
         }
         #ptrStars i {
             position: absolute; background: #fff; border-radius: 50%;
+        }
+        /* Фигурка знака луны: бокс ~140px у верхнего края полосы неба,
+           точки-звёзды внутри — наследуют стили #ptrStars i. Линии — SVG
+           под точками (viewBox 0 0 140 140). Подпись знака — сразу под
+           боксом. Видимость диктует opacity #ptrStars. */
+        .ptr-zodiac {
+            position: absolute; left: 50%; top: 8px;
+            width: 140px; height: 140px;
+            transform: translateX(-50%);
+        }
+        .ptr-zodiac svg {
+            position: absolute; inset: 0; width: 100%; height: 100%;
+        }
+        .ptr-zodiac line {
+            stroke: rgba(255, 255, 255, .35); stroke-width: 1;
+        }
+        .ptr-zodiac-cap {
+            position: absolute; left: 50%; top: 152px;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            text-align: center; font-size: 10px; letter-spacing: .08em;
+            color: rgba(255, 255, 255, .65);
         }
         html.ptr-moon #titleH1 img { visibility: hidden; }
         /* Требования ВК к мини-аппам (класс .vk ставит JS в VK-режиме):
@@ -414,7 +446,7 @@
     </style>
 </head>
 <body>
-    <img id="ptrMoon" src="1f319.webp" alt="" width="24" height="24">
+    <div id="ptrMoon" aria-hidden="true"></div>
     <div id="ptrStars" aria-hidden="true"></div>
     <div id="ptrWrap">
     <h1 id="titleH1"><img src="1f319.webp" alt="🌙" width="24" height="24" style="vertical-align:-3px;"> Лунно-солнечные юбилеи</h1>
@@ -706,21 +738,81 @@ applyTheme();
 // location.reload(): подтянуть свежую версию кода после деплоя (чек-лист ВК
 // «обновления без выхода из приложения»). Облако ВК намеренно не перечитывается.
 (function () {
-    // Звёзды для ночной темы: ~25 случайных белых точек в верхней полосе неба.
+    // Звёзды для ночной темы: фоновые случайные белые точки — ТОЛЬКО левее и
+    // правее бокса зодиака, по 25 на сторону (итого 50), чтобы не налезать на
+    // фигурку знака. Бокс фигурки ~140px по центру + зазор 10px ⇒ каждая
+    // боковая зона = calc((100% - 160px) * [0..1]) от своего края.
     // Создаются на всех платформах (не только в VK): на десктопе в тёмной теме
     // они должны быть видны слева и справа от колонки формы. Сама тяга PTR —
     // только для touch-устройств (VK и мобильные браузеры), небо нужно всем.
     const starsBox = document.getElementById("ptrStars");
     if (starsBox) {
-        for (let i = 0; i < 25; i++) {
+        for (let i = 0; i < 50; i++) {
             const s = document.createElement("i");
             const sz = i % 3 ? 2 : 1; // крупные и мелкие вперемешку
-            s.style.cssText = "left:" + (Math.random() * 100).toFixed(2) + "%;"
+            const edge = i < 25 ? "left" : "right"; // 25 левее + 25 правее
+            s.style.cssText = edge + ":calc((100% - 160px) * " + Math.random().toFixed(4) + ");"
                 + "top:" + Math.round(Math.random() * 250) + "px;"
                 + "width:" + sz + "px;height:" + sz + "px;";
             starsBox.appendChild(s);
         }
     }
+
+    // Фигурка текущего знака луны (точки + линии-соединения) + подпись названия:
+    // бокс по центру ширины полосы, подпись у нижнего края (см. CSS ниже).
+    // Рисуем ЛЕНИВО — только при старте тяги PTR или сразу при ?ptr=N
+    // (скриншоты): вне тяги центр неба всё равно закрыт обёрткой, в статике
+    // фигурку никто не видит. Боковые фоновые звёзды выше ждут не ждут.
+    // Знак считаем инлайн: norm360/MZODIAC_* объявлены const НИЖЕ по
+    // скрипту (TDZ), а moonNew — hoisted function declaration, доступна.
+    // Отдельной проверки тёмной темы не нужно: вне её #ptrStars прозрачен.
+    let zodiacDrawn = false;
+    function drawZodiac() {
+        if (!starsBox || zodiacDrawn) return; // один раз за загрузку
+        zodiacDrawn = true;
+        const ZODIAC_FIGS = [
+            { name: "овен", seg: [[0, 1], [1, 2], [2, 3], [3, 4]], pts: [[.10, .75, 2], [.35, .50, 3], [.60, .35, 3], [.80, .45, 2], [.90, .60, 1]] },
+            { name: "телец", seg: [[0, 1], [1, 2], [2, 3], [3, 4], [2, 5], [2, 6]], pts: [[.15, .25, 3], [.30, .40, 2], [.45, .55, 3], [.55, .40, 2], [.70, .25, 3], [.40, .75, 2], [.60, .75, 1]] },
+            { name: "близнецы", seg: [[0, 1], [1, 2], [0, 3], [3, 4], [4, 2], [5, 6], [6, 7], [6, 8], [7, 9]], pts: [[.22, .20, 3], [.22, .45, 2], [.22, .70, 2], [.42, .30, 2], [.42, .60, 2], [.68, .20, 3], [.68, .45, 2], [.68, .70, 2], [.86, .32, 2], [.90, .58, 1]] },
+            { name: "рак", seg: [[0, 1], [2, 1], [1, 3]], pts: [[.30, .25, 2], [.50, .45, 3], [.70, .25, 2], [.50, .80, 2]] },
+            { name: "лев", seg: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [5, 7]], pts: [[.35, .20, 3], [.55, .15, 2], [.65, .30, 2], [.55, .45, 3], [.40, .55, 2], [.25, .70, 3], [.55, .75, 2], [.80, .65, 2]] },
+            { name: "дева", seg: [[0, 1], [1, 2], [1, 3], [3, 4], [3, 5], [3, 6]], pts: [[.15, .30, 2], [.35, .45, 3], [.30, .70, 2], [.55, .50, 2], [.75, .35, 2], [.85, .60, 1], [.55, .80, 2]] },
+            { name: "весы", seg: [[0, 3], [3, 1], [1, 2], [2, 4], [4, 0], [3, 4]], pts: [[.50, .20, 3], [.20, .75, 2], [.80, .75, 2], [.35, .50, 2], [.65, .50, 2]] },
+            { name: "скорпион", seg: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7]], pts: [[.15, .30, 3], [.25, .50, 2], [.40, .65, 2], [.60, .75, 3], [.80, .70, 2], [.90, .55, 2], [.85, .40, 1], [.75, .35, 1]] },
+            { name: "стрелец", seg: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0], [3, 5], [4, 6]], pts: [[.30, .35, 3], [.55, .35, 2], [.75, .45, 2], [.60, .60, 2], [.40, .60, 2], [.55, .80, 1], [.30, .60, 2]] },
+            { name: "козерог", seg: [[0, 1], [1, 2], [2, 3], [3, 4]], pts: [[.15, .30, 3], [.35, .55, 2], [.55, .70, 3], [.75, .60, 2], [.90, .35, 2]] },
+            { name: "водолей", seg: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]], pts: [[.15, .30, 2], [.30, .45, 3], [.45, .30, 2], [.60, .45, 3], [.75, .30, 2], [.85, .55, 1]] },
+            { name: "рыбы", seg: [[0, 1], [1, 2], [2, 6], [6, 3], [3, 4], [4, 5]], pts: [[.15, .70, 3], [.25, .55, 2], [.40, .35, 2], [.60, .35, 2], [.75, .55, 2], [.85, .70, 3], [.50, .50, 1]] }
+        ];
+        const fig = ZODIAC_FIGS[Math.floor(moonNew(new Date()).longitude / 30) % 12];
+        const zbox = document.createElement("div");
+        zbox.className = "ptr-zodiac";
+        // Линии-соединения — SVG под точками (seg — пары индексов pts).
+        const lines = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        lines.setAttribute("viewBox", "0 0 140 140");
+        for (const [a, b] of fig.seg) {
+            const ln = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            ln.setAttribute("x1", fig.pts[a][0] * 140);
+            ln.setAttribute("y1", fig.pts[a][1] * 140);
+            ln.setAttribute("x2", fig.pts[b][0] * 140);
+            ln.setAttribute("y2", fig.pts[b][1] * 140);
+            lines.appendChild(ln);
+        }
+        zbox.appendChild(lines);
+        for (const [x, y, sz] of fig.pts) {
+            const s = document.createElement("i");
+            s.style.cssText = "left:" + x * 100 + "%;top:" + y * 100 + "%;"
+                + "width:" + sz + "px;height:" + sz + "px;opacity:.95;";
+            zbox.appendChild(s);
+        }
+        const zcap = document.createElement("div");
+        zcap.className = "ptr-zodiac-cap";
+        zcap.textContent = fig.name;
+        starsBox.appendChild(zbox);
+        starsBox.appendChild(zcap);
+    }
+    // ?ptr=N (скриншоты): тянуть нечем — рисуем сразу при загрузке.
+    if (parseFloat(new URLSearchParams(location.search).get("ptr")) > 0) drawZodiac();
 
     // Кастомный PTR активен на любом touch-устройстве (VK WebView и мобильные
     // браузеры): это позволяет тестировать отклик (navigator.vibrate) вне
@@ -786,6 +878,7 @@ applyTheme();
             if (e.cancelable) e.preventDefault();
             pulling = true;
             document.documentElement.classList.add("ptr-moon"); // 🌙 в заголовке гаснет сразу
+            drawZodiac(); // фигурка знака появляется вместе с раскрытым небом
         }
         if (dy <= 0) { ptrReset(); armed = false; return; }
         dist = dy * 0.5; // сопротивление
@@ -950,6 +1043,12 @@ const tithiInt = m => Math.floor(m.phase * 30) + 1;
 const TITHI_BASE = ["пратипада", "двитья", "трития", "чатуртхи", "панчами", "шаштхи",
     "саптами", "аштами", "навами", "дашами", "экадаши", "двадаши", "трайодаши", "чатурдаши"];
 const tithiName = n => n === 15 ? "пурнима" : n === 30 ? "амавасья" : TITHI_BASE[(n - 1) % 15];
+
+// Луна в небе (#ptrMoon) — юникод текущей фазы по титхи (вместо статичной
+// 1f319.webp 🌙). Считается один раз при загрузке — внутри суток фаза не
+// меняется. Иконка в заголовке остаётся статичной 1f319.webp.
+const ptrMoonBox = document.getElementById("ptrMoon");
+if (ptrMoonBox) ptrMoonBox.textContent = phaseName(tithiInt(moonNew(new Date())), false);
 
 const MZODIAC_ICON = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"];
 const MZODIAC_RU = ["овен", "телец", "близнецы", "рак", "лев", "дева", "весы", "скорпион", "стрелец", "козерог", "водолей", "рыбы"];
