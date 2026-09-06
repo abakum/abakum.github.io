@@ -2,5 +2,5 @@
 "C:\Program Files\Google\Chrome\Application\chrome.exe" --headless --window-size=600,1200 --screenshot="c:\tmp\screenshot2.png" "https://abakum.github.io/LunarReturns/?vk_app_id=1#1"
 "C:\Program Files\Google\Chrome\Application\chrome.exe" --headless --window-size=600,1200 --screenshot="c:\tmp\screenshot3.png" "https://abakum.github.io/LunarReturns/?vk_app_id=1&appearance=dark"
 "C:\Program Files\Google\Chrome\Application\chrome.exe" --headless --window-size=600,1200 --screenshot="c:\tmp\screenshot4.png" "https://abakum.github.io/LunarReturns/?vk_app_id=1&appearance=dark#1"
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --headless --window-size=1920,1080 --screenshot="c:\tmp\screenshot5.png" "https://abakum.github.io/LunarReturns/?vk_app_id=1&ptr=100"
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --headless --window-size=1920,1080 --screenshot="c:\tmp\screenshot6.png" "https://abakum.github.io/LunarReturns/?vk_app_id=1&appearance=dark&ptr=100"
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --headless --window-size=1920,1080 --screenshot="c:\tmp\screenshot5.png" "https://abakum.github.io/LunarReturns/?vk_app_id=1&ptr=160#1"
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --headless --window-size=1920,1080 --screenshot="c:\tmp\screenshot6.png" "https://abakum.github.io/LunarReturns/?vk_app_id=1&appearance=dark&ptr=160#1"
