@@ -954,6 +954,12 @@ function lrSeedJson() {
     return JSON.stringify([{ n: "Ада", d: "1815-12-10" }]);
 }
 
+// База «пустая по сути»: ничего или только стартовая заготовка «Ада» —
+// спрашивать при импорте нечего, просто заменяем.
+function dbIsTrivial() {
+    return db.length === 0 || JSON.stringify(db) === lrSeedJson();
+}
+
 // Настройки (#lr_ls) для передачи вслед за базой; значения — не ПДн.
 function lrLsHash() {
     const ls = {};
@@ -2159,7 +2165,7 @@ async function importDbText(text) {
         status("Неверный формат базы", true);
         return;
     }
-    const doMerge = await confirmAuto("Импорт", "✅ — объединить (" + incoming.length + " зап.)\n❌ — заменить текущую базу");
+    const doMerge = !dbIsTrivial() && await confirmAuto("Импорт", "✅ — объединить (" + incoming.length + " зап.)\n❌ — заменить текущую базу");
     const merged = doMerge ? db.concat(incoming).filter((r, i, a) =>
         a.findIndex(x => x.n === r.n && x.d === r.d) === i) : incoming;
     const backup = db;
@@ -2620,7 +2626,7 @@ async function vkDbGet() {
         if (!incoming.every(validRecord)) {
             throw new Error("неверный формат базы в облаке ВКонтакте");
         }
-        const doMerge = await confirmAuto("Импорт", "✅ — объединить (" + incoming.length + " зап.)\n❌ — заменить текущую базу");
+        const doMerge = !dbIsTrivial() && await confirmAuto("Импорт", "✅ — объединить (" + incoming.length + " зап.)\n❌ — заменить текущую базу");
         const merged = doMerge ? db.concat(incoming).filter((r, i, a) =>
             a.findIndex(x => x.n === r.n && x.d === r.d) === i) : incoming;
         const backup = db;
@@ -2720,7 +2726,7 @@ function cloudGet(btn) {
         if (!Array.isArray(incoming) || !incoming.every(validRecord)) {
             throw new Error("неверный формат базы в облаке");
         }
-        const doMerge = await confirmAuto("Импорт", "✅ — объединить (" + incoming.length + " зап.)\n❌ — заменить текущую базу");
+        const doMerge = !dbIsTrivial() && await confirmAuto("Импорт", "✅ — объединить (" + incoming.length + " зап.)\n❌ — заменить текущую базу");
         const merged = doMerge ? db.concat(incoming).filter((r, i, a) =>
             a.findIndex(x => x.n === r.n && x.d === r.d) === i) : incoming;
         const backup = db;
