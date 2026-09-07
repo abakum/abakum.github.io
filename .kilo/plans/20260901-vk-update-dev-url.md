@@ -17,7 +17,7 @@
 - Но в исходнике, кроме `environment`, в Hosting API (`apps.getGoHostingUploadServer`
   и `apps.createGoHostingTask`) передаются отдельные флаги `update_dev` / `update_prod`
   (0|1) — **только если они есть в `vk-hosting-config.json`**. Текущий конфиг их не
-  содержит (решение «не заданы» из плана 20260901-vk-mini-apps-deploy-plan.md).
+  содержит (решение «не заданы» из плана 20260901-vk-mini-apps-deploy.md).
 - Событие очереди `CODE_SKIP` (202) = версия выложена, URL не переключён;
   `CODE_DEPLOY` (201) = «URLs changed». Без `update_dev: 1` сервер не переключает
   URL приложения — отсюда симптом.

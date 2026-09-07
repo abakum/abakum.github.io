@@ -408,8 +408,16 @@
             max-width: 360px;
             width: 100%;
             box-sizing: border-box;
+            text-align: center;
         }
-        #confirmMsg { margin-bottom: 10px; }
+        /* Заголовок-глагол + уточнение ниже; pre-line даёт перенос строк
+           в уточнении (альтернативы импорта ✅/❌ — на отдельных строках). */
+        #confirmTitle { font-weight: 600; margin-bottom: 4px; }
+        #confirmMsg {
+            margin-bottom: 10px;
+            color: var(--muted);
+            white-space: pre-line;
+        }
         #confirmDialog .btnrow { justify-content: center; }
         /* Разделитель колонок: в обоих режимах — вертикальная перетаскиваемая
            полоска (ширину колонки меняет JS). В одну колонку она прижата к
@@ -442,6 +450,9 @@
         #ptrWrap.two-col #cols { display: flex; gap: 12px; align-items: flex-start; }
         #ptrWrap.two-col #cols > section:first-of-type { flex: 0 0 var(--colW, 336px); min-width: 0; margin-bottom: 12px; }
         #ptrWrap.two-col #resultSec { flex: 1 1 0; min-width: 0; margin-bottom: 12px; }
+        /* В двух колонках результат и так выравнивается напротив строки-
+           источника (alignResultToRow) — кнопка возврата 🔙 не нужна. */
+        #ptrWrap.two-col #srcBtn { display: none; }
         #ptrWrap.two-col #colSplitter {
             position: static; height: auto;
             flex: 0 0 12px; align-self: stretch;
@@ -514,6 +525,7 @@
 
     <div id="confirmOverlay" onclick="if(event.target===this)closeConfirm(false)">
         <div id="confirmDialog" role="alertdialog" aria-modal="true">
+            <div id="confirmTitle"></div>
             <div id="confirmMsg"></div>
             <div class="btnrow">
                 <button type="button" id="confirmOk" onclick="closeConfirm(true)" title="Да">✅</button>
@@ -527,7 +539,8 @@
     <section id="resultSec" style="display:none;">
         <textarea id="resultText" rows="12" readonly></textarea>
         <div class="btnrow">
-            <button type="button" id="srcBtn" onclick="scrollToSourceRow()" title="К строке источника" style="display:none;">⬉</button>
+            <button type="button" id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Наверх">🔝</button>
+            <button type="button" id="srcBtn" onclick="scrollToSourceRow()" title="К строке источника" style="display:none;">🔙</button>
             <button type="button" id="detailBtn" onclick="toggleDetail()" title="Сжато">⋯</button>
             <button onclick="copyResult()" title="Копировать текст">⎘</button>
             <button type="button" id="qrBtn" onclick="toggleResultQr()" title="Показать QR результата">⛶</button>
@@ -1242,9 +1255,14 @@ const sortDb = () => db.sort((a, b) => a.d.localeCompare(b.d) || ((a.h ?? 12) - 
 // оверлей работает всегда и не блокирует поток. Возвращает Promise<boolean>,
 // вызывается через await в async-функциях/обработчиках.
 let confirmResolve = null;
-function confirmAuto(msg) {
+// title — глагол в заголовке, detail — уточнение ниже (опционально;
+// \n в нём — принудительные строки, см. white-space: pre-line у #confirmMsg).
+function confirmAuto(title, detail) {
     return new Promise(resolve => {
-        document.getElementById("confirmMsg").textContent = msg;
+        document.getElementById("confirmTitle").textContent = title;
+        const msg = document.getElementById("confirmMsg");
+        msg.textContent = detail || "";
+        msg.style.display = detail ? "" : "none";
         confirmResolve = resolve;
         const ov = document.getElementById("confirmOverlay");
         ov.style.display = "flex";
@@ -1372,7 +1390,7 @@ function cancelEdit() {
 }
 
 async function removeRecord(i) {
-    if (!await confirmAuto("Удалить " + db[i].n + " " + db[i].d + "?")) return;
+    if (!await confirmAuto("Удалить", db[i].n + " " + db[i].d + "?")) return;
     db.splice(i, 1);
     if (db.length === 0) adaSeeded = false;
     if (!saveDb()) { renderList(); refreshDbQr(); return; }
@@ -2106,7 +2124,7 @@ function showDbQr() {
 
 async function clearDb() {
     if (db.length === 0) { status("База уже пуста", true); return; }
-    if (!await confirmAuto("Удалить ВСЕ записи (" + db.length + ")?")) return;
+    if (!await confirmAuto("Удалить", "ВСЕ записи (" + db.length + ")")) return;
     db = [];
     adaSeeded = false;
     localStorage.setItem(DB_KEY, JSON.stringify(db));
@@ -2141,7 +2159,7 @@ async function importDbText(text) {
         status("Неверный формат базы", true);
         return;
     }
-    const doMerge = await confirmAuto("✅ — объединить (" + incoming.length + " зап.), ❌ — заменить текущую базу");
+    const doMerge = await confirmAuto("Импорт", "✅ — объединить (" + incoming.length + " зап.)\n❌ — заменить текущую базу");
     const merged = doMerge ? db.concat(incoming).filter((r, i, a) =>
         a.findIndex(x => x.n === r.n && x.d === r.d) === i) : incoming;
     const backup = db;
@@ -2209,7 +2227,7 @@ function initPushConsent() {
             return;
         }
         const subscribed = localStorage.getItem(VKPUSH_KEY) === "1";
-        if (subscribed && !await confirmAuto("Отозвать согласие и удалить подписку на оповещения из облака Яндекса?")) {
+        if (subscribed && !await confirmAuto("Отозвать", "согласие и удалить подписку на оповещения из облака Яндекса?")) {
             cb.checked = true;
             return;
         }
@@ -2323,7 +2341,7 @@ function initPdConsent() {
         }
         localStorage.removeItem(PD_CONSENT_KEY);
         if (vkminiapp) {
-            if (await confirmAuto("Удалить ПДн из облака ВКонтакте? Локальная база сохранится.")) {
+            if (await confirmAuto("Удалить", "ПДн из облака ВКонтакте? Локальная база сохранится.")) {
                 applyPdConsent();
                 cloudRun(() => vkDbClear());
             } else {
@@ -2332,7 +2350,7 @@ function initPdConsent() {
                 applyPdConsent();
             }
         } else if (yandexToken) {
-            if (await confirmAuto("Удалить ПДн из облака Яндекс? Локальная база сохранится.")) {
+            if (await confirmAuto("Удалить", "ПДн из облака Яндекс? Локальная база сохранится.")) {
                 const token = yandexToken;
                 applyPdConsent();
                 cloudRun(() => cloudDelete(token));
@@ -2602,7 +2620,7 @@ async function vkDbGet() {
         if (!incoming.every(validRecord)) {
             throw new Error("неверный формат базы в облаке ВКонтакте");
         }
-        const doMerge = await confirmAuto("✅ — объединить (" + incoming.length + " зап.), ❌ — заменить текущую базу");
+        const doMerge = await confirmAuto("Импорт", "✅ — объединить (" + incoming.length + " зап.)\n❌ — заменить текущую базу");
         const merged = doMerge ? db.concat(incoming).filter((r, i, a) =>
             a.findIndex(x => x.n === r.n && x.d === r.d) === i) : incoming;
         const backup = db;
@@ -2702,7 +2720,7 @@ function cloudGet(btn) {
         if (!Array.isArray(incoming) || !incoming.every(validRecord)) {
             throw new Error("неверный формат базы в облаке");
         }
-        const doMerge = await confirmAuto("✅ — объединить (" + incoming.length + " зап.), ❌ — заменить текущую базу");
+        const doMerge = await confirmAuto("Импорт", "✅ — объединить (" + incoming.length + " зап.)\n❌ — заменить текущую базу");
         const merged = doMerge ? db.concat(incoming).filter((r, i, a) =>
             a.findIndex(x => x.n === r.n && x.d === r.d) === i) : incoming;
         const backup = db;

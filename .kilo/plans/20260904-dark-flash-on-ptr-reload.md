@@ -28,7 +28,7 @@
 
 ### Корень проблемы
 
-Механизм темы из плана `20260903-vk-theme-switch-plan.md`: в нативных клиентах источник — `prefers-color-scheme`, а конфиг темы от VK (`VKWebAppUpdateConfig` / `VKWebAppGetConfig`) приходит **асинхронно** после старта страницы; на Android System WebView медиазапрос к тому же **не пересчитывается сам** без фокуса/поворота.
+Механизм темы из плана `20260903-vk-theme-switch.md`: в нативных клиентах источник — `prefers-color-scheme`, а конфиг темы от VK (`VKWebAppUpdateConfig` / `VKWebAppGetConfig`) приходит **асинхронно** после старта страницы; на Android System WebView медиазапрос к тому же **не пересчитывается сам** без фокуса/поворота.
 
 При `location.reload()` из кастомного PTR в WebView на момент **первого кадра** сигнал темы ещё не тёмный:
 
