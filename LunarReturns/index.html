@@ -266,8 +266,8 @@
             текущей фазы (80px) слева от бокса зодиака (50%−158…−78,
             зазор 8px до бокса), top 38px — по центру бокса (8 + 140/2 −
             80/2). На светлой теме месяц слегка прозрачен (не перегружает
-            небо); звёзды видны только на тёмной теме (см. генерацию
-            точек в JS). */
+            небо); небо видно в обеих темах с полной непрозрачностью, точки/
+            линии/подпись в светлой теме темнее (см. CSS ниже). */
         #ptrMoon {
             position: fixed; top: 38px;
             left: calc(50% - 158px);
@@ -278,16 +278,26 @@
         @media (prefers-color-scheme: light) {
             :root:not(.theme-dark) #ptrMoon { opacity: .6; }
         }
+        /* Небо видно всегда с полной непрозрачностью; в светлой теме вместо
+           затемнения бледности точки/линии/подпись просто темнее (см. ниже),
+           иначе белое на светлом не видно. */
         #ptrStars {
             position: fixed; top: 0; left: 0; right: 0; height: 280px;
-            pointer-events: none; z-index: -1; opacity: 0;
-        }
-        html.theme-dark #ptrStars { opacity: 1; }
-        @media (prefers-color-scheme: dark) {
-            html:not(.theme-light) #ptrStars { opacity: 1; }
+            pointer-events: none; z-index: -1; opacity: 1;
         }
         #ptrStars i {
             position: absolute; background: #fff; border-radius: 50%;
+        }
+        :root.theme-light #ptrStars i { background: #555; }
+        @media (prefers-color-scheme: light) {
+            :root:not(.theme-dark) #ptrStars i { background: #555; }
+        }
+        /* Боковые случайные звёзды (прямые <i> полосы) — только в тёмной
+           теме: на светлом фоне серые точки выглядят грязью. Фигурка зодиака
+           (вложенные <i> в .ptr-zodiac) остаётся видимой. */
+        :root.theme-light #ptrStars > i { display: none; }
+        @media (prefers-color-scheme: light) {
+            :root:not(.theme-dark) #ptrStars > i { display: none; }
         }
         /* Фигурка знака луны: бокс ~140px по центру ширины полосы неба у
            её верхнего края — обёртка скрывает его в статике, виден при
@@ -306,12 +316,20 @@
         .ptr-zodiac line {
             stroke: rgba(255, 255, 255, .35); stroke-width: 1;
         }
+        :root.theme-light .ptr-zodiac line { stroke: rgba(0, 0, 0, .25); }
+        @media (prefers-color-scheme: light) {
+            :root:not(.theme-dark) .ptr-zodiac line { stroke: rgba(0, 0, 0, .25); }
+        }
         .ptr-zodiac-cap {
             position: absolute; left: 50%; top: 152px;
             transform: translateX(-50%);
             white-space: nowrap;
             text-align: center; font-size: 10px; letter-spacing: .08em;
             color: rgba(255, 255, 255, .65);
+        }
+        :root.theme-light .ptr-zodiac-cap { color: rgba(0, 0, 0, .45); }
+        @media (prefers-color-scheme: light) {
+            :root:not(.theme-dark) .ptr-zodiac-cap { color: rgba(0, 0, 0, .45); }
         }
         html.ptr-moon #titleH1 img { visibility: hidden; }
         /* Требования ВК к мини-аппам (класс .vk ставит JS в VK-режиме):
@@ -539,7 +557,7 @@
     <section id="resultSec" style="display:none;">
         <textarea id="resultText" rows="12" readonly></textarea>
         <div class="btnrow">
-            <button type="button" id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Наверх">🔝</button>
+            <button type="button" id="topBtn" onclick="toTop()" title="Наверх">🔝</button>
             <button type="button" id="srcBtn" onclick="scrollToSourceRow()" title="К строке источника" style="display:none;">🔙</button>
             <button type="button" id="detailBtn" onclick="toggleDetail()" title="Сжато">⋯</button>
             <button onclick="copyResult()" title="Копировать текст">⎘</button>
@@ -829,6 +847,7 @@ applyTheme();
     }
     // ?ptr=N (скриншоты): тянуть нечем — рисуем сразу при загрузке.
     if (parseFloat(new URLSearchParams(location.search).get("ptr")) > 0) drawZodiac();
+    window.drawZodiac = drawZodiac; // для кивка 🔝 вне этого IIFE (см. toTop)
 
     // Кастомный PTR активен на любом touch-устройстве (VK WebView и мобильные
     // браузеры): это позволяет тестировать отклик (navigator.vibrate) вне
@@ -1566,6 +1585,26 @@ function toggleResultQr() {
 function scrollToSourceRow() {
     const row = document.getElementById("list").children[selectedIdx];
     if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+// Кнопка 🔝: скролл наверх; если прокручивать нечего (уже у верха) —
+// «кивок» обёрткой на 160px вниз на пару секунд, заодно приоткрывая небо
+// с зодиаком. Инлайновый transform перекрывает и ?ptr=N (CSS-переменная),
+// и возвращается к нему после сброса.
+function toTop() {
+    if (scrollY > 0) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+    }
+    const w = document.getElementById("ptrWrap");
+    if (!w) return;
+    if (window.drawZodiac) window.drawZodiac(); // кивок тоже приоткрывает небо
+    w.style.transition = "transform .3s";
+    w.style.transform = "translateY(160px)";
+    setTimeout(() => {
+        w.style.transform = "";
+        setTimeout(() => { w.style.transition = ""; }, 350);
+    }, 2000);
 }
 
 function renderNow() {
