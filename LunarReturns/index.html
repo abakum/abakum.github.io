@@ -953,15 +953,17 @@ applyTheme();
 // (isAllowedUrl) убран: старые stage-URL должны открываться напрямую, чтобы
 // базу можно было перенести вручную (⎘ на старой версии → 📋 на новой).
 const LR_ORIGIN_PREFIX = "lr_origin_";
-const LR_ORIGIN_RE = /^https:\/\/(stage|prod)-app54746591-[a-z0-9]+\.pages\.vk-apps\.(ru|com)$/;
-// Production-версия мини-аппа: только на prod-origin хостинга ВК.
-// В dev/stage-версиях (и на локальном туннеле) ВК-уведомления запрещены
-// платформой («untrusted apps») — чекбокс согласия и 🔔 там не показываем.
-// TEMP(публикация): временно false, чтобы при публикации не было ошибок от
-// prod-фич (подписка на пуши). Вернуть исходное выражение после отладки
-// подписки на опубликованном приложении:
-//   const vkProdApp = vkminiapp && /^https:\/\/prod-/.test(location.origin);
-const vkProdApp = false;
+// VK-хостинг: *.pages.vk-apps.ru, прод может жить на *.pages-ac.vk-apps.ru.
+const LR_ORIGIN_RE = /^https:\/\/(stage|prod)-app54746591-[a-z0-9]+\.pages(-ac)?\.vk-apps\.(ru|com)$/;
+// Гейт ВК-пушей (чекбокс согласия, кнопка 🔔, подписка): платформа
+// разрешает уведомления только «доверенным» приложениям, поэтому включаем
+// их выборочно по origin хостинга ВК.
+// TEMP(публикация): пуши показываем и пробуем ТОЛЬКО на stage-origin
+// (тестирование подписки), на prod — не показываем, чтобы пройти
+// модерацию без ошибок от prod-фич. После отладки подписки на
+// опубликованном приложении вернуть исходное выражение:
+//   const vkPushEnabled = vkminiapp && /^https:\/\/prod-/.test(location.origin);
+const vkPushEnabled = vkminiapp && /^https:\/\/stage-/.test(location.origin);
 const LR_MIGRATE_MAX_TRIES = 3;
 let lrMigrated = false;
 
@@ -2258,7 +2260,7 @@ function pushConsentGiven() {
 }
 
 function initPushConsent() {
-    if (!vkProdApp || !vkNativeApp) return;
+    if (!vkPushEnabled || !vkNativeApp) return;
     document.getElementById("pdPushConsentLabel").style.display = "block";
     const cb = document.getElementById("pdPushConsent");
     const note = document.getElementById("pdPushWithdrawNote");
@@ -2498,18 +2500,26 @@ function cloudPresign(action, token) {
     token = token || yandexToken;
     if (!FUNCTION_URL) {
         status("FUNCTION_URL не задан — разверните функцию, см. README.md", true);
-        return Promise.reject();
+        // reject с Error: обработчики ниже читают e.message, голый reject()
+        // ронял бы их TypeError'ом.
+        return Promise.reject(new Error("FUNCTION_URL не задан"));
     }
     if (!token) {
         status("Сначала войдите через Яндекс", true);
-        return Promise.reject();
+        return Promise.reject(new Error("Сначала войдите через Яндекс"));
     }
     return fetch(FUNCTION_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, action })
-    }).then(resp => {
-        if (!resp.ok) throw new Error("функция вернула " + resp.status);
+    }).then(async resp => {
+        if (!resp.ok) {
+            // Бэкенд отдаёт осмысленный {"error": "..."} — показываем его,
+            // а не безликое «функция вернула 403».
+            let msg = "функция вернула " + resp.status;
+            try { msg = (await resp.json()).error || msg; } catch (e) {}
+            throw new Error(msg);
+        }
         return resp.json();
     }).then(data => {
         if (!data.url) throw new Error("функция не вернула url");
@@ -2825,8 +2835,12 @@ function pushApi(action, payload) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(Object.assign({ action: action }, payload))
-    }).then(r => {
-        if (!r.ok) throw new Error("функция вернула " + r.status);
+    }).then(async r => {
+        if (!r.ok) {
+            let msg = "функция вернула " + r.status;
+            try { msg = (await r.json()).error || msg; } catch (e) {}
+            throw new Error(msg);
+        }
         return r.json();
     });
 }
@@ -2848,7 +2862,7 @@ function vkLaunchParams() {
 }
 
 async function togglePushVk() {
-    if (!vkProdApp || !vkNativeApp || !pushConsentGiven()) {
+    if (!vkPushEnabled || !vkNativeApp || !pushConsentGiven()) {
         status("Для оповещений требуется согласие (чекбокс под списком; доступно только в production-версии)", true);
         return;
     }
@@ -2883,7 +2897,7 @@ function updatePushDates() {
     if (vkminiapp) {
         // ВК-подписка: серверу уходит только vk_user_id (в подписанных launch-параметрах)
         // и обезличенные MM-DD; имена не покидают устройство.
-        if (vkProdApp && localStorage.getItem(VKPUSH_KEY) === "1" && pushConsentGiven())
+        if (vkPushEnabled && localStorage.getItem(VKPUSH_KEY) === "1" && pushConsentGiven())
             pushApi("vk_subscribe", { launch_params: vkLaunchParams(), dates: allPushDates() }).catch(() => { });
         return;
     }
@@ -2933,7 +2947,7 @@ async function togglePush() {
 function refreshPushBtn() {
     const btn = document.getElementById("pushBtn");
     if (vkminiapp) {
-        if (!PUSH_URL || !vkProdApp || !vkNativeApp || !pushConsentGiven()) { btn.style.display = "none"; return; }
+        if (!PUSH_URL || !vkPushEnabled || !vkNativeApp || !pushConsentGiven()) { btn.style.display = "none"; return; }
         btn.style.display = "";
         const on = localStorage.getItem(VKPUSH_KEY) === "1";
         btn.textContent = on ? "🔔" : "🔕";
