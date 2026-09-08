@@ -9,11 +9,17 @@ const root = path.resolve(__dirname, "..");
 const dest = path.join(root, "build");
 
 // Файлы/папки, которые попадают на хостинг VK.
-// sw.js / manifest.webmanifest / icons не включаем: PWA в мини-аппах не используется,
-// а index.html уже содержит .catch() для тихой регистрации отсутствующего сервис-воркера.
+// sw.js / manifest.webmanifest / icons включаем для веб-версии: страница
+// хостинга, открытая напрямую в браузере (без launch-параметров, vkminiapp
+// false), подписывается на web-push Яндекса — без SW принимать пуши некому.
+// Внутри клиента ВК (vkminiapp true) SW не регистрируется, а манифест
+// удаляется из DOM (applyVkUi) — там по-прежнему native-уведомления ВК.
 const entries = [
   "index.html",
   "1f319.webp",
+  "sw.js",
+  "manifest.webmanifest",
+  "icons",
   "qr",
   "vendor"
 ];

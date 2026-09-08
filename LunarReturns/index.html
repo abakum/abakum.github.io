@@ -649,12 +649,9 @@ let yandexToken = "";
 // VK Mini App определяется по параметру vk_app_id в URL, который VK всегда
 // добавляет при запуске мини-аппа (см. dev.vk.com/mini-apps/development/launch-params).
 const vkminiapp = new URLSearchParams(location.search).has("vk_app_id");
-// Нативный клиент ВК (android/iphone): только там VKWebAppAllowNotifications
-// может выдать разрешение; в браузерных клиентах (mobile_web, desktop_web) оно
-// всегда отклоняется — там не показываем согласие/кнопку пушей. Отсутствие
-// vk_platform (подделка URL, старые клиенты) — безопасный дефолт «не нативный».
-const vkPlatform = new URLSearchParams(location.search).get("vk_platform");
-const vkNativeApp = vkminiapp && (vkPlatform === "android" || vkPlatform === "iphone");
+// Платформа клиента: гейтов пушей от неё больше нет — по доке
+// VKWebAppAllowNotifications поддерживает Android, iOS, Mobile Web и Web
+// (фактическая выдача разрешения на stage проверяется тестом).
 // Классы .vk/.vk-mweb уже выставлены ранним скриптом в head (до первого кадра).
 // Здесь используется только флаг vkminiapp для логики (vkBridge, PTR, push).
 // Версия VK-сборки — прямо из origin хостинга (см. LR_ORIGIN_RE):
@@ -955,15 +952,19 @@ applyTheme();
 const LR_ORIGIN_PREFIX = "lr_origin_";
 // VK-хостинг: *.pages.vk-apps.ru, прод может жить на *.pages-ac.vk-apps.ru.
 const LR_ORIGIN_RE = /^https:\/\/(stage|prod)-app54746591-[a-z0-9]+\.pages(-ac)?\.vk-apps\.(ru|com)$/;
-// Гейт ВК-пушей (чекбокс согласия, кнопка 🔔, подписка): платформа
-// разрешает уведомления только «доверенным» приложениям, поэтому включаем
-// их выборочно по origin хостинга ВК.
+// Гейт ВК-пушей (кнопка 🔔, подписка): платформа разрешает уведомления
+// только «доверенным» приложениям, поэтому включаем их выборочно по origin
+// хостинга ВК.
 // TEMP(публикация): пуши показываем и пробуем ТОЛЬКО на stage-origin
 // (тестирование подписки), на prod — не показываем, чтобы пройти
 // модерацию без ошибок от prod-фич. После отладки подписки на
-// опубликованном приложении вернуть исходное выражение:
+// опубликованном приложении вернуть исходное выражение и VK_PUSH_CONSENT
+// переключить в true:
 //   const vkPushEnabled = vkminiapp && /^https:\/\/prod-/.test(location.origin);
 const vkPushEnabled = vkminiapp && /^https:\/\/stage-/.test(location.origin);
+// TEMP(публикация): чекбокс согласия на пуш-ПДн скрыт — серверу уходит
+// только vk_user_id и обезличенные MM-DD (без имён), согласие не требуется.
+const VK_PUSH_CONSENT = false;
 const LR_MIGRATE_MAX_TRIES = 3;
 let lrMigrated = false;
 
@@ -1961,7 +1962,19 @@ async function renderSwVersion() {
     // В мини-аппе показываем версию VK-сборки (prod-<hash>/stage-<hash>),
     // в браузере — версию сервис-воркера из IDB.
     const ver = vkminiapp ? vkBuildVersion : await idbGetKey("swver");
-    el.textContent = typeof ver === "string" && ver ? " " + ver.replace(/^lunarreturns-/, "") : "";
+    if (typeof ver !== "string" || !ver) return;
+    const label = " " + ver.replace(/^lunarreturns-/, "");
+    if (vkminiapp && vkBuildVersion.startsWith("stage-")) {
+        // Stage: текст версии — ссылка на прямой VK-хостинг-URL (без
+        // launch-параметров): веб-версия для теста 🔔 web-push и PWA.
+        const a = document.createElement("a");
+        a.href = location.origin + location.pathname;
+        a.textContent = label;
+        a.style.color = "var(--muted)";
+        el.appendChild(a);
+        return;
+    }
+    el.textContent = label;
 }
 
 async function renderPushLog() {
@@ -2260,7 +2273,10 @@ function pushConsentGiven() {
 }
 
 function initPushConsent() {
-    if (!vkPushEnabled || !vkNativeApp) return;
+    // TEMP(публикация): чекбокс согласия скрыт (VK_PUSH_CONSENT=false) —
+    // согласие не требуется, данные обезличены; логика вернётся вместе с
+    // prod-выражением vkPushEnabled.
+    if (!vkPushEnabled || !VK_PUSH_CONSENT) return;
     document.getElementById("pdPushConsentLabel").style.display = "block";
     const cb = document.getElementById("pdPushConsent");
     const note = document.getElementById("pdPushWithdrawNote");
@@ -2312,8 +2328,10 @@ function applyVkUi() {
 
 // Строки согласия ПДн имеют смысл только на «домашних» адресах: каноническом
 // https://abakum.github.io/LunarReturns/ или в мини-аппе ВКонтакте (там текст
-// адаптируется в applyVkUi). На остальных оригинах (локальная разработка,
-// чужие хостинги) облако недоступно — прячем согласия и локальную заметку.
+// адаптируется в applyVkUi). Прямой VK-хостинг-URL в браузере — тестовая
+// среда без облаков: только локальная база и подписки (🔔 web-push). На
+// остальных оригинах (локальная разработка, чужие хостинги) облако
+// недоступно — прячем согласия и локальную заметку.
 const PD_HOME_URL_RE = /^https:\/\/abakum\.github\.io\/LunarReturns\/?(index\.html)?$/;
 function pdConsentRelevant() {
     return vkminiapp || PD_HOME_URL_RE.test(location.origin + location.pathname);
@@ -2384,6 +2402,9 @@ function initPdConsent() {
         if (cb.checked) {
             localStorage.setItem(PD_CONSENT_KEY, "1");
             applyPdConsent();
+            // Токен, пришедший из OAuth до согласия (редирект входа ведёт на
+            // канонический адрес), подхватывается сразу после чекбокса.
+            pickPendingOAuthToken();
             return;
         }
         localStorage.removeItem(PD_CONSENT_KEY);
@@ -2420,19 +2441,37 @@ function loginYandex() {
         status("YANDEX_CLIENT_ID не задан — зарегистрируйте приложение, см. README.md", true);
         return;
     }
-    const redirect = location.origin
-        + location.pathname.replace(/index\.html$/, "");
+    // redirect_uri зарегистрирован в OAuth-приложении только для канонического
+    // адреса (хэш pages-URL VK-хостинга меняется при каждом деплое — его не
+    // прописать). После входа пользователь продолжит на abakum.github.io —
+    // это страница управления облаком; на VK-хостинге 🔑 нужен только для
+    // облачной базы, web-push подписка работает без токена.
+    const redirect = "https://abakum.github.io/LunarReturns/";
     location = "https://oauth.yandex.ru/authorize?response_type=token&client_id="
         + encodeURIComponent(YANDEX_CLIENT_ID)
         + "&redirect_uri=" + encodeURIComponent(redirect);
 }
 
+// Токен из OAuth-хэша, полученный до согласия ПДн (согласия пер-оригиновые,
+// а редирект входа ведёт на канонический адрес): ждёт в sessionStorage и
+// подхватывается после установки чекбокса согласия.
+const OAUTH_PENDING_KEY = "lr_oauth_token";
+
 function checkOAuthHash() {
     const m = location.hash.match(/access_token=([^&]+)/);
-    if (!m) return;
-    if (!pdConsentGiven()) { history.replaceState(null, "", location.pathname); return; }
-    yandexToken = decodeURIComponent(m[1]);
-    history.replaceState(null, "", location.pathname);
+    if (m) {
+        try { sessionStorage.setItem(OAUTH_PENDING_KEY, decodeURIComponent(m[1])); } catch (e) {}
+        history.replaceState(null, "", location.pathname);
+    }
+    pickPendingOAuthToken();
+}
+
+function pickPendingOAuthToken() {
+    let token = null;
+    try { token = sessionStorage.getItem(OAUTH_PENDING_KEY); } catch (e) {}
+    if (!token || !pdConsentGiven()) return;
+    try { sessionStorage.removeItem(OAUTH_PENDING_KEY); } catch (e) {}
+    yandexToken = token;
     const lb = document.getElementById("loginBtn");
     lb.textContent = "🔒";
     lb.title = "Выйти";
@@ -2862,8 +2901,8 @@ function vkLaunchParams() {
 }
 
 async function togglePushVk() {
-    if (!vkPushEnabled || !vkNativeApp || !pushConsentGiven()) {
-        status("Для оповещений требуется согласие (чекбокс под списком; доступно только в production-версии)", true);
+    if (!vkPushEnabled || (VK_PUSH_CONSENT && !pushConsentGiven())) {
+        status("Для оповещений требуется согласие (чекбокс под списком)", true);
         return;
     }
     if (localStorage.getItem(VKPUSH_KEY) === "1") {
@@ -2897,7 +2936,7 @@ function updatePushDates() {
     if (vkminiapp) {
         // ВК-подписка: серверу уходит только vk_user_id (в подписанных launch-параметрах)
         // и обезличенные MM-DD; имена не покидают устройство.
-        if (vkPushEnabled && localStorage.getItem(VKPUSH_KEY) === "1" && pushConsentGiven())
+        if (vkPushEnabled && (!VK_PUSH_CONSENT || pushConsentGiven()) && localStorage.getItem(VKPUSH_KEY) === "1")
             pushApi("vk_subscribe", { launch_params: vkLaunchParams(), dates: allPushDates() }).catch(() => { });
         return;
     }
@@ -2947,7 +2986,7 @@ async function togglePush() {
 function refreshPushBtn() {
     const btn = document.getElementById("pushBtn");
     if (vkminiapp) {
-        if (!PUSH_URL || !vkPushEnabled || !vkNativeApp || !pushConsentGiven()) { btn.style.display = "none"; return; }
+        if (!PUSH_URL || !vkPushEnabled || (VK_PUSH_CONSENT && !pushConsentGiven())) { btn.style.display = "none"; return; }
         btn.style.display = "";
         const on = localStorage.getItem(VKPUSH_KEY) === "1";
         btn.textContent = on ? "🔔" : "🔕";
