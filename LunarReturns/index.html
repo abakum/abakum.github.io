@@ -622,6 +622,10 @@ const LR_LS_KEYS = [DAYS_KEY, PD_CONSENT_KEY, PD_PUSH_CONSENT_KEY, VKPUSH_KEY, T
 // Префикс СТАРЫХ поштучных ключей настроек (миграция на блоб в
 // vkRestoreSettings; объявлен здесь, т.к. используется в нескольких местах).
 const LR_S_PREFIX = "lr_s_";
+// Блоб-ключ настроек и таймер дебаунса записи: объявлены ЗДЕСЬ, до первого
+// вызова lsSet() (верхнеуровневый applyTheme() в блоке темы) — иначе TDZ.
+const LR_S_BLOB_KEY = "lr_s_blob";
+let lrBlobFlushTimer = null;
 const QR_MAX_BYTES = 2953;
 const SPACE = "\u2002\u2004";
 const WIDE_SPACE = "\u2003\u2004";
@@ -2629,9 +2633,7 @@ function vkSyncDebug(msg) {
 // и одно чтение вместо поштучных вызовов VKWebAppStorageSet/Get. Мобильный
 // клиент ВК троттлит частые вызовы Storage-методов — поштучная схема могла
 // молча терять согласие. Запись дебаунсится: очередь схлопывается в один вызов.
-const LR_S_BLOB_KEY = "lr_s_blob";
-let lrBlobFlushTimer = null;
-
+// (LR_S_BLOB_KEY/lrBlobFlushTimer объявлены в блоке констант выше — TDZ.)
 function lrSettingsSnapshot() {
     const o = {};
     for (const k of LR_LS_KEYS) {
