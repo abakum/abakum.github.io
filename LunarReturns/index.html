@@ -1957,8 +1957,23 @@ async function idbGetKey(key) {
     } catch (e) { return undefined; }
 }
 
+// Веб-версия на VK-хостинге: stage/prod pages-origin, открытый напрямую в
+// браузере (без launch-параметров, vkminiapp=false).
+const VK_WEB_HOST_RE = /^(stage|prod)-app54746591-/;
+
 async function renderSwVersion() {
     const el = document.getElementById("swverText");
+    // Прямой VK-хостинг-URL: SW может активироваться позже первой отрисовки,
+    // а «Сообщить об ошибке» (issues GitHub) в ВК-окружении нерелевантно —
+    // прячем ссылку и берём версию прямо из sw.js (const CACHE).
+    if (!vkminiapp && VK_WEB_HOST_RE.test(location.hostname)) {
+        document.getElementById("bugLink").style.display = "none";
+        try {
+            const src = await fetch("sw.js").then(r => r.text());
+            const m = src.match(/const CACHE = "([^"]+)"/);
+            if (m) { el.textContent = " " + m[1].replace(/^lunarreturns-/, ""); return; }
+        } catch (e) { }
+    }
     // В мини-аппе показываем версию VK-сборки (prod-<hash>/stage-<hash>),
     // в браузере — версию сервис-воркера из IDB.
     const ver = vkminiapp ? vkBuildVersion : await idbGetKey("swver");
@@ -2922,13 +2937,21 @@ async function togglePushVk() {
     }
     const perm = await vkBridge.send("VKWebAppAllowNotifications")
         .catch(e => ({ error: e }));
-    if (!perm || perm.result === false || perm.error) {
+    const granted = !!perm && perm.result === true && !perm.error;
+    // TEMP(публикация): на stage до модерации разрешение недоступно —
+    // тестируем конвейер: подписываемся с test:1 (сервер хранит запись,
+    // но не отправляет на неё пуши). На prod байпаса нет.
+    const stageTest = vkBuildVersion.startsWith("stage-");
+    if (!granted && !stageTest) {
         status("Разрешение на уведомления не выдано (" + vkErr(perm && perm.error) + ")", true);
         return;
     }
-    await pushApi("vk_subscribe", { launch_params: vkLaunchParams(), dates: allPushDates() });
+    await pushApi("vk_subscribe", Object.assign(
+        { launch_params: vkLaunchParams(), dates: allPushDates() },
+        granted ? { } : { lr_stage_probe: 1 }
+    ));
     localStorage.setItem(VKPUSH_KEY, "1");
-    status("Оповещения включены");
+    status(granted ? "Оповещения включены" : "Тестовая подписка создана (разрешение не выдано)");
 }
 
 function updatePushDates() {
