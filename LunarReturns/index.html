@@ -626,6 +626,13 @@ const LR_S_PREFIX = "lr_s_";
 // вызова lsSet() (верхнеуровневый applyTheme() в блоке темы) — иначе TDZ.
 const LR_S_BLOB_KEY = "lr_s_blob";
 let lrBlobFlushTimer = null;
+// Облако ВК, база: один ключ = массив записей (JSON), пакуем по байтовому
+// бюджету (лимит значения VK Storage — 4096 байт, проверяем по факту).
+// Число занятых ключей данных — в служебном ключе VK_DB_CNT_KEY ("cnt").
+const VK_DB_CHUNK_BYTES = 4096;
+const VK_DB_CNT_KEY = "cnt";
+const VK_DB_MAX_RECORDS = 989;
+
 const QR_MAX_BYTES = 2953;
 const SPACE = "\u2002\u2004";
 const WIDE_SPACE = "\u2003\u2004";
@@ -962,7 +969,8 @@ applyTheme();
 // localStorage. Переходов между origins больше нет (требование модерации:
 // ни <a href>, ни location.replace): настройки (не ПДн, LR_LS_KEYS)
 // синхронизируются с облаком ВК под ключами lr_s_* (lsSet/vkRestoreSettings),
-// база — при согласии ПДн под ключами «0»..«989» (vkDbPut/vkDbGet).
+// база — при согласии ПДн в ключах-чанках «0»..«K-1» + счётчик «cnt»
+// (vkDbPut/vkDbGet).
 // Свежий origin детектится в head по пустоте сохранённой ширины колонки
 // (window.__lrFreshOrigin), не по пустоте базы; восстановление на запуске —
 // vkRestoreCloud().
@@ -2575,10 +2583,12 @@ function cloudPresign(action, token) {
     });
 }
 
-// ---- Облако ВКонтакте (VKWebAppStorage): одна запись db = один ключ "0".."989".
-// Лимиты VK: значение ≤ 4096 байт (записи {n,d} хватает с запасом),
-// 1000 ключей на пользователя суммарно: 990 под записи + 1 блоб настроек
-// lr_s_blob; удаление ключей отсутствует — затираем пустой строкой.
+// ---- Облако ВКонтакте (VKWebAppStorage): база пакуется в ключи-чанки
+// "0".."K-1" (JSON-массивы записей, бюджет VK_DB_CHUNK_BYTES), число занятых
+// ключей — в служебном ключе "cnt". Лимиты VK: значение ≤ 4096 байт,
+// 1000 ключей на пользователя суммарно; удаление ключей отсутствует —
+// затираем пустой строкой. Легаси-схема (одна запись = один ключ-объект)
+// читается и мигрируется при первом сохранении.
 
 function vkErr(e) {
     return (e && (e.message
@@ -2599,6 +2609,38 @@ function vkStorageGet(keys) {
 function vkStorageGetKeys() {
     return vkBridge.send("VKWebAppStorageGetKeys", { count: 1000, offset: 0 })
         .then(res => (res && res.keys) || []);
+}
+
+// Число занятых ключей данных ("cnt") в новой чанковой схеме; -1 — ключа нет
+// (легаси-схема или пустое облако).
+function vkGetCnt() {
+    return vkStorageGet([VK_DB_CNT_KEY]).then(res => {
+        const v = res && res.keys && res.keys[0] && res.keys[0].value;
+        const n = parseInt(v, 10);
+        return (Number.isInteger(n) && n >= 0 && n <= 990) ? n : -1;
+    }).catch(() => -1);
+}
+
+// Паковка записей в чанки по фактическому байтовому бюджету: ключи-значения
+// не превышают VK_DB_CHUNK_BYTES (лимит значения VK Storage). Запятая между
+// элементами учтена. Имя ограничено maxlength="64", поэтому чанк всегда
+// помещается даже из одной записи.
+function vkDbChunks(records) {
+    const chunks = [];
+    let cur = [];
+    let curLen = 2; // "[]"
+    for (const r of records) {
+        const len = byteLen(JSON.stringify(r));
+        if (cur.length && curLen + len + 1 > VK_DB_CHUNK_BYTES) {
+            chunks.push(JSON.stringify(cur));
+            cur = [];
+            curLen = 2;
+        }
+        cur.push(r);
+        curLen += len + (cur.length > 1 ? 1 : 0);
+    }
+    if (cur.length) chunks.push(JSON.stringify(cur));
+    return chunks;
 }
 
 // ---- Настройки в облаке ВК (VKWebAppStorage, блоб lr_s_blob, см. LR_LS_KEYS) ----
@@ -2746,37 +2788,78 @@ async function vkRestoreCloud() {
 
 async function vkDbPut() {
     try {
-        if (db.length > 989) {
-            status("Слишком много записей для облака ВКонтакте (максимум 989)", true);
+        if (db.length > VK_DB_MAX_RECORDS) {
+            status("Слишком много записей для облака ВКонтакте (максимум " + VK_DB_MAX_RECORDS + ")", true);
             return;
         }
-        const oldKeys = await vkStorageGetKeys();
-        const maxOld = oldKeys.reduce((m, k) => Math.max(m, (parseInt(k, 10) || 0) + 1), 0);
-        for (let i = 0; i < db.length; i++) await vkStorageSet(String(i), JSON.stringify(db[i]));
-        for (let i = db.length; i < maxOld; i++) await vkStorageSet(String(i), "");
-        status("База сохранена в облако ВКонтакте. Записей: " + db.length);
+        const chunks = vkDbChunks(db);
+        // -1 — легаси-схема (ключа cnt нет): возможны старые поштучные ключи.
+        const oldCnt = await vkGetCnt();
+        for (let i = 0; i < chunks.length; i++) await vkStorageSet(String(i), chunks[i]);
+        // Затираем хвост прошлой чанковой записи (ключей стало меньше).
+        for (let i = chunks.length; i < oldCnt; i++) await vkStorageSet(String(i), "");
+        // cnt пишется последним: обрыв посреди записи оставляет прежнее целое
+        // состояние (либо легаси-читаемый вид).
+        await vkStorageSet(VK_DB_CNT_KEY, String(chunks.length));
+        if (oldCnt < 0) await vkLegacyWipe(chunks.length);
+        status("База сохранена в облако ВКонтакте. Записей: " + db.length
+            + (chunks.length ? ", ключей: " + chunks.length : ""));
     } catch (e) {
         status("Ошибка сохранения: " + vkErr(e), true);
     }
 }
 
+// Разовая зачистка легаси-ключей (одиночные записи в "0".."989") после
+// перехода на чанковую схему: чистим числовые ключи >= from, cnt и lr_s_*
+// не трогаем. Иначе старые записи удвоились бы при легаси-чтении.
+async function vkLegacyWipe(from) {
+    try {
+        const keys = await vkStorageGetKeys();
+        for (const k of keys) {
+            if (k === VK_DB_CNT_KEY || k.startsWith(LR_S_PREFIX)) continue;
+            const n = parseInt(k, 10);
+            if (Number.isInteger(n) && n < from) continue;
+            await vkStorageSet(k, "");
+        }
+    } catch (e) { }
+}
+
 async function vkDbGet() {
     try {
+        const cnt = await vkGetCnt();
+        // Легаси-схема (cnt нет): читаем все 990 числовых ключей и распознаём
+        // одиночные записи-объекты наравне с чанками-массивами.
+        const legacy = cnt < 0;
+        const keyCount = legacy ? 990 : cnt;
         const keys = [];
-        for (let i = 0; i < 990; i++) keys.push(String(i));
+        for (let i = 0; i < keyCount; i++) keys.push(String(i));
         const res = await vkStorageGet(keys);
         const byKey = {};
         for (const kv of (res && res.keys) || []) byKey[kv.key] = kv.value;
         let incoming = [];
         let empty = true;
-        for (let i = 0; i < 990; i++) {
+        for (let i = 0; i < keyCount; i++) {
             const v = byKey[String(i)];
             if (!v) continue;
             empty = false;
+            let val;
             try {
-                incoming.push(JSON.parse(v));
+                val = JSON.parse(v);
             } catch (err) {
                 throw new Error("в облаке ВКонтакте не JSON");
+            }
+            if (Array.isArray(val)) {
+                // Новая схема: чанк-массив записей.
+                if (!val.every(validRecord)) {
+                    throw new Error("неверный формат базы в облаке ВКонтакте");
+                }
+                for (const r of val) incoming.push(r);
+            } else {
+                // Легаси: одиночная запись-объект.
+                if (!validRecord(val)) {
+                    throw new Error("неверный формат базы в облаке ВКонтакте");
+                }
+                incoming.push(val);
             }
         }
         let emptyMsg = "В облаке ВКонтакте пусто и дата рождения в профиле не указана — заготовка: Ада";
@@ -2812,7 +2895,8 @@ async function vkDbGet() {
         refreshDbQr();
         status(empty
             ? emptyMsg
-            : "База загружена из облака ВКонтакте. Записей: " + db.length);
+            : "База загружена из облака ВКонтакте. Записей: " + db.length
+                + (!legacy ? ", ключей: " + cnt : ""));
     } catch (e) {
         status("Ошибка загрузки: " + vkErr(e), true);
     }
@@ -2820,11 +2904,19 @@ async function vkDbGet() {
 
 async function vkDbClear() {
     try {
-        const keys = await vkStorageGetKeys();
-        for (const k of keys) {
+        const cnt = await vkGetCnt();
+        if (cnt >= 0) {
+            // Чанковая схема: затереть занятые ключи данных и сам cnt.
             // Настройки (lr_s_*) — не ПДн, отзыв согласия их не удаляет.
-            if (k.startsWith(LR_S_PREFIX)) continue;
-            await vkStorageSet(k, "");
+            for (let i = 0; i < cnt; i++) await vkStorageSet(String(i), "");
+            await vkStorageSet(VK_DB_CNT_KEY, "");
+        } else {
+            // Легаси: числовые ключи неизвестны — проход по списку ключей.
+            const keys = await vkStorageGetKeys();
+            for (const k of keys) {
+                if (k.startsWith(LR_S_PREFIX)) continue;
+                await vkStorageSet(k, "");
+            }
         }
         status("Согласие отозвано: ПДн удалены из облака ВКонтакте. Локальная база сохранена");
     } catch (e) {
