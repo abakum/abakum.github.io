@@ -2648,6 +2648,20 @@ function vkApplyRestoredSettings() {
     refreshPushBtn();
 }
 
+// Бэкфилл: настройки, существующие локально, но отсутствующие в облаке ВК
+// (согласие выдано до появления синхронизации; тихий сбой write-through),
+// дозаписываются в облако. Иначе первая же смена origin хостинга их теряла.
+async function vkBackfillSettings() {
+    try {
+        const have = new Set((await vkStorageGetKeys()).filter(k => k.startsWith(LR_S_PREFIX)));
+        for (const k of LR_LS_KEYS) {
+            const v = localStorage.getItem(k);
+            if (v === null || have.has(LR_S_PREFIX + k)) continue;
+            await vkStorageSet(LR_S_PREFIX + k, String(v));
+        }
+    } catch (e) { }
+}
+
 // Восстановление на запуске (VK-режим, после VKWebAppInit).
 // База: только на свежем origin (пустая ширина колонки — window.__lrFreshOrigin
 // из head, НЕ пустота базы) и при согласии ПДн — автоподтяжка из облака ВК
@@ -2660,6 +2674,7 @@ async function vkRestoreCloud() {
     try {
         if (await vkRestoreSettings()) vkApplyRestoredSettings();
     } catch (e) { }
+    await vkBackfillSettings();
     if (!window.__lrFreshOrigin || !pdConsentGiven()) return;
     try {
         await cloudRun(() => vkDbGet());
