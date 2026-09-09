@@ -590,8 +590,9 @@
 <b>Великое слияние:</b> сложение лунного 8-летнего и недельного 11-летнего циклов (8+11) дает 19-летний Метонов цикл. При этом +38 часов 11 минут погрешности 8-летнего цикла складываются с -36 часами 6 минутами погрешности 11-летнего цикла, снижая общую погрешность до 2 часов 5 минут.</li>
 </p>
 <div id="pushlog" style="display:none; font-size:0.85em; color:var(--muted2); white-space:pre-line;"></div>
+<!-- Ссылка «Сообщить об ошибке» создаётся JS только вне VK (renderSwVersion):
+     в VK-режиме DOM не содержит <a href> (требование модерации). -->
 <div id="swver" style="font-size:0.85em; color:var(--muted2); min-height:1.2em;">
-    <a id="bugLink" href="https://github.com/abakum/LunarReturns/issues" target="_blank" rel="noopener" style="color:var(--muted);">Сообщить об ошибке</a>
     <span id="swverText"></span>
 </div>
 
@@ -614,8 +615,13 @@ const VKPUSH_PROBE_KEY = "lunarreturns.vkpushProbe";
 // Тема ("dark"/"light"): пишется applyTheme(), читается ранним скриптом в head
 // до первого кадра — убирает светлую вспышку при PTR-reload в нативном клиенте.
 const THEME_KEY = "lunarreturns.theme";
-// Настройки, переносимые между версиями ВК-хостинга через #lr_ls (не ПДн).
+// Настройки, синхронизируемые с облаком ВКонтакте (ключи lr_s_* в
+// VKWebAppStorage; значения — не ПДн). Запись — lsSet(), чтение/применение —
+// vkRestoreCloud() на свежем origin.
 const LR_LS_KEYS = [DAYS_KEY, PD_CONSENT_KEY, PD_PUSH_CONSENT_KEY, VKPUSH_KEY, THEME_KEY];
+// Префикс ключей настроек в VKWebAppStorage (не конфликтует с «0»..«989» базы;
+// объявлен здесь, т.к. applyTheme()/lsSet() вызываются до блока vk-хранилища).
+const LR_S_PREFIX = "lr_s_";
 const QR_MAX_BYTES = 2953;
 const SPACE = "\u2002\u2004";
 const WIDE_SPACE = "\u2003\u2004";
@@ -659,7 +665,7 @@ const vkminiapp = new URLSearchParams(location.search).has("vk_app_id");
 // (фактическая выдача разрешения на stage проверяется тестом).
 // Классы .vk/.vk-mweb уже выставлены ранним скриптом в head (до первого кадра).
 // Здесь используется только флаг vkminiapp для логики (vkBridge, PTR, push).
-// Версия VK-сборки — прямо из origin хостинга (см. LR_ORIGIN_RE):
+// Версия VK-сборки — прямо из hostname хостинга:
 // https://prod-app54746591-4ff53da5fb4c.pages.vk-apps.com → "prod-4ff53da5fb4c".
 const vkBuildVersion = (() => {
     const m = location.hostname.match(/^(stage|prod)-app\d+-([a-z0-9]+)/);
@@ -693,8 +699,9 @@ function applyTheme() {
     // Персистентность темы: ранний скрипт в head на следующей загрузке (в т.ч.
     // PTR-reload) берёт её из localStorage ДО первого кадра, чтобы не отрисовать
     // страницу светлой в тёмном режиме (prefers-color-scheme в WebView на старте
-    // ещё светлый, launch-параметр не гарантирован).
-    try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch (e) { }
+    // ещё светлый, launch-параметр не гарантирован). В VK-режиме тема заодно
+    // пишется в облако ВК (lr_s_*), чтобы пережить смену origin хостинга.
+    lsSet(THEME_KEY, dark ? "dark" : "light");
     // Нативные контролы (input[type=date] на Android игнорирует CSS color)
     // красит color-scheme из блоков переменных выше.
     // theme-color = фактический фон body (статус-бар браузера/PWA).
@@ -946,17 +953,15 @@ applyTheme();
     }, { passive: true });
 })();
 
-// ---- Миграция базы между версиями VK-хостинга ----
-// Каждая выкладка получает новый stage-URL (новый origin) с пустым localStorage.
-// Указатели прежних версий хранятся в VKWebAppStorage (ключи lr_origin_<unixtime>,
-// значение — origin; URL не является ПДн), а сама база передаётся цепочкой
-// location.replace только через #-фрагмент URL: фрагмент не отправляется на
-// серверы, поэтому ПДн не покидают устройство. Редирект посторонних адресов
-// (isAllowedUrl) убран: старые stage-URL должны открываться напрямую, чтобы
-// базу можно было перенести вручную (⎘ на старой версии → 📋 на новой).
-const LR_ORIGIN_PREFIX = "lr_origin_";
-// VK-хостинг: *.pages.vk-apps.ru, прод может жить на *.pages-ac.vk-apps.ru.
-const LR_ORIGIN_RE = /^https:\/\/(stage|prod)-app54746591-[a-z0-9]+\.pages(-ac)?\.vk-apps\.(ru|com)$/;
+// ---- Смена версии VK-хостинга: облако ВК вместо миграции ----
+// Каждая выкладка получает новый stage-URL (новый origin) с пустым
+// localStorage. Переходов между origins больше нет (требование модерации:
+// ни <a href>, ни location.replace): настройки (не ПДн, LR_LS_KEYS)
+// синхронизируются с облаком ВК под ключами lr_s_* (lsSet/vkRestoreSettings),
+// база — при согласии ПДн под ключами «0»..«989» (vkDbPut/vkDbGet).
+// Свежий origin детектится в head по пустоте сохранённой ширины колонки
+// (window.__lrFreshOrigin), не по пустоте базы; восстановление на запуске —
+// vkRestoreCloud().
 // Гейт ВК-пушей (кнопка 🔔, подписка): платформа разрешает уведомления
 // только «доверенным» приложениям, поэтому включаем их выборочно по origin
 // хостинга ВК.
@@ -970,12 +975,6 @@ const vkPushEnabled = vkminiapp && /^https:\/\/stage-/.test(location.origin);
 // TEMP(публикация): чекбокс согласия на пуш-ПДн скрыт — серверу уходит
 // только vk_user_id и обезличенные MM-DD (без имён), согласие не требуется.
 const VK_PUSH_CONSENT = false;
-const LR_MIGRATE_MAX_TRIES = 3;
-let lrMigrated = false;
-
-function lrHashParams() {
-    return new URLSearchParams(location.hash.slice(1));
-}
 
 function lrSeedJson() {
     return JSON.stringify([{ n: "Ада", d: "1815-12-10" }]);
@@ -985,61 +984,6 @@ function lrSeedJson() {
 // спрашивать при импорте нечего, просто заменяем.
 function dbIsTrivial() {
     return db.length === 0 || JSON.stringify(db) === lrSeedJson();
-}
-
-// Настройки (#lr_ls) для передачи вслед за базой; значения — не ПДн.
-function lrLsHash() {
-    const ls = {};
-    for (const k of LR_LS_KEYS) {
-        const v = localStorage.getItem(k);
-        if (v !== null) ls[k] = v;
-    }
-    return Object.keys(ls).length ? "&lr_ls=" + encodeURIComponent(JSON.stringify(ls)) : "";
-}
-
-// Режим отдачи: эта (прежняя) версия отдаёт базу новой и не рендерится.
-// Переход выполняется только на origin нашего приложения (LR_ORIGIN_RE).
-if (lrHashParams().has("lr_migrate")) {
-    let back = null;
-    try {
-        const u = new URL(lrHashParams().get("lr_migrate") || "");
-        if (u.protocol === "https:" && LR_ORIGIN_RE.test(u.origin) && u.pathname === location.pathname) back = u;
-    } catch (e) { }
-    if (back) {
-        let raw = null;
-        try {
-            const parsed = JSON.parse(localStorage.getItem(DB_KEY) || "");
-            if (Array.isArray(parsed) && parsed.length) raw = localStorage.getItem(DB_KEY);
-        } catch (e) { }
-        back.hash = (raw ? "lr_db=" + encodeURIComponent(raw) : "lr_fail=1") + lrLsHash();
-        location.replace(back.href);
-        throw "lr_migrate_serve";
-    }
-}
-
-// Настройки от прежней версии (#lr_ls): разбираем в обеих ветках (lr_db/lr_fail),
-// применяем ниже — после объявления DAYS_DEFS, до основного init.
-let lrLsPending = null;
-if (lrHashParams().has("lr_ls") && (lrHashParams().has("lr_db") || lrHashParams().has("lr_fail"))) {
-    try { lrLsPending = JSON.parse(lrHashParams().get("lr_ls") || ""); } catch (e) { }
-}
-
-// Приём базы от прежней версии: только если локальная база пуста/сид.
-if (lrHashParams().has("lr_db")) {
-    const raw = localStorage.getItem(DB_KEY);
-    if (!raw || raw === lrSeedJson()) {
-        try {
-            const parsed = JSON.parse(lrHashParams().get("lr_db") || "");
-            if (Array.isArray(parsed) && parsed.length && parsed.every(validRecord)) {
-                localStorage.setItem(DB_KEY, lrHashParams().get("lr_db"));
-                lrMigrated = true;
-            }
-        } catch (e) { }
-    }
-    history.replaceState(null, "", location.pathname + location.search);
-} else if (lrHashParams().has("lr_fail")) {
-    sessionStorage.setItem("lr_migrate_attempts", String(lrAttempts() + 1));
-    history.replaceState(null, "", location.pathname + location.search);
 }
 
 function moonNew(date) {
@@ -1237,7 +1181,6 @@ function saveDb() {
         return false;
     }
     localStorage.setItem(DB_KEY, json);
-    if (vkminiapp) vkPointerPut().catch(() => { });
     idbPutDb();
     updatePushDates();
     return true;
@@ -1852,11 +1795,12 @@ const DAYS_DEFS = {
     buddhist: ["Буддийские дни", buildBuddhist, "☸️"]
 };
 
-// Перенос настроек с прежней версии (#lr_ls): только белый список, только
-// отсутствующие в localStorage ключи, только валидные значения (чужие и
-// битые молча пропускаются). Вызов до loadDayKind()/initPdConsent().
+// Применение настроек из облака ВК (vkRestoreSettings): только белый список,
+// только отсутствующие в localStorage ключи, только валидные значения (чужие
+// и битые молча пропускаются). Вызывается после основного init — вызывающая
+// сторона обновляет производный UI (vkApplyRestoredSettings).
 // DAYS_KEY допускает легаси-формат ["kind"] (как loadDayKind) —
-// нормализуем в текущий вид при переносе.
+// нормализуем в текущий вид при применении.
 function applyLsParams(ls) {
     if (!ls || typeof ls !== "object") return;
     for (const k of LR_LS_KEYS) {
@@ -1869,14 +1813,13 @@ function applyLsParams(ls) {
             }
             if (DAYS_DEFS[v]) localStorage.setItem(k, v);
         } else if (k === THEME_KEY) {
-            // Тема переносится только валидным явным значением ("dark"/"light").
+            // Тема применяется только валидным явным значением ("dark"/"light").
             if (v === "dark" || v === "light") localStorage.setItem(k, v);
         } else if (v === "1") {
             localStorage.setItem(k, v);
         }
     }
 }
-if (lrLsPending) applyLsParams(lrLsPending);
 
 let savedUiDisp = null;
 let religionMode = false;
@@ -1913,7 +1856,7 @@ function loadDayKind() {
 }
 
 function saveDayKind() {
-    localStorage.setItem(DAYS_KEY, dayKind);
+    lsSet(DAYS_KEY, dayKind);
     updatePushDates();
     idbPutDays();
 }
@@ -1972,11 +1915,20 @@ const VK_WEB_HOST_RE = /^(stage|prod)-app54746591-/;
 
 async function renderSwVersion() {
     const el = document.getElementById("swverText");
-    // Прямой VK-хостинг-URL: SW может активироваться позже первой отрисовки,
-    // а «Сообщить об ошибке» (issues GitHub) в ВК-окружении нерелевантно —
-    // прячем ссылку и берём версию прямо из sw.js (const CACHE).
+    // Ссылка на issues — только вне VK (в VK-режиме DOM без <a href>,
+    // требование модерации); на прямом VK-хостинг-URL она тоже не нужна,
+    // там версия берётся прямо из sw.js (const CACHE).
+    if (!vkminiapp && !VK_WEB_HOST_RE.test(location.hostname) && !document.getElementById("bugLink")) {
+        const a = document.createElement("a");
+        a.id = "bugLink";
+        a.href = "https://github.com/abakum/LunarReturns/issues";
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.style.color = "var(--muted)";
+        a.textContent = "Сообщить об ошибке";
+        el.parentNode.insertBefore(a, el);
+    }
     if (!vkminiapp && VK_WEB_HOST_RE.test(location.hostname)) {
-        document.getElementById("bugLink").style.display = "none";
         try {
             const src = await fetch("sw.js").then(r => r.text());
             const m = src.match(/const CACHE = "([^"]+)"/);
@@ -2308,7 +2260,7 @@ function initPushConsent() {
     note.style.display = cb.checked ? "" : "none";
     cb.addEventListener("change", async () => {
         if (cb.checked) {
-            localStorage.setItem(PD_PUSH_CONSENT_KEY, "1");
+            lsSet(PD_PUSH_CONSENT_KEY, "1");
             note.style.display = "";
             refreshPushBtn();
             return;
@@ -2318,10 +2270,10 @@ function initPushConsent() {
             cb.checked = true;
             return;
         }
-        localStorage.removeItem(PD_PUSH_CONSENT_KEY);
+        lsSet(PD_PUSH_CONSENT_KEY, null);
         note.style.display = "none";
         if (subscribed) {
-            localStorage.removeItem(VKPUSH_KEY);
+            lsSet(VKPUSH_KEY, null);
             pushApi("vk_unsubscribe", { launch_params: vkLaunchParams() }).catch(() => { });
             if (window.vkBridge) vkBridge.send("VKWebAppDenyNotifications").catch(() => { });
             status("Согласие отозвано: подписка удалена из облака Яндекса");
@@ -2344,10 +2296,8 @@ function applyVkUi() {
     const w = document.getElementById("pdWithdrawNote");
     if (w) w.textContent = "Отзыв согласия удаляет ПДн из облака ВКонтакте.";
     // Строку версии не прячем: в мини-аппе вместо версии SW показывается
-    // версия VK-сборки (см. renderSwVersion / LR_VK_BUILD).
-    // Внешняя ссылка на GitHub-issues нерелевантна внутри нативного клиента — прячем.
-    const bug = document.getElementById("bugLink");
-    if (bug) bug.style.display = "none";
+    // версия VK-сборки (см. renderSwVersion). Ссылки на issues в VK-режиме
+    // нет в разметке — DOM мини-аппа не содержит <a href> (модерация ВК).
 }
 
 // Строки согласия ПДн имеют смысл только на «домашних» адресах: каноническом
@@ -2424,21 +2374,21 @@ function initPdConsent() {
     cb.checked = pdConsentGiven();
     cb.addEventListener("change", async () => {
         if (cb.checked) {
-            localStorage.setItem(PD_CONSENT_KEY, "1");
+            lsSet(PD_CONSENT_KEY, "1");
             applyPdConsent();
             // Токен, пришедший из OAuth до согласия (редирект входа ведёт на
             // канонический адрес), подхватывается сразу после чекбокса.
             pickPendingOAuthToken();
             return;
         }
-        localStorage.removeItem(PD_CONSENT_KEY);
+        lsSet(PD_CONSENT_KEY, null);
         if (vkminiapp) {
             if (await confirmAuto("Удалить", "ПДн из облака ВКонтакте? Локальная база сохранится.")) {
                 applyPdConsent();
                 cloudRun(() => vkDbClear());
             } else {
                 cb.checked = true;
-                localStorage.setItem(PD_CONSENT_KEY, "1");
+                lsSet(PD_CONSENT_KEY, "1");
                 applyPdConsent();
             }
         } else if (yandexToken) {
@@ -2457,6 +2407,12 @@ function initPdConsent() {
 }
 
 function loginYandex() {
+    // В мини-аппе входа через Яндекс нет (кнопка скрыта); guard страхует от
+    // location = oauth.yandex.ru — переходов на чужие домены в VK нет.
+    if (vkminiapp) {
+        status("Вход через Яндекс в мини-аппе недоступен", true);
+        return;
+    }
     if (!pdConsentGiven()) {
         status("Для облачного хранения требуется согласие", true);
         return;
@@ -2519,8 +2475,7 @@ function hashSelect() {
 // базы — выбирается первая из них (подъезд к результату делает selectRecord
 // для обоих режимов), далее между именинниками дня навигируют 🔼🔽. Затем —
 // при выбранном религиозном календаре — дни («тап по яйцу» открывает список
-// от сегодняшней даты). Явный #N из hashSelect приоритетнее; миграционные
-// хэши автотап отключают.
+// от сегодняшней даты). Явный #N из hashSelect приоритетнее.
 
 // Сегодняшние MM-DD с правилом 02-28→02-29 невисокосного года.
 function todayMds() {
@@ -2539,8 +2494,6 @@ const todayIdxs = () => {
 
 function autoTapToday() {
     try {
-        const p = lrHashParams();
-        if (p.has("lr_db") || p.has("lr_migrate") || p.has("lr_fail")) return;
         const idxs = todayIdxs();
         if (idxs.length) {
             selectRecord(idxs[0]);
@@ -2620,8 +2573,8 @@ function cloudPresign(action, token) {
 
 // ---- Облако ВКонтакте (VKWebAppStorage): одна запись db = один ключ "0".."989".
 // Лимиты VK: значение ≤ 4096 байт (записи {n,d} хватает с запасом),
-// 1000 ключей на пользователя суммарно: 990 под записи + до 10 под
-// указатели версий lr_origin_*; удаление ключей отсутствует — затираем пустой строкой.
+// 1000 ключей на пользователя суммарно: 990 под записи + 5 под настройки
+// lr_s_* (LR_LS_KEYS); удаление ключей отсутствует — затираем пустой строкой.
 
 function vkErr(e) {
     return (e && (e.message
@@ -2644,72 +2597,74 @@ function vkStorageGetKeys() {
         .then(res => (res && res.keys) || []);
 }
 
-// ---- Указатели версий и миграция базы (см. блок в начале скрипта) ----
+// ---- Настройки в облаке ВК (VKWebAppStorage, ключи lr_s_*, см. LR_LS_KEYS) ----
 
-function lrAttempts() {
-    return Number(sessionStorage.getItem("lr_migrate_attempts") || 0) || 0;
-}
-
-// Список прежних версий из VKWebAppStorage: [{date, origin}], свежие первыми.
-async function vkPointerGet() {
-    const keys = (await vkStorageGetKeys()).filter(k => k.startsWith(LR_ORIGIN_PREFIX));
-    if (!keys.length) return [];
-    const res = await vkStorageGet(keys);
-    const by = {};
-    for (const kv of (res && res.keys) || []) by[kv.key] = kv.value;
-    return keys
-        .map(k => ({ date: Number(k.slice(LR_ORIGIN_PREFIX.length)) || 0, origin: by[k] || "" }))
-        .filter(p => LR_ORIGIN_RE.test(p.origin))
-        .sort((a, b) => b.date - a.date);
-}
-
-// Запоминает origin текущей версии; история ≤ 10, старшие затираются пустой строкой
-// (удаления ключей в VKWebAppStorage нет). URL версии — не ПДн, согласие не требуется.
-async function vkPointerPut() {
-    const list = await vkPointerGet();
-    if (list.some(p => p.origin === location.origin)) return;
-    await vkStorageSet(LR_ORIGIN_PREFIX + Math.floor(Date.now() / 1000), location.origin);
-    for (const p of list.slice(9)) await vkStorageSet(LR_ORIGIN_PREFIX + p.date, "");
-}
-
-// Запуск миграции: только на свежем origin → перейти за базой на свежий
-// непробованный origin. Триггер взводится в head при отсутствии сохранённой
-// ширины колонки (lunarreturns.colw), а НЕ по «пустоте» БД: пользователь мог
-// очистить базу без смены версии — очистка не должна тащить старые данные.
-async function maybeMigrateDb() {
-    if (!window.vkBridge) return;
-    if (!window.__lrFreshOrigin) return;
-    let list = [];
-    try { list = await vkPointerGet(); } catch (e) { return; }
-    const others = list.filter(p => p.origin !== location.origin);
-    if (lrAttempts() >= LR_MIGRATE_MAX_TRIES || !others.length) {
-        if (others.length) showMigrateFallback(others);
-        return;
+// Запись настройки: localStorage + облако ВК (write-through, fire-and-forget).
+// Значения LR_LS_KEYS — не ПДн; value === null означает удаление ключа.
+function lsSet(key, value) {
+    try {
+        if (value === null) localStorage.removeItem(key);
+        else localStorage.setItem(key, value);
+    } catch (e) { return; }
+    if (vkminiapp && window.vkBridge) {
+        try {
+            vkStorageSet(LR_S_PREFIX + key, value === null ? "" : String(value)).catch(() => { });
+        } catch (e) { }
     }
-    const tried = JSON.parse(sessionStorage.getItem("lr_migrate_tried") || "[]");
-    const next = others.find(p => !tried.includes(p.origin));
-    if (!next) { showMigrateFallback(others); return; }
-    tried.push(next.origin);
-    sessionStorage.setItem("lr_migrate_tried", JSON.stringify(tried));
-    const back = location.origin + location.pathname + location.search;
-    location.replace(next.origin + location.pathname + location.search
-        + "#lr_migrate=" + encodeURIComponent(back));
 }
 
-// Фолбэк: ссылки на прежние версии + инструкция ручного переноса (⎘ → 📋).
-function showMigrateFallback(list) {
-    const anchor = document.getElementById("status");
-    const div = document.createElement("div");
-    div.id = "lrFallback";
-    div.style.cssText = "font-size:0.9em;color:var(--muted);margin:8px 0;";
-    const links = list.map(p => {
-        const d = p.date ? new Date(p.date * 1000).toLocaleDateString("ru-RU") : "дата неизвестна";
-        return '<a href="' + p.origin + location.pathname + '" target="_blank" rel="noopener">версия от ' + d + "</a>";
-    }).join("<br>");
-    div.innerHTML = "Не удалось перенести базу автоматически.<br>"
-        + "Откройте прежнюю версию, нажмите ⎘ (скопировать базу), вернитесь сюда и нажмите 📋 (вставить):<br>"
-        + links;
-    anchor.parentNode.insertBefore(div, anchor);
+// Восстановление настроек из облака: применяются только отсутствующие локально
+// ключи и только в валидном виде (applyLsParams). true — если применилось хоть что-то.
+async function vkRestoreSettings() {
+    const keys = (await vkStorageGetKeys()).filter(k => k.startsWith(LR_S_PREFIX));
+    if (!keys.length) return false;
+    const res = await vkStorageGet(keys);
+    const ls = {};
+    for (const kv of (res && res.keys) || []) {
+        const k = kv.key.slice(LR_S_PREFIX.length);
+        if (LR_LS_KEYS.includes(k) && kv.value) ls[k] = kv.value;
+    }
+    if (!Object.keys(ls).length) return false;
+    // Тема: локальное значение к этому моменту — автозапись applyTheme() при
+    // старте (system/launch-параметр), а не выбор пользователя, поэтому явная
+    // тема из облака приоритетнее: снимаем локальную и форсируем восстановленную
+    // (перекраска — в vkApplyRestoredSettings). Остальные ключи: локальное выигрывает.
+    const th = ls[THEME_KEY];
+    if ((th === "dark" || th === "light") && localStorage.getItem(THEME_KEY) !== th) {
+        localStorage.removeItem(THEME_KEY);
+        themeForced = th;
+    }
+    applyLsParams(ls);
+    return true;
+}
+
+// Обновление UI после восстановления настроек (основной init уже отрисовался).
+function vkApplyRestoredSettings() {
+    loadDayKind();
+    if (themeForced) applyTheme(); // перекраска под восстановленную тему
+    const cb = document.getElementById("pdConsent");
+    if (cb) cb.checked = pdConsentGiven();
+    applyPdConsent();
+    refreshPushBtn();
+}
+
+// Восстановление на запуске (VK-режим, после VKWebAppInit).
+// База: только на свежем origin (пустая ширина колонки — window.__lrFreshOrigin
+// из head, НЕ пустота базы) и при согласии ПДн — автоподтяжка из облака ВК
+// (vkDbGet; локальная база на свежем origin — сид, диалог объединения не
+// возникает). Настройки восстанавливаются раньше базы: согласие читается уже
+// из восстановленного localStorage. Ошибки облака молча: приложение остаётся
+// работоспособным на локальных данных.
+async function vkRestoreCloud() {
+    if (!window.vkBridge) return;
+    try {
+        if (await vkRestoreSettings()) vkApplyRestoredSettings();
+    } catch (e) { }
+    if (!window.__lrFreshOrigin || !pdConsentGiven()) return;
+    try {
+        await cloudRun(() => vkDbGet());
+        autoTapToday();
+    } catch (e) { }
 }
 
 async function vkDbPut() {
@@ -2789,7 +2744,11 @@ async function vkDbGet() {
 async function vkDbClear() {
     try {
         const keys = await vkStorageGetKeys();
-        for (const k of keys) await vkStorageSet(k, "");
+        for (const k of keys) {
+            // Настройки (lr_s_*) — не ПДн, отзыв согласия их не удаляет.
+            if (k.startsWith(LR_S_PREFIX)) continue;
+            await vkStorageSet(k, "");
+        }
         status("Согласие отозвано: ПДн удалены из облака ВКонтакте. Локальная база сохранена");
     } catch (e) {
         status("Не удалось удалить ПДн из облака ВКонтакте (" + vkErr(e) + ") — повторите отзыв согласия: поставьте и снова снимите галочку", true);
@@ -2958,7 +2917,7 @@ async function togglePushVk() {
         return;
     }
     if (localStorage.getItem(VKPUSH_KEY) === "1") {
-        localStorage.removeItem(VKPUSH_KEY);
+        lsSet(VKPUSH_KEY, null);
         localStorage.removeItem(VKPUSH_PROBE_KEY);
         pushApi("vk_unsubscribe", { launch_params: vkLaunchParams() }).catch(() => { });
         if (window.vkBridge) vkBridge.send("VKWebAppDenyNotifications").catch(() => { });
@@ -2990,7 +2949,7 @@ async function togglePushVk() {
         { launch_params: vkLaunchParams(), dates: allPushDates() },
         granted ? { } : { lr_stage_probe: 1 }
     ));
-    localStorage.setItem(VKPUSH_KEY, "1");
+    lsSet(VKPUSH_KEY, "1");
     if (granted) localStorage.removeItem(VKPUSH_PROBE_KEY);
     else localStorage.setItem(VKPUSH_PROBE_KEY, "1");
     status(granted ? "Оповещения включены" : "Тестовая подписка создана (разрешение не выдано)");
@@ -3186,19 +3145,22 @@ idbPutDb();
 if (vkminiapp) {
     // Мини-апп ВКонтакте: сервис-воркер и PWA не используются.
     // Инициализируем vk-bridge и включаем VK-интерфейс (тексты согласия,
-    // скрытие 🔑 Яндекса и версии SW; пуши — ВК-нативные).
+    // скрытие 🔑 Яндекса; пуши — ВК-нативные).
     if (window.vkBridge) {
         // После init явно перечитываем конфиг (страховка для Android WebView,
-        // где стартовое VKWebAppUpdateConfig иногда теряется).
-        vkBridge.send("VKWebAppInit").then(() => {
+        // где стартовое VKWebAppUpdateConfig иногда теряется), затем —
+        // восстановление настроек/базы из облака ВК (vkRestoreCloud).
+        const afterInit = () => {
             refreshThemeFromBridge();
             applyTheme();
-        }, applyTheme);
+            vkRestoreCloud();
+        };
+        vkBridge.send("VKWebAppInit").then(afterInit, () => {
+            applyTheme();
+            vkRestoreCloud();
+        });
     }
     applyVkUi();
-    if (lrMigrated) status("База перенесена со старой версии автоматически");
-    vkPointerPut().catch(() => { });
-    maybeMigrateDb();
 } else if ("serviceWorker" in navigator && location.protocol === "https:") {
     navigator.serviceWorker.register("./sw.js").catch(() => { });
     navigator.serviceWorker.ready.then(() => renderSwVersion());
