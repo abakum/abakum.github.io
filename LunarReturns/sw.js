@@ -1,6 +1,8 @@
-const CACHE = "lunarreturns-v11";
+const CACHE = "lunarreturns-v12";
+// "./" (корень) на VK-хостинге отдаёт 403 — из списка убран: addAll
+// атомарен, один 403 валил весь install → SW не активировался →
+// serviceWorker.ready висел вечно («тишина» 🔔 на прямом URL).
 const INSTALL_URLS = [
-    "./",
     "./index.html",
     "./manifest.webmanifest",
     "./qr/qrcode.js",
@@ -11,7 +13,13 @@ const INSTALL_URLS = [
 
 self.addEventListener("install", e => {
     e.waitUntil(
-        caches.open(CACHE).then(c => c.addAll(INSTALL_URLS)).then(() => self.skipWaiting())
+        // Кэш — оптимизация, не критерий установки: одиночный сбой ресурса
+        // не должен блокировать активацию SW (раньше addAll был atomic).
+        caches.open(CACHE).then(c =>
+            Promise.allSettled(INSTALL_URLS.map(u =>
+                fetch(u).then(r => r.ok ? c.put(u, r) : null).catch(() => null))
+            )
+        ).then(() => self.skipWaiting())
     );
 });
 
@@ -156,7 +164,8 @@ self.addEventListener("push", e => {
 
 self.addEventListener("notificationclick", e => {
     e.notification.close();
-    e.waitUntil(clients.openWindow("./"));
+    // Корень "./" на VK-хостинге отдаёт 403 — открываем index.html.
+    e.waitUntil(clients.openWindow("./index.html"));
 });
 
 self.addEventListener("fetch", e => {

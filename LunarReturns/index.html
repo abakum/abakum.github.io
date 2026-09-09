@@ -2995,13 +2995,21 @@ async function togglePush() {
                 status("Оповещения недоступны (нет PUSH_URL или ключа)", true);
                 return;
             }
-            const reg = await navigator.serviceWorker.ready;
+            // Фидбек на каждом шаге: раньше «тишина» на прямом URL была из-за
+            // неотвеченного браузерного промпта/неактивного SW без сообщений.
+            status("Подготовка сервис-воркера…");
+            const reg = await Promise.race([
+                navigator.serviceWorker.ready,
+                new Promise((_, rej) => setTimeout(() =>
+                    rej(new Error("сервис-воркер не активировался за 10 с (консоль?)")), 10000)),
+            ]);
             const sub = await reg.pushManager.getSubscription();
             if (sub) {
                 await sub.unsubscribe();
                 pushApi("unsubscribe", { endpoint: sub.endpoint }).catch(() => { });
                 status("Оповещения отключены");
             } else {
+                status("Ожидание разрешения браузера…");
                 if ((await Notification.requestPermission()) !== "granted") {
                     status("Разрешение на уведомления не выдано", true);
                     return;
