@@ -2902,13 +2902,23 @@ function getPushSubscription() {
         .catch(() => null);
 }
 
-// Подписанные launch-параметры ВК (vk_* и sign) для серверной проверки sign.
+// Launch-параметры ВК (весь набор из location.search, включая sign) для
+// серверной проверки sign: актуальный алгоритм ВК подписывает ВСЕ параметры
+// (не только vk_*), поэтому клиент обязан передать их без обрезки. Это
+// платформенные параметры без ПДн; сервер извлекает только vk_user_id.
 function vkLaunchParams() {
     const p = {};
-    new URLSearchParams(location.search).forEach((v, k) => {
-        if (k === "sign" || k.startsWith("vk_")) p[k] = v;
-    });
+    new URLSearchParams(location.search).forEach((v, k) => { p[k] = v; });
     return p;
+}
+
+// vkBridge.send вне клиента ВК может не разрешиться никогда (нет ответа
+// вебвью/iframe) — таймаут превращает зависание в ошибку «не выдано».
+function vkSendTimeout(method, ms) {
+    return Promise.race([
+        vkBridge.send(method),
+        new Promise(resolve => setTimeout(() => resolve({ error: "timeout" }), ms)),
+    ]);
 }
 
 async function togglePushVk() {
@@ -2932,7 +2942,7 @@ async function togglePushVk() {
         status("Оповещения недоступны (vk-bridge не загружен)", true);
         return;
     }
-    const perm = await vkBridge.send("VKWebAppAllowNotifications")
+    const perm = await vkSendTimeout("VKWebAppAllowNotifications", 8000)
         .catch(e => ({ error: e }));
     const granted = !!perm && perm.result === true && !perm.error;
     // TEMP(публикация): на stage до модерации разрешение недоступно —
