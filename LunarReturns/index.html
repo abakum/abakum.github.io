@@ -606,6 +606,10 @@ const PD_CONSENT_KEY = "lunarreturns.pdConsent";
 const PD_PUSH_CONSENT_KEY = "lunarreturns.pdPushConsent";
 const AUTOTAP_KEY = "lunarreturns.autotap";
 const VKPUSH_KEY = "lunarreturns.vkpush";
+// Пробная VK-подписка (stage, разрешение до модерации недоступно): сервер
+// хранит её с пустыми dates; флаг передаётся и в updatePushDates, чтобы
+// авто-обновление дат не «оживило» запись до выдачи разрешения.
+const VKPUSH_PROBE_KEY = "lunarreturns.vkpushProbe";
 // Тема ("dark"/"light"): пишется applyTheme(), читается ранним скриптом в head
 // до первого кадра — убирает светлую вспышку при PTR-reload в нативном клиенте.
 const THEME_KEY = "lunarreturns.theme";
@@ -2922,6 +2926,7 @@ async function togglePushVk() {
     }
     if (localStorage.getItem(VKPUSH_KEY) === "1") {
         localStorage.removeItem(VKPUSH_KEY);
+        localStorage.removeItem(VKPUSH_PROBE_KEY);
         pushApi("vk_unsubscribe", { launch_params: vkLaunchParams() }).catch(() => { });
         if (window.vkBridge) vkBridge.send("VKWebAppDenyNotifications").catch(() => { });
         status("Оповещения отключены");
@@ -2939,8 +2944,10 @@ async function togglePushVk() {
         .catch(e => ({ error: e }));
     const granted = !!perm && perm.result === true && !perm.error;
     // TEMP(публикация): на stage до модерации разрешение недоступно —
-    // тестируем конвейер: подписываемся с test:1 (сервер хранит запись,
-    // но не отправляет на неё пуши). На prod байпаса нет.
+    // тестируем конвейер: подписываемся с lr_stage_probe (сервер хранит
+    // запись с ПУСТЫМИ dates — рассылка на неё не идёт). На prod байпаса
+    // нет. Пробный режим помечаем локально (VKPUSH_PROBE), чтобы
+    // updatePushDates тоже передавал флаг и не «оживлял» запись.
     const stageTest = vkBuildVersion.startsWith("stage-");
     if (!granted && !stageTest) {
         status("Разрешение на уведомления не выдано (" + vkErr(perm && perm.error) + ")", true);
@@ -2951,6 +2958,8 @@ async function togglePushVk() {
         granted ? { } : { lr_stage_probe: 1 }
     ));
     localStorage.setItem(VKPUSH_KEY, "1");
+    if (granted) localStorage.removeItem(VKPUSH_PROBE_KEY);
+    else localStorage.setItem(VKPUSH_PROBE_KEY, "1");
     status(granted ? "Оповещения включены" : "Тестовая подписка создана (разрешение не выдано)");
 }
 
@@ -2960,7 +2969,10 @@ function updatePushDates() {
         // ВК-подписка: серверу уходит только vk_user_id (в подписанных launch-параметрах)
         // и обезличенные MM-DD; имена не покидают устройство.
         if (vkPushEnabled && (!VK_PUSH_CONSENT || pushConsentGiven()) && localStorage.getItem(VKPUSH_KEY) === "1")
-            pushApi("vk_subscribe", { launch_params: vkLaunchParams(), dates: allPushDates() }).catch(() => { });
+            pushApi("vk_subscribe", Object.assign(
+                { launch_params: vkLaunchParams(), dates: allPushDates() },
+                localStorage.getItem(VKPUSH_PROBE_KEY) === "1" ? { lr_stage_probe: 1 } : { }
+            )).catch(() => { });
         return;
     }
     getPushSubscription().then(sub => {
