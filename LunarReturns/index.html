@@ -615,12 +615,12 @@ const VKPUSH_PROBE_KEY = "lunarreturns.vkpushProbe";
 // Тема ("dark"/"light"): пишется applyTheme(), читается ранним скриптом в head
 // до первого кадра — убирает светлую вспышку при PTR-reload в нативном клиенте.
 const THEME_KEY = "lunarreturns.theme";
-// Настройки, синхронизируемые с облаком ВКонтакте (ключи lr_s_* в
-// VKWebAppStorage; значения — не ПДн). Запись — lsSet(), чтение/применение —
-// vkRestoreCloud() на свежем origin.
+// Настройки, синхронизируемые с облаком ВКонтакте (ОДИН блоб-ключ lr_s_blob
+// в VKWebAppStorage; значения — не ПДн). Запись — lsSet() (дебаунс → один
+// вызов), чтение/применение — vkRestoreCloud() на свежем origin.
 const LR_LS_KEYS = [DAYS_KEY, PD_CONSENT_KEY, PD_PUSH_CONSENT_KEY, VKPUSH_KEY, THEME_KEY];
-// Префикс ключей настроек в VKWebAppStorage (не конфликтует с «0»..«989» базы;
-// объявлен здесь, т.к. applyTheme()/lsSet() вызываются до блока vk-хранилища).
+// Префикс СТАРЫХ поштучных ключей настроек (миграция на блоб в
+// vkRestoreSettings; объявлен здесь, т.к. используется в нескольких местах).
 const LR_S_PREFIX = "lr_s_";
 const QR_MAX_BYTES = 2953;
 const SPACE = "\u2002\u2004";
@@ -2573,8 +2573,8 @@ function cloudPresign(action, token) {
 
 // ---- Облако ВКонтакте (VKWebAppStorage): одна запись db = один ключ "0".."989".
 // Лимиты VK: значение ≤ 4096 байт (записи {n,d} хватает с запасом),
-// 1000 ключей на пользователя суммарно: 990 под записи + 5 под настройки
-// lr_s_* (LR_LS_KEYS); удаление ключей отсутствует — затираем пустой строкой.
+// 1000 ключей на пользователя суммарно: 990 под записи + 1 блоб настроек
+// lr_s_blob; удаление ключей отсутствует — затираем пустой строкой.
 
 function vkErr(e) {
     return (e && (e.message
@@ -2597,34 +2597,92 @@ function vkStorageGetKeys() {
         .then(res => (res && res.keys) || []);
 }
 
-// ---- Настройки в облаке ВК (VKWebAppStorage, ключи lr_s_*, см. LR_LS_KEYS) ----
+// ---- Настройки в облаке ВК (VKWebAppStorage, блоб lr_s_blob, см. LR_LS_KEYS) ----
 
-// Запись настройки: localStorage + облако ВК (write-through, fire-and-forget).
-// Значения LR_LS_KEYS — не ПДн; value === null означает удаление ключа.
+// Запись настройки: localStorage + облако ВК (write-through). Облачная часть
+// дебаунсится (300 мс) и уходит ОДНИМ вызовом — блоб всех настроек целиком
+// (см. flushSettingsBlob): поштучные VKWebAppStorageSet мобильный клиент
+// троттлит. Значения LR_LS_KEYS — не ПДн; value === null означает удаление.
 function lsSet(key, value) {
     try {
         if (value === null) localStorage.removeItem(key);
         else localStorage.setItem(key, value);
     } catch (e) { return; }
     if (vkminiapp && window.vkBridge) {
-        try {
-            vkStorageSet(LR_S_PREFIX + key, value === null ? "" : String(value)).catch(() => { });
-        } catch (e) { }
+        if (lrBlobFlushTimer) clearTimeout(lrBlobFlushTimer);
+        lrBlobFlushTimer = setTimeout(flushSettingsBlob, 300);
     }
+}
+
+// TEMP(отладка синхронизации): видимый след записи/чтения настроек — убрать
+// после починки. Лог не содержит ПДн.
+function vkSyncDebug(msg) {
+    try {
+        const log = JSON.parse(sessionStorage.getItem("lr_vkdbg") || "[]");
+        log.push(new Date().toISOString().slice(11, 19) + " " + msg);
+        sessionStorage.setItem("lr_vkdbg", JSON.stringify(log.slice(-8)));
+    } catch (e) { }
+    status(msg);
+}
+
+// Все настройки — ОДНИМ ключом lr_s_blob (JSON {ключ: значение}): одна запись
+// и одно чтение вместо поштучных вызовов VKWebAppStorageSet/Get. Мобильный
+// клиент ВК троттлит частые вызовы Storage-методов — поштучная схема могла
+// молча терять согласие. Запись дебаунсится: очередь схлопывается в один вызов.
+const LR_S_BLOB_KEY = "lr_s_blob";
+let lrBlobFlushTimer = null;
+
+function lrSettingsSnapshot() {
+    const o = {};
+    for (const k of LR_LS_KEYS) {
+        const v = localStorage.getItem(k);
+        if (v !== null) o[k] = v;
+    }
+    return o;
+}
+
+function flushSettingsBlob() {
+    lrBlobFlushTimer = null;
+    if (!(vkminiapp && window.vkBridge)) return;
+    try {
+        vkStorageSet(LR_S_BLOB_KEY, JSON.stringify(lrSettingsSnapshot()))
+            .catch(e => vkSyncDebug("ошибка записи блоба настроек: " + vkErr(e)));
+    } catch (e) { }
 }
 
 // Восстановление настроек из облака: применяются только отсутствующие локально
 // ключи и только в валидном виде (applyLsParams). true — если применилось хоть что-то.
 async function vkRestoreSettings() {
-    const keys = (await vkStorageGetKeys()).filter(k => k.startsWith(LR_S_PREFIX));
-    if (!keys.length) return false;
-    const res = await vkStorageGet(keys);
-    const ls = {};
-    for (const kv of (res && res.keys) || []) {
-        const k = kv.key.slice(LR_S_PREFIX.length);
-        if (LR_LS_KEYS.includes(k) && kv.value) ls[k] = kv.value;
+    let ls = {};
+    let fromLegacy = false;
+    try {
+        const res = await vkStorageGet([LR_S_BLOB_KEY]);
+        const blob = res && res.keys && res.keys[0] && res.keys[0].value;
+        if (blob) {
+            const parsed = JSON.parse(blob);
+            if (parsed && typeof parsed === "object") ls = parsed;
+        }
+    } catch (e) { }
+    if (!Object.keys(ls).length) {
+        // Миграция с поштучных lr_s_*-ключей (записаны до блоб-схемы).
+        try {
+            const keys = (await vkStorageGetKeys()).filter(k => k.startsWith(LR_S_PREFIX));
+            if (keys.length) {
+                const res = await vkStorageGet(keys);
+                for (const kv of (res && res.keys) || []) {
+                    const k = kv.key.slice(LR_S_PREFIX.length);
+                    if (LR_LS_KEYS.includes(k) && kv.value) ls[k] = kv.value;
+                }
+                fromLegacy = true;
+            }
+        } catch (e) { }
     }
+    for (const k of Object.keys(ls)) {
+        if (!LR_LS_KEYS.includes(k) || typeof ls[k] !== "string") delete ls[k];
+    }
+    vkSyncDebug("облако настроек: " + (Object.keys(ls).join(", ") || "пусто"));
     if (!Object.keys(ls).length) return false;
+    window.__lrCloudSettings = new Set(Object.keys(ls)); // что уже в облаке
     // Тема: локальное значение к этому моменту — автозапись applyTheme() при
     // старте (system/launch-параметр), а не выбор пользователя, поэтому явная
     // тема из облака приоритетнее: снимаем локальную и форсируем восстановленную
@@ -2635,6 +2693,7 @@ async function vkRestoreSettings() {
         themeForced = th;
     }
     applyLsParams(ls);
+    if (fromLegacy) flushSettingsBlob(); // миграция: блоб становится единым источником
     return true;
 }
 
@@ -2648,17 +2707,14 @@ function vkApplyRestoredSettings() {
     refreshPushBtn();
 }
 
-// Бэкфилл: настройки, существующие локально, но отсутствующие в облаке ВК
-// (согласие выдано до появления синхронизации; тихий сбой write-through),
-// дозаписываются в облако. Иначе первая же смена origin хостинга их теряла.
+// Бэкфилл: настройки, существующие локально, но отсутствующие в облачном
+// блобе (согласие выдано до появления синхронизации; тихий сбой записи),
+// дозаписываются одним вызовом — блоб перезаписывается целиком.
 async function vkBackfillSettings() {
     try {
-        const have = new Set((await vkStorageGetKeys()).filter(k => k.startsWith(LR_S_PREFIX)));
-        for (const k of LR_LS_KEYS) {
-            const v = localStorage.getItem(k);
-            if (v === null || have.has(LR_S_PREFIX + k)) continue;
-            await vkStorageSet(LR_S_PREFIX + k, String(v));
-        }
+        const cloud = window.__lrCloudSettings || new Set();
+        const local = Object.keys(lrSettingsSnapshot());
+        if (local.some(k => !cloud.has(k))) flushSettingsBlob();
     } catch (e) { }
 }
 
@@ -2673,8 +2729,12 @@ async function vkRestoreCloud() {
     if (!window.vkBridge) return;
     try {
         if (await vkRestoreSettings()) vkApplyRestoredSettings();
-    } catch (e) { }
+    } catch (e) {
+        vkSyncDebug("ошибка восстановления: " + vkErr(e)); // TEMP(отладка)
+    }
     await vkBackfillSettings();
+    vkSyncDebug("согласие после restore: " + pdConsentGiven()
+        + ", freshOrigin: " + !!window.__lrFreshOrigin); // TEMP(отладка)
     if (!window.__lrFreshOrigin || !pdConsentGiven()) return;
     try {
         await cloudRun(() => vkDbGet());
