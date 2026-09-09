@@ -2834,9 +2834,15 @@ async function vkDbGet() {
         // одиночные записи-объекты наравне с чанками-массивами.
         const legacy = cnt < 0;
         const keyCount = legacy ? 990 : cnt;
-        const keys = [];
-        for (let i = 0; i < keyCount; i++) keys.push(String(i));
-        const res = await vkStorageGet(keys);
+        // cnt === 0 — облако заведомо пусто: запрос без ключей VK API
+        // отвергает ошибкой «api error», пропускаем чтение.
+        const res = keyCount
+            ? await vkStorageGet((() => {
+                const keys = [];
+                for (let i = 0; i < keyCount; i++) keys.push(String(i));
+                return keys;
+            })())
+            : { keys: [] };
         const byKey = {};
         for (const kv of (res && res.keys) || []) byKey[kv.key] = kv.value;
         let incoming = [];
