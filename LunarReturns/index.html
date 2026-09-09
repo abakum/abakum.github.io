@@ -1510,14 +1510,16 @@ function selectRecord(i) {
 
 // В двухколоночном режиме ставим результат напротив строки-источника:
 // margin-top = отступ строки от верха #cols (колонки выровнены по верху).
+// Результат подъезжает на 7 строчек выше уровня записи.
 function alignResultToRow(i) {
     const sec = document.getElementById("resultSec");
     sec.style.marginTop = "";
     if (!isTwoCol()) return;
     const row = document.getElementById("list").children[i];
     if (!row) return;
+    const lineH = parseFloat(getComputedStyle(document.getElementById("resultText")).lineHeight) || 0;
     const top = row.getBoundingClientRect().top - document.getElementById("cols").getBoundingClientRect().top;
-    sec.style.marginTop = top + "px";
+    sec.style.marginTop = Math.max(0, top - 7 * lineH) + "px";
 }
 
 function toggleDetail() {
