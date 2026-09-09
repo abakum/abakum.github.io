@@ -819,6 +819,9 @@ applyTheme();
     // фигурку никто не видит. Боковые фоновые звёзды выше ждут не ждут.
     // Знак считаем инлайн: norm360/MZODIAC_* объявлены const НИЖЕ по
     // скрипту (TDZ), а moonNew — hoisted function declaration, доступна.
+    // moonNew ждёт дату по МСК (внутри вычитает TZ_MS): передаём
+    // Date.now() + TZ_MS, как в renderNow() — иначе фигурка считается по
+    // положению Луны 3 часа назад и расходится со строкой знака в «Сейчас».
     // Отдельной проверки тёмной темы не нужно: вне её #ptrStars прозрачен.
     let zodiacDrawn = false;
     function drawZodiac() {
@@ -838,7 +841,7 @@ applyTheme();
             { name: "водолей", seg: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]], pts: [[.15, .30, 2], [.30, .45, 3], [.45, .30, 2], [.60, .45, 3], [.75, .30, 2], [.85, .55, 1]] },
             { name: "рыбы", seg: [[0, 1], [1, 2], [2, 6], [6, 3], [3, 4], [4, 5]], pts: [[.15, .70, 3], [.25, .55, 2], [.40, .35, 2], [.60, .35, 2], [.75, .55, 2], [.85, .70, 3], [.50, .50, 1]] }
         ];
-        const fig = ZODIAC_FIGS[Math.floor(moonNew(new Date()).longitude / 30) % 12];
+        const fig = ZODIAC_FIGS[Math.floor(moonNew(new Date(Date.now() + TZ_MS)).longitude / 30) % 12];
         const zbox = document.createElement("div");
         zbox.className = "ptr-zodiac";
         // Линии-соединения — SVG под точками (seg — пары индексов pts).
@@ -1053,7 +1056,7 @@ const tithiName = n => n === 15 ? "пурнима" : n === 30 ? "амавась�
 // 1f319.webp 🌙). Считается один раз при загрузке — внутри суток фаза не
 // меняется. Иконка в заголовке остаётся статичной 1f319.webp.
 const ptrMoonBox = document.getElementById("ptrMoon");
-if (ptrMoonBox) ptrMoonBox.textContent = phaseName(tithiInt(moonNew(new Date())), false);
+if (ptrMoonBox) ptrMoonBox.textContent = phaseName(tithiInt(moonNew(new Date(Date.now() + TZ_MS))), false);
 
 const MZODIAC_ICON = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"];
 const MZODIAC_RU = ["овен", "телец", "близнецы", "рак", "лев", "дева", "весы", "скорпион", "стрелец", "козерог", "водолей", "рыбы"];

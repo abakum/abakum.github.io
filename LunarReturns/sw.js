@@ -1,4 +1,4 @@
-const CACHE = "lunarreturns-v12";
+const CACHE = "lunarreturns-v13";
 // "./" (корень) на VK-хостинге отдаёт 403 — из списка убран: addAll
 // атомарен, один 403 валил весь install → SW не активировался →
 // serviceWorker.ready висел вечно («тишина» 🔔 на прямом URL).
