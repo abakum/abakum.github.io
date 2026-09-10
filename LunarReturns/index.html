@@ -1944,6 +1944,38 @@ async function idbGetKey(key) {
 // браузере (без launch-параметров, vkminiapp=false).
 const VK_WEB_HOST_RE = /^(stage|prod)-app54746591-/;
 
+// GitHub-версия фронтенда (бэкенд Яндекса работает через этот же фронтенд).
+const GITHUB_HOST_RE = /(^|\.)github\.io$/;
+const VK_APP_URL = "https://vk.ru/app54746591";
+const GITHUB_APP_URL = "https://abakum.github.io/LunarReturns";
+
+// Перекрёстные ссылки на другие версии в подвале: создаём их из JS (не в
+// разметке) и никогда не в VK-режиме (модерация запрещает <a href> в DOM
+// мини-аппа, см. renderSwVersion). GitHub-версия → только «VK mini app»;
+// прочие не-VK орижины → «VK mini app» + «Yandex Cloud».
+function renderOriginLinks() {
+    if (vkminiapp || VK_WEB_HOST_RE.test(location.hostname)) return;
+    if (document.getElementById("originLinks")) return;
+    const host = document.getElementById("swver");
+    if (!host) return;
+    const links = GITHUB_HOST_RE.test(location.hostname)
+        ? [["VK mini app", VK_APP_URL]]
+        : [["VK mini app", VK_APP_URL], ["Yandex Cloud", GITHUB_APP_URL]];
+    const wrap = document.createElement("span");
+    wrap.id = "originLinks";
+    links.forEach(([text, url], i) => {
+        if (i > 0) wrap.appendChild(document.createTextNode(" "));
+        const a = document.createElement("a");
+        a.href = url;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.style.color = "var(--muted)";
+        a.textContent = text;
+        wrap.appendChild(a);
+    });
+    host.appendChild(wrap);
+}
+
 async function renderSwVersion() {
     const el = document.getElementById("swverText");
     // Ссылка на issues — только вне VK (в VK-режиме DOM без <a href>,
@@ -3343,6 +3375,7 @@ if (!hashSelect()) autoTapToday();
 refreshPushBtn();
 renderPushLog();
 renderSwVersion();
+renderOriginLinks();
 idbPutDb();
 if (vkminiapp) {
     // Мини-апп ВКонтакте: сервис-воркер и PWA не используются.
