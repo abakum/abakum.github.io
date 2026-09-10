@@ -980,16 +980,23 @@ applyTheme();
 // Гейт ВК-пушей (кнопка 🔔, подписка): платформа разрешает уведомления
 // только «доверенным» приложениям, поэтому включаем их выборочно по origin
 // хостинга ВК.
-// TEMP(публикация): пуши показываем и пробуем ТОЛЬКО на stage-origin
-// (тестирование подписки), на prod — не показываем, чтобы пройти
-// модерацию без ошибок от prod-фич. После отладки подписки на
-// опубликованном приложении вернуть исходное выражение и VK_PUSH_CONSENT
-// переключить в true:
+// TEMP(модерация): пуши показываем и пробуем ТОЛЬКО на stage-origin
+// (тестирование подписки и полного флоу согласия), на prod — не
+// показываем, чтобы пройти модерацию без ошибок от prod-фич. После
+// отладки на опубликованном приложении вернуть исходное выражение и
+// константу согласия:
 //   const vkPushEnabled = vkminiapp && /^https:\/\/prod-/.test(location.origin);
+//   const VK_PUSH_CONSENT = true;
 const vkPushEnabled = vkminiapp && /^https:\/\/stage-/.test(location.origin);
-// TEMP(публикация): чекбокс согласия на пуш-ПДн скрыт — серверу уходит
-// только vk_user_id и обезличенные MM-DD (без имён), согласие не требуется.
-const VK_PUSH_CONSENT = false;
+// Согласие на пуш-ПДн обязательно там, где включены ВК-пуши: vk_user_id —
+// ПДн (идентификатор ВКонтакте хранится в облаке Яндекса, текст — в
+// разметке pdPushConsentText). Сейчас это stage+VK: полный флоу согласия
+// (чекбокс, гейт 🔔, отзыв→отписка) отлаживается до модерации. На prod
+// флаг false: чекбокс временно не показывается (vkPushEnabled=false).
+// Прямой stage-URL в браузере не задействован: нет vk_app_id →
+// vkminiapp=false, веб-путь это согласие не использует (ВК id туда не
+// передаётся).
+const VK_PUSH_CONSENT = vkPushEnabled;
 
 function lrSeedJson() {
     return JSON.stringify([{ n: "Ада", d: "1815-12-10" }]);
@@ -2273,9 +2280,11 @@ function pushConsentGiven() {
 }
 
 function initPushConsent() {
-    // TEMP(публикация): чекбокс согласия скрыт (VK_PUSH_CONSENT=false) —
-    // согласие не требуется, данные обезличены; логика вернётся вместе с
-    // prod-выражением vkPushEnabled.
+    // Показ только в ВК-режиме там, где включены ВК-пуши (сейчас — stage,
+    // см. vkPushEnabled/VK_PUSH_CONSENT). Без галочки 🔔 скрыт
+    // (refreshPushBtn), подписка и авто-обновление дат не уходят
+    // (togglePushVk/updatePushDates); отзыв согласия при подписке —
+    // confirm → отписка (ниже).
     if (!vkPushEnabled || !VK_PUSH_CONSENT) return;
     document.getElementById("pdPushConsentLabel").style.display = "block";
     const cb = document.getElementById("pdPushConsent");
