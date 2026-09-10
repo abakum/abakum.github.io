@@ -516,7 +516,7 @@
                 <button type="button" onclick="toggleDays('catholic')" title="Католические дни">✝️</button>
                 <button type="button" onclick="toggleDays('jewish')" title="Иудейские дни">✡️</button>
             </span>
-            <button id="pushBtn" onclick="togglePush()" title="Включить оповещения о днях">🔕</button>
+            <button id="pushBtn" onclick="togglePush()" title="Включить уведомления о днях">🔕</button>
             <button id="loginBtn" onclick="loginYandex()" title="Войти через Яндекс">🔑</button>
             <button id="cloudPutBtn" onclick="cloudPut(this)" title="Сохранить базу в облако" style="display:none;">📤</button>
             <button id="cloudGetBtn" onclick="cloudGet(this)" title="Загрузить базу из облака" style="display:none;">📥</button>
@@ -2331,7 +2331,7 @@ function initPushConsent() {
             return;
         }
         const subscribed = localStorage.getItem(VKPUSH_KEY) === "1";
-        if (subscribed && !await confirmAuto("Отозвать", "согласие и удалить подписку на оповещения из облака Яндекса?")) {
+        if (subscribed && !await confirmAuto("Отозвать", "согласие и удалить подписку на уведомления из облака Яндекса?")) {
             cb.checked = true;
             return;
         }
@@ -3139,7 +3139,7 @@ function vkSendTimeout(method, ms) {
 
 async function togglePushVk() {
     if (!vkPushEnabled || (VK_PUSH_CONSENT && !pushConsentGiven())) {
-        status("Для оповещений требуется согласие (чекбокс под списком)", true);
+        status("Для уведомлений требуется согласие (чекбокс под списком)", true);
         return;
     }
     if (localStorage.getItem(VKPUSH_KEY) === "1") {
@@ -3147,15 +3147,15 @@ async function togglePushVk() {
         localStorage.removeItem(VKPUSH_PROBE_KEY);
         pushApi("vk_unsubscribe", { launch_params: vkLaunchParams() }).catch(() => { });
         if (window.vkBridge) vkBridge.send("VKWebAppDenyNotifications").catch(() => { });
-        status("Оповещения отключены");
+        status("Уведомления отключены");
         return;
     }
     if (!new URLSearchParams(location.search).get("vk_user_id")) {
-        status("Оповещения недоступны (нет vk_user_id в launch-параметрах)", true);
+        status("Уведомления недоступны (нет vk_user_id в launch-параметрах)", true);
         return;
     }
     if (!window.vkBridge) {
-        status("Оповещения недоступны (vk-bridge не загружен)", true);
+        status("Уведомления недоступны (vk-bridge не загружен)", true);
         return;
     }
     const perm = await vkSendTimeout("VKWebAppAllowNotifications", 8000)
@@ -3178,7 +3178,7 @@ async function togglePushVk() {
     lsSet(VKPUSH_KEY, "1");
     if (granted) localStorage.removeItem(VKPUSH_PROBE_KEY);
     else localStorage.setItem(VKPUSH_PROBE_KEY, "1");
-    status(granted ? "Оповещения включены" : "Тестовая подписка создана (разрешение не выдано)");
+    status(granted ? "Уведомления включены" : "Тестовая подписка создана (разрешение не выдано)");
 }
 
 function updatePushDates() {
@@ -3202,13 +3202,13 @@ async function togglePush() {
     try {
         if (vkminiapp) {
             if (!PUSH_URL) {
-                status("Оповещения недоступны (нет PUSH_URL)", true);
+                status("Уведомления недоступны (нет PUSH_URL)", true);
                 return;
             }
             await togglePushVk();
         } else {
             if (!("serviceWorker" in navigator) || !PUSH_URL || !PUSH_PUBLIC_KEY) {
-                status("Оповещения недоступны (нет PUSH_URL или ключа)", true);
+                status("Уведомления недоступны (нет PUSH_URL или ключа)", true);
                 return;
             }
             // Фидбек на каждом шаге: раньше «тишина» на прямом URL была из-за
@@ -3223,7 +3223,7 @@ async function togglePush() {
             if (sub) {
                 await sub.unsubscribe();
                 pushApi("unsubscribe", { endpoint: sub.endpoint }).catch(() => { });
-                status("Оповещения отключены");
+                status("Уведомления отключены");
             } else {
                 status("Ожидание разрешения браузера…");
                 if ((await Notification.requestPermission()) !== "granted") {
@@ -3235,11 +3235,11 @@ async function togglePush() {
                     applicationServerKey: b64urlToUint8(PUSH_PUBLIC_KEY)
                 });
                 await pushApi("subscribe", { subscription: newSub.toJSON(), dates: allPushDates() });
-                status("Оповещения включены");
+                status("Уведомления включены");
             }
         }
     } catch (e) {
-        status("Ошибка оповещений: " + e.message, true);
+        status("Ошибка уведомлений: " + e.message, true);
     }
     refreshPushBtn();
 }
@@ -3251,7 +3251,7 @@ function refreshPushBtn() {
         btn.style.display = "";
         const on = localStorage.getItem(VKPUSH_KEY) === "1";
         btn.textContent = on ? "🔔" : "🔕";
-        btn.title = on ? "Отключить оповещения о днях" : "Включить оповещения о днях";
+        btn.title = on ? "Отключить уведомления о днях" : "Включить уведомления о днях";
         return;
     }
     if (!("serviceWorker" in navigator) || location.protocol !== "https:" || !PUSH_URL || !PUSH_PUBLIC_KEY) {
@@ -3260,7 +3260,7 @@ function refreshPushBtn() {
     }
     getPushSubscription().then(sub => {
         btn.textContent = sub ? "🔔" : "🔕";
-        btn.title = sub ? "Отключить оповещения о днях" : "Включить оповещения о днях";
+        btn.title = sub ? "Отключить уведомления о днях" : "Включить уведомления о днях";
     });
 }
 
