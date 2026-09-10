@@ -1460,9 +1460,14 @@ function selectRecord(i) {
     selectedIdx = i;
     renderList();
     renderResult();
-    if (isTwoCol())
+    if (isTwoCol()) {
         alignResultToRow(i);
-    else
+        // Результат выровнен напротив строки-источника, поэтому подъезжаем к
+        // самой строке: для уже видимой строки scrollIntoView — no-op, а при
+        // автотапе «сегодня» / навигации 🔼🔽 строка может быть за экраном.
+        const row = document.getElementById("list").children[i];
+        if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else
         document.getElementById("resultSec").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
