@@ -1168,17 +1168,21 @@ function status(msg, isError) {
 }
 
 function loadDb() {
+    let broken = false;
     try {
         const raw = localStorage.getItem(DB_KEY);
         if (raw) {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed)) { db = parsed.filter(validRecord); sortDb(); }
         }
-    } catch (e) { }
+    } catch (e) { broken = true; }
     if (db.length === 0) {
         db = [{ n: "Ада", d: "1815-12-10" }];
         adaSeeded = true;
         localStorage.setItem(DB_KEY, JSON.stringify(db));
+        // Важно не потерять молча: испорченный localStorage после перезаписи
+        // восстановить нечем.
+        if (broken) status("Локальная база повреждена — заготовка: Ада", true);
     }
 }
 
@@ -2668,17 +2672,6 @@ function lsSet(key, value) {
     }
 }
 
-// TEMP(отладка синхронизации): видимый след записи/чтения настроек — убрать
-// после починки. Лог не содержит ПДн.
-function vkSyncDebug(msg) {
-    try {
-        const log = JSON.parse(sessionStorage.getItem("lr_vkdbg") || "[]");
-        log.push(new Date().toISOString().slice(11, 19) + " " + msg);
-        sessionStorage.setItem("lr_vkdbg", JSON.stringify(log.slice(-8)));
-    } catch (e) { }
-    status(msg);
-}
-
 // Все настройки — ОДНИМ ключом lr_s_blob (JSON {ключ: значение}): одна запись
 // и одно чтение вместо поштучных вызовов VKWebAppStorageSet/Get. Мобильный
 // клиент ВК троттлит частые вызовы Storage-методов — поштучная схема могла
@@ -2698,7 +2691,7 @@ function flushSettingsBlob() {
     if (!(vkminiapp && window.vkBridge)) return;
     try {
         vkStorageSet(LR_S_BLOB_KEY, JSON.stringify(lrSettingsSnapshot()))
-            .catch(e => vkSyncDebug("ошибка записи блоба настроек: " + vkErr(e)));
+            .catch(e => status("ошибка записи блоба настроек: " + vkErr(e)));
     } catch (e) { }
 }
 
@@ -2732,7 +2725,6 @@ async function vkRestoreSettings() {
     for (const k of Object.keys(ls)) {
         if (!LR_LS_KEYS.includes(k) || typeof ls[k] !== "string") delete ls[k];
     }
-    vkSyncDebug("облако настроек: " + (Object.keys(ls).join(", ") || "пусто"));
     if (!Object.keys(ls).length) return false;
     window.__lrCloudSettings = new Set(Object.keys(ls)); // что уже в облаке
     // Тема: локальное значение к этому моменту — автозапись applyTheme() при
@@ -2775,18 +2767,16 @@ async function vkBackfillSettings() {
 // из head, НЕ пустота базы) и при согласии ПДн — автоподтяжка из облака ВК
 // (vkDbGet; локальная база на свежем origin — сид, диалог объединения не
 // возникает). Настройки восстанавливаются раньше базы: согласие читается уже
-// из восстановленного localStorage. Ошибки облака молча: приложение остаётся
-// работоспособным на локальных данных.
+// из восстановленного localStorage. Ошибка восстановления настроек выводится
+// в статус: приложение остаётся работоспособным на локальных данных.
 async function vkRestoreCloud() {
     if (!window.vkBridge) return;
     try {
         if (await vkRestoreSettings()) vkApplyRestoredSettings();
     } catch (e) {
-        vkSyncDebug("ошибка восстановления: " + vkErr(e)); // TEMP(отладка)
+        status("Ошибка восстановления настроек: " + vkErr(e), true);
     }
     await vkBackfillSettings();
-    vkSyncDebug("согласие после restore: " + pdConsentGiven()
-        + ", freshOrigin: " + !!window.__lrFreshOrigin); // TEMP(отладка)
     if (!window.__lrFreshOrigin || !pdConsentGiven()) return;
     try {
         await cloudRun(() => vkDbGet());
@@ -2829,7 +2819,9 @@ async function vkLegacyWipe(from) {
             if (Number.isInteger(n) && n < from) continue;
             await vkStorageSet(k, "");
         }
-    } catch (e) { }
+    } catch (e) {
+        status("Не удалось зачистить старые ключи облака ВКонтакте: " + vkErr(e), true);
+    }
 }
 
 async function vkDbGet() {
