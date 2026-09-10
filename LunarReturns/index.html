@@ -780,7 +780,10 @@ function refreshThemeOnReturn() {
 }
 
 document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") refreshThemeOnReturn();
+    if (document.visibilityState === "visible") {
+        refreshThemeOnReturn();
+        checkDayRollover();
+    }
 });
 
 if (vkminiapp && window.vkBridge && typeof vkBridge.subscribe === "function") {
@@ -792,7 +795,10 @@ if (vkminiapp && window.vkBridge && typeof vkBridge.subscribe === "function") {
             themeForced = (a === "dark" || a === "light") ? a : null;
             applyTheme();
         } else if (ev.type === "VKWebAppViewRestore") {
-            refreshThemeOnReturn(); // избыточно с visibilitychange, но безвредно
+            // Тема избыточна с visibilitychange; смена суток дублируется,
+            // но checkDayRollover идемпотентен по lrLastDay (см. выше).
+            refreshThemeOnReturn();
+            checkDayRollover();
         }
     });
 }
@@ -1697,6 +1703,13 @@ const mskToday = () => {
     return [t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate()];
 };
 
+// День (МСК) последнего выполненного автопоиска именинника: стартовый прогон
+// идёт ниже по скрипту (autoTapToday), далее checkDayRollover() перезапускает
+// его при возврате из фона в новые сутки. Инициализация на месте объявления —
+// события возврата, пришедшие до конца исполнения скрипта, не дают ложного
+// «перевода суток» до завершения стартовой последовательности.
+let lrLastDay = mskToday().join("-");
+
 let dayStart = 0, dayEnd = 0, dayKind = "";
 
 const ORTH_OFFS = [[-7, "Вход Господень в Иерусалим"], [-1, "Великая Суббота"], [0, "Пасха"], [9, "Радоница"], [39, "Вознесение Господне"], [49, "День Святой Троицы"]];
@@ -2591,6 +2604,43 @@ function autoTapToday() {
             toggleReligionBtns();
         }
     } catch (e) { }
+}
+
+// UI занят для перезапуска автопоиска при возврате из фона: открытый диалог
+// (иначе re-render списка под модалом) или несохранённый ввод в форме
+// (иначе startEdit затёр бы набранный текст). При редактировании поля
+// сравниваются с тем, что записал бы startEdit(editingIdx) (город он
+// сбрасывает в ""), в режиме добавления занятость — любое непустое поле.
+function lrFormBusy() {
+    if (document.getElementById("confirmOverlay").classList.contains("open")
+        || document.getElementById("pasteOverlay").classList.contains("open")) return true;
+    const g = id => document.getElementById(id).value;
+    if (editingIdx >= 0 && db[editingIdx]) {
+        const r = db[editingIdx];
+        return g("fName") !== r.n || g("fDate") !== r.d
+            || g("fHour") !== ("h" in r ? String(r.h) : "")
+            || g("fMin") !== ("m" in r ? String(r.m) : "")
+            || g("fCity") !== "";
+    }
+    return g("fName") !== "" || g("fDate") !== "" || g("fHour") !== ""
+        || g("fMin") !== "" || g("fCity") !== "";
+}
+
+// Возврат из фона в новые сутки (МСК): перезапуск стартовой связки
+// renderList + renderNow + autoTapToday — ровно то, что видно при повторном
+// открытии приложения в новые сутки (иначе без именинника остаётся вчерашняя
+// строка «Сейчас» или вчерашний выбранный результат). Занятый UI пропускает
+// прогон БЕЗ фиксации даты — проверка повторится при следующем скрытии/возврате.
+// Идемпотентен: visibilitychange и VKWebAppViewRestore приходят вместе,
+// второй вызов видит уже обновлённый lrLastDay и ничего не делает.
+function checkDayRollover() {
+    const today = mskToday().join("-");
+    if (today === lrLastDay) return;
+    if (lrFormBusy()) return;
+    lrLastDay = today;
+    renderList();
+    renderNow();
+    autoTapToday();
 }
 
 // Навигация 🔼🔽 между именинниками сегодняшнего дня (см. updateTodayNav).
