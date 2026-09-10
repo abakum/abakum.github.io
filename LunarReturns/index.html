@@ -1891,7 +1891,11 @@ function toggleReligionBtns() {
         for (const el of els) { savedUiDisp.push([el, el.style.display]); el.style.display = "none"; }
         rb.style.display = "inline";
         hideResult();
-        if (dayKind) renderDays(dayKind);
+        if (dayKind) {
+            const items = buildDays(dayKind);
+            renderDays(dayKind, items);
+            scrollToTodayDay(items);
+        }
     } else {
         if (savedUiDisp) for (const [el, d] of savedUiDisp) el.style.display = d;
         savedUiDisp = null;
@@ -2128,9 +2132,22 @@ function toggleDays(kind) {
     dayKind = kind;
     hideResult();
     renderDays(kind, items);
+    scrollToTodayDay(items);
     renderTitle();
     saveDayKind();
     updateReligionActions();
+}
+
+// Прокрутка к сегодняшнему религиозному дню после открытия списка: buildDays
+// фильтрует дни от сегодняшнего JDN (dayStart) и сортирует, поэтому сегодняшнее
+// событие, когда оно есть, — всегда первая строка списка. Центрируем её, как
+// selectRecord делает для строки именинника.
+function scrollToTodayDay(items) {
+    try {
+        if (!dayKind || !items || !items.length || items[0][0] !== dayStart) return;
+        const row = document.getElementById(dayKind).querySelector(".row");
+        if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch (e) { }
 }
 
 function religionDates() {
