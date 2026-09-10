@@ -610,7 +610,10 @@ const PD_PUSH_CONSENT_KEY = "lunarreturns.pdPushConsent";
 const VKPUSH_KEY = "lunarreturns.vkpush";
 // Пробная VK-подписка (stage, разрешение до модерации недоступно): сервер
 // хранит её с пустыми dates; флаг передаётся и в updatePushDates, чтобы
-// авто-обновление дат не «оживило» запись до выдачи разрешения.
+// авто-обновление дат не «оживило» запись до выдачи разрешения. Синхронизируется
+// с облаком ВК (в LR_LS_KEYS): при смене версии origin VKPUSH_KEY
+// восстановился бы без probe-флага и updatePushDates отправил бы
+// vk_subscribe с реальными датами — «оживил» бы непрошедшую модерацию запись.
 const VKPUSH_PROBE_KEY = "lunarreturns.vkpushProbe";
 // Тема ("dark"/"light"): пишется applyTheme(), читается ранним скриптом в head
 // до первого кадра — убирает светлую вспышку при PTR-reload в нативном клиенте.
@@ -618,7 +621,7 @@ const THEME_KEY = "lunarreturns.theme";
 // Настройки, синхронизируемые с облаком ВКонтакте (ОДИН блоб-ключ lr_s_blob
 // в VKWebAppStorage; значения — не ПДн). Запись — lsSet() (дебаунс → один
 // вызов), чтение/применение — vkRestoreCloud() на свежем origin.
-const LR_LS_KEYS = [DAYS_KEY, PD_CONSENT_KEY, PD_PUSH_CONSENT_KEY, VKPUSH_KEY, THEME_KEY];
+const LR_LS_KEYS = [DAYS_KEY, PD_CONSENT_KEY, PD_PUSH_CONSENT_KEY, VKPUSH_KEY, VKPUSH_PROBE_KEY, THEME_KEY];
 // Префикс СТАРЫХ поштучных ключей настроек (миграция на блоб в
 // vkRestoreSettings; объявлен здесь, т.к. используется в нескольких местах).
 const LR_S_PREFIX = "lr_s_";
@@ -626,6 +629,14 @@ const LR_S_PREFIX = "lr_s_";
 // вызова lsSet() (верхнеуровневый applyTheme() в блоке темы) — иначе TDZ.
 const LR_S_BLOB_KEY = "lr_s_blob";
 let lrBlobFlushTimer = null;
+// Фоновая запись блоба удерживается до завершения первого восстановления
+// настроек (vkRestoreCloud): стартовый lsSet (автотема в applyTheme) уходит
+// в дебаунс и иначе мог перезаписать блоб раньше, чем restore прочитает его
+// и дополнит localStorage, — облако теряло настройки при смене версии origin.
+// Пропущенные за время удержания записи помечаются и уходят одним флшем
+// после снятия удержания (снимок — уже с восстановленными ключами).
+let lrBlobHold = 1;
+let lrBlobHoldDirty = false;
 // Облако ВК, база: один ключ = массив записей (JSON), пакуем по байтовому
 // бюджету (лимит значения VK Storage — 4096 байт, проверяем по факту).
 // Число занятых ключей данных — в служебном ключе VK_DB_CNT_KEY ("cnt").
@@ -2311,6 +2322,17 @@ function pushConsentGiven() {
     return localStorage.getItem(PD_PUSH_CONSENT_KEY) === "1";
 }
 
+// Синхронизация чекбокса пуш-согласия с localStorage. Стартовая отрисовка
+// (initPushConsent) выполняется ДО восстановления из облака, поэтому на
+// свежем origin согласие нужно перечитать после restore
+// (vkApplyRestoredSettings) — иначе оно выглядит потерянным.
+function syncPushConsentUi() {
+    const cb = document.getElementById("pdPushConsent");
+    if (!cb) return;
+    cb.checked = pushConsentGiven();
+    document.getElementById("pdPushWithdrawNote").style.display = cb.checked ? "" : "none";
+}
+
 function initPushConsent() {
     // Показ только в ВК-режиме там, где включены ВК-пуши (сейчас — stage,
     // см. vkPushEnabled/VK_PUSH_CONSENT). Без галочки 🔔 скрыт
@@ -2321,8 +2343,7 @@ function initPushConsent() {
     document.getElementById("pdPushConsentLabel").style.display = "block";
     const cb = document.getElementById("pdPushConsent");
     const note = document.getElementById("pdPushWithdrawNote");
-    cb.checked = pushConsentGiven();
-    note.style.display = cb.checked ? "" : "none";
+    syncPushConsentUi();
     cb.addEventListener("change", async () => {
         if (cb.checked) {
             lsSet(PD_PUSH_CONSENT_KEY, "1");
@@ -2339,6 +2360,7 @@ function initPushConsent() {
         note.style.display = "none";
         if (subscribed) {
             lsSet(VKPUSH_KEY, null);
+            lsSet(VKPUSH_PROBE_KEY, null);
             pushApi("vk_unsubscribe", { launch_params: vkLaunchParams() }).catch(() => { });
             if (window.vkBridge) vkBridge.send("VKWebAppDenyNotifications").catch(() => { });
             status("Согласие отозвано: подписка удалена из облака Яндекса");
@@ -2730,6 +2752,7 @@ function lrSettingsSnapshot() {
 function flushSettingsBlob() {
     lrBlobFlushTimer = null;
     if (!(vkminiapp && window.vkBridge)) return;
+    if (lrBlobHold) { lrBlobHoldDirty = true; return; }
     try {
         vkStorageSet(LR_S_BLOB_KEY, JSON.stringify(lrSettingsSnapshot()))
             .catch(e => status("ошибка записи блоба настроек: " + vkErr(e)));
@@ -2788,6 +2811,7 @@ function vkApplyRestoredSettings() {
     if (themeForced) applyTheme(); // перекраска под восстановленную тему
     const cb = document.getElementById("pdConsent");
     if (cb) cb.checked = pdConsentGiven();
+    syncPushConsentUi();
     applyPdConsent();
     refreshPushBtn();
 }
@@ -2810,19 +2834,29 @@ async function vkBackfillSettings() {
 // возникает). Настройки восстанавливаются раньше базы: согласие читается уже
 // из восстановленного localStorage. Ошибка восстановления настроек выводится
 // в статус: приложение остаётся работоспособным на локальных данных.
+// Запись блоба настроек удерживается до завершения (lrBlobHold): стартовые
+// автозаписи (тема) не затирают блоб до или во время чтения.
 async function vkRestoreCloud() {
-    if (!window.vkBridge) return;
     try {
-        if (await vkRestoreSettings()) vkApplyRestoredSettings();
-    } catch (e) {
-        status("Ошибка восстановления настроек: " + vkErr(e), true);
+        if (!window.vkBridge) return;
+        try {
+            if (await vkRestoreSettings()) vkApplyRestoredSettings();
+        } catch (e) {
+            status("Ошибка восстановления настроек: " + vkErr(e), true);
+        }
+        await vkBackfillSettings();
+        if (!window.__lrFreshOrigin || !pdConsentGiven()) return;
+        try {
+            await cloudRun(() => vkDbGet());
+            autoTapToday();
+        } catch (e) { }
+    } finally {
+        // Удержание снято: отложенные за время restore записи (в т.ч.
+        // стартовая автотема) уходят одним флшем поверх восстановленного
+        // localStorage.
+        lrBlobHold = 0;
+        if (lrBlobHoldDirty) { lrBlobHoldDirty = false; flushSettingsBlob(); }
     }
-    await vkBackfillSettings();
-    if (!window.__lrFreshOrigin || !pdConsentGiven()) return;
-    try {
-        await cloudRun(() => vkDbGet());
-        autoTapToday();
-    } catch (e) { }
 }
 
 async function vkDbPut() {
@@ -3144,7 +3178,7 @@ async function togglePushVk() {
     }
     if (localStorage.getItem(VKPUSH_KEY) === "1") {
         lsSet(VKPUSH_KEY, null);
-        localStorage.removeItem(VKPUSH_PROBE_KEY);
+        lsSet(VKPUSH_PROBE_KEY, null);
         pushApi("vk_unsubscribe", { launch_params: vkLaunchParams() }).catch(() => { });
         if (window.vkBridge) vkBridge.send("VKWebAppDenyNotifications").catch(() => { });
         status("Уведомления отключены");
@@ -3164,8 +3198,9 @@ async function togglePushVk() {
     // TEMP(публикация): на stage до модерации разрешение недоступно —
     // тестируем конвейер: подписываемся с lr_stage_probe (сервер хранит
     // запись с ПУСТЫМИ dates — рассылка на неё не идёт). На prod байпаса
-    // нет. Пробный режим помечаем локально (VKPUSH_PROBE), чтобы
-    // updatePushDates тоже передавал флаг и не «оживлял» запись.
+    // нет. Пробный режим помечаем флагом (VKPUSH_PROBE, синхронизируется
+    // с облаком ВК), чтобы updatePushDates тоже передавал флаг и не
+    // «оживлял» запись.
     const stageTest = vkBuildVersion.startsWith("stage-");
     if (!granted && !stageTest) {
         status("Разрешение на уведомления не выдано (" + vkErr(perm && perm.error) + ")", true);
@@ -3176,8 +3211,8 @@ async function togglePushVk() {
         granted ? { } : { lr_stage_probe: 1 }
     ));
     lsSet(VKPUSH_KEY, "1");
-    if (granted) localStorage.removeItem(VKPUSH_PROBE_KEY);
-    else localStorage.setItem(VKPUSH_PROBE_KEY, "1");
+    if (granted) lsSet(VKPUSH_PROBE_KEY, null);
+    else lsSet(VKPUSH_PROBE_KEY, "1");
     status(granted ? "Уведомления включены" : "Тестовая подписка создана (разрешение не выдано)");
 }
 
