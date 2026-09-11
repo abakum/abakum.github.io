@@ -590,8 +590,7 @@
 <b>Великое слияние:</b> сложение лунного 8-летнего и недельного 11-летнего циклов (8+11) дает 19-летний Метонов цикл. При этом +38 часов 11 минут погрешности 8-летнего цикла складываются с -36 часами 6 минутами погрешности 11-летнего цикла, снижая общую погрешность до 2 часов 5 минут.</li>
 </p>
 <div id="pushlog" style="display:none; font-size:0.85em; color:var(--muted2); white-space:pre-line;"></div>
-<!-- Ссылка «Сообщить об ошибке» создаётся JS только вне VK (renderSwVersion):
-     в VK-режиме DOM не содержит <a href> (требование модерации). -->
+
 <div id="swver" style="font-size:0.85em; color:var(--muted2); min-height:1.2em;">
     <span id="swverText"></span>
 </div>
@@ -608,12 +607,6 @@ const DAYS_KEY = "lunarreturns.days";
 const PD_CONSENT_KEY = "lunarreturns.pdConsent";
 const PD_PUSH_CONSENT_KEY = "lunarreturns.pdPushConsent";
 const VKPUSH_KEY = "lunarreturns.vkpush";
-// Пробная VK-подписка (stage, разрешение до модерации недоступно): сервер
-// хранит её с пустыми dates; флаг передаётся и в updatePushDates, чтобы
-// авто-обновление дат не «оживило» запись до выдачи разрешения. Синхронизируется
-// с облаком ВК (в LR_LS_KEYS): при смене версии origin VKPUSH_KEY
-// восстановился бы без probe-флага и updatePushDates отправил бы
-// vk_subscribe с реальными датами — «оживил» бы непрошедшую модерацию запись.
 const VKPUSH_PROBE_KEY = "lunarreturns.vkpushProbe";
 // Тема ("dark"/"light"): пишется applyTheme(), читается ранним скриптом в head
 // до первого кадра — убирает светлую вспышку при PTR-reload в нативном клиенте.
@@ -984,35 +977,13 @@ applyTheme();
     }, { passive: true });
 })();
 
-// ---- Смена версии VK-хостинга: облако ВК вместо миграции ----
-// Каждая выкладка получает новый stage-URL (новый origin) с пустым
-// localStorage. Переходов между origins больше нет (требование модерации:
-// ни <a href>, ни location.replace): настройки (не ПДн, LR_LS_KEYS)
-// синхронизируются с облаком ВК под ключами lr_s_* (lsSet/vkRestoreSettings),
-// база — при согласии ПДн в ключах-чанках «0»..«K-1» + счётчик «cnt»
-// (vkDbPut/vkDbGet).
-// Свежий origin детектится в head по пустоте сохранённой ширины колонки
-// (window.__lrFreshOrigin), не по пустоте базы; восстановление на запуске —
-// vkRestoreCloud().
 // Гейт ВК-пушей (кнопка 🔔, подписка): платформа разрешает уведомления
 // только «доверенным» приложениям, поэтому включаем их выборочно по origin
 // хостинга ВК.
-// TEMP(модерация): пуши показываем и пробуем ТОЛЬКО на stage-origin
-// (тестирование подписки и полного флоу согласия), на prod — не
-// показываем, чтобы пройти модерацию без ошибок от prod-фич. После
-// отладки на опубликованном приложении вернуть исходное выражение и
-// константу согласия:
 //   const vkPushEnabled = vkminiapp && /^https:\/\/prod-/.test(location.origin);
 //   const VK_PUSH_CONSENT = true;
 const vkPushEnabled = vkminiapp && /^https:\/\/stage-/.test(location.origin);
-// Согласие на пуш-ПДн обязательно там, где включены ВК-пуши: vk_user_id —
-// ПДн (идентификатор ВКонтакте хранится в облаке Яндекса, текст — в
-// разметке pdPushConsentText). Сейчас это stage+VK: полный флоу согласия
-// (чекбокс, гейт 🔔, отзыв→отписка) отлаживается до модерации. На prod
-// флаг false: чекбокс временно не показывается (vkPushEnabled=false).
-// Прямой stage-URL в браузере не задействован: нет vk_app_id →
-// vkminiapp=false, веб-путь это согласие не использует (ВК id туда не
-// передаётся).
+
 const VK_PUSH_CONSENT = vkPushEnabled;
 
 function lrSeedJson() {
@@ -1977,10 +1948,6 @@ const GITHUB_HOST_RE = /(^|\.)github\.io$/;
 const VK_APP_URL = "https://vk.ru/app54746591";
 const GITHUB_APP_URL = "https://abakum.github.io/LunarReturns";
 
-// Перекрёстные ссылки на другие версии в подвале: создаём их из JS (не в
-// разметке) и никогда не в VK-режиме (модерация запрещает <a href> в DOM
-// мини-аппа, см. renderSwVersion). GitHub-версия → только «VK mini app»;
-// прочие не-VK орижины → «VK mini app» + «Yandex Cloud».
 function renderOriginLinks() {
     if (vkminiapp || VK_WEB_HOST_RE.test(location.hostname)) return;
     if (document.getElementById("originLinks")) return;
@@ -2006,9 +1973,6 @@ function renderOriginLinks() {
 
 async function renderSwVersion() {
     const el = document.getElementById("swverText");
-    // Ссылка на issues — только вне VK (в VK-режиме DOM без <a href>,
-    // требование модерации); на прямом VK-хостинг-URL она тоже не нужна,
-    // там версия берётся прямо из sw.js (const CACHE).
     if (!vkminiapp && !VK_WEB_HOST_RE.test(location.hostname) && !document.getElementById("bugLink")) {
         const a = document.createElement("a");
         a.id = "bugLink";
@@ -2412,9 +2376,6 @@ function applyVkUi() {
     if (t) t.textContent = "Разрешаю хранить📤 персональные данные (ПДн: названия событий и даты) в облаке ВКонтакте согласно 152-ФЗ и GDPR.";
     const w = document.getElementById("pdWithdrawNote");
     if (w) w.textContent = "Отзыв согласия удаляет ПДн из облака ВКонтакте.";
-    // Строку версии не прячем: в мини-аппе вместо версии SW показывается
-    // версия VK-сборки (см. renderSwVersion). Ссылки на issues в VK-режиме
-    // нет в разметке — DOM мини-аппа не содержит <a href> (модерация ВК).
 }
 
 // Строки согласия ПДн имеют смысл только на «домашних» адресах: каноническом
@@ -3262,12 +3223,6 @@ async function togglePushVk() {
     const perm = await vkSendTimeout("VKWebAppAllowNotifications", 8000)
         .catch(e => ({ error: e }));
     const granted = !!perm && perm.result === true && !perm.error;
-    // TEMP(публикация): на stage до модерации разрешение недоступно —
-    // тестируем конвейер: подписываемся с lr_stage_probe (сервер хранит
-    // запись с ПУСТЫМИ dates — рассылка на неё не идёт). На prod байпаса
-    // нет. Пробный режим помечаем флагом (VKPUSH_PROBE, синхронизируется
-    // с облаком ВК), чтобы updatePushDates тоже передавал флаг и не
-    // «оживлял» запись.
     const stageTest = vkBuildVersion.startsWith("stage-");
     if (!granted && !stageTest) {
         status("Разрешение на уведомления не выдано (" + vkErr(perm && perm.error) + ")", true);
