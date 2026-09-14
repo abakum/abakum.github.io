@@ -1190,7 +1190,15 @@ function setFooter(open, persist) {
     b.setAttribute("aria-expanded", String(open));
     if (persist) { try { localStorage.setItem(FOOTER_KEY, open ? "1" : "0"); } catch (e) {} }
 }
-function toggleFooter() { setFooter(!footerOpen(), true); }
+function toggleFooter() {
+    setFooter(!footerOpen(), true);
+    if (footerOpen()) {
+        // Показанный подвал должен быть виден целиком: после применения
+        // layout доскролливаем страницу до его нижнего края.
+        requestAnimationFrame(() =>
+            document.getElementById("footerSec").scrollIntoView({ block: "end", behavior: "smooth" }));
+    }
+}
 
 function loadDb() {
     let broken = false;
