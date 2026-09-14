@@ -363,6 +363,8 @@
         .qr img, .qr svg { max-width: 100%; height: auto; }
         #status { color: var(--muted); min-height: 1.2em; overflow-wrap: anywhere; }
         #status.error { color: var(--err); }
+        /* Кнопка-глаз: вход в подвал (#footer: согласия, статус/теория,
+           журнал пушей, версия). Стиль — как у всех кнопок. */
         .btnrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
         #cols { display: block; }
         /* В одну колонку первая колонка сохраняет ширину, заданную разделителем
@@ -569,6 +571,9 @@
     </section>
 </div>
 
+    <section id="footerSec">
+    <button type="button" id="footerToggle" onclick="toggleFooter()" title="Показать детали" aria-expanded="false" aria-controls="footer">👁</button>
+    <div id="footer" hidden>
     <label id="pdConsentLabel" style="display:block; font-size:0.9em; color:var(--muted);">
         <input type="checkbox" id="pdConsent">
         <span id="pdConsentText">Разрешаю хранить🔑📤 персональные данные (ПДн: названия событий и даты) в облаке Яндекс согласно 152-ФЗ и GDPR.</span> <span id="pdWithdrawNote" style="display:none;">Отзыв согласия удаляет ПДн из облака Яндекс.</span>
@@ -594,6 +599,8 @@
 <div id="swver" style="font-size:0.85em; color:var(--muted2); min-height:1.2em;">
     <span id="swverText"></span>
 </div>
+    </div>
+    </section>
 
 <!-- vk-bridge @3.0.2, локальная копия: https://unpkg.com/@vkontakte/vk-bridge@3.0.2/dist/browser.min.js -->
 <script src="./vendor/vk-bridge.min.js"></script>
@@ -1160,7 +1167,26 @@ function status(msg, isError) {
     const el = document.getElementById("status");
     el.textContent = msg;
     el.className = isError ? "error" : "";
+    // Ошибка должна быть видна всегда: подвал (#footer) раскрывается
+    // принудительно, БЕЗ записи выбора в localStorage (см. setFooter).
+    if (isError) setFooter(true, false);
 }
+
+// ---- Подвал (#footer): согласия, статус/теория, журнал пушей, версия ----
+// Скрыт по умолчанию (ненавязчивость); вход — «призрачная» кнопка-глаз
+// #footerToggle. Выбор помнится локально (FOOTER_KEY, не синхронизируется
+// в облако ВК). Ошибки статуса раскрывают подвал принудительно (см. status()).
+const FOOTER_KEY = "lunarreturns.footer";
+function footerOpen() { return !document.getElementById("footer").hidden; }
+function setFooter(open, persist) {
+    document.getElementById("footer").hidden = !open;
+    const b = document.getElementById("footerToggle");
+    b.textContent = open ? "ⓘ" : "👁";
+    b.title = open ? "Скрыть детали" : "Показать детали";
+    b.setAttribute("aria-expanded", String(open));
+    if (persist) { try { localStorage.setItem(FOOTER_KEY, open ? "1" : "0"); } catch (e) {} }
+}
+function toggleFooter() { setFooter(!footerOpen(), true); }
 
 function loadDb() {
     let broken = false;
@@ -3418,6 +3444,12 @@ function recalcLayout() {
 document.addEventListener("keydown", e => {
     if (e.key === "Escape" && document.getElementById("confirmOverlay").style.display === "flex") closeConfirm(false);
 });
+
+// Применяем сохранённое состояние подвала до loadDb(): ошибки старта (напр.
+// «Локальная база повреждена») через status(..., true) раскрыт его поверх.
+let savedFooter = null;
+try { savedFooter = localStorage.getItem(FOOTER_KEY); } catch (e) {}
+setFooter(savedFooter === "1", false);
 
 loadDb();
 loadDayKind();
