@@ -364,7 +364,11 @@
         #status { color: var(--muted); min-height: 1.2em; overflow-wrap: anywhere; }
         #status.error { color: var(--err); }
         /* Кнопка-глаз: вход в подвал (#footer: согласия, статус/теория,
-           журнал пушей, версия). Стиль — как у всех кнопок. */
+           журнал пушей, версия). Стиль — как у всех кнопок. Отступ до
+           содержимого подвала — только когда подвал показан, чтобы при
+           скрытом подвале и при спрятанных «Разрешаю…» не было лишних
+           двойных промежутков. */
+        #footer:not([hidden]) { margin-top: 1em; }
         .btnrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
         #cols { display: block; }
         /* В одну колонку первая колонка сохраняет ширину, заданную разделителем
