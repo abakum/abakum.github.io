@@ -1888,6 +1888,9 @@ function applyLsParams(ls) {
 
 let savedUiDisp = null;
 let religionMode = false;
+// true, пока режим религии открывается из навигации 🔼🔽 (gotoSameDay):
+// тогда прокрутку/подсветку дня выполняет сам gotoSameDay, а не вход по 🥚.
+let sameDayNav = false;
 
 function toggleReligionBtns() {
     const rb = document.getElementById("religionBtns");
@@ -1907,7 +1910,7 @@ function toggleReligionBtns() {
         if (dayKind) {
             const items = buildDays(dayKind);
             renderDays(dayKind, items);
-            scrollToTodayDay(items);
+            if (!sameDayNav) enterDaysView(items);
         }
     } else {
         if (savedUiDisp) for (const [el, d] of savedUiDisp) el.style.display = d;
@@ -2146,21 +2149,29 @@ function toggleDays(kind) {
     dayKind = kind;
     hideResult();
     renderDays(kind, items);
-    scrollToTodayDay(items);
+    enterDaysView(items);
     renderTitle();
     saveDayKind();
     updateReligionActions();
 }
 
-// Прокрутка к сегодняшнему религиозному дню после открытия списка: buildDays
-// фильтрует дни от сегодняшнего JDN (dayStart) и сортирует, поэтому сегодняшнее
-// событие, когда оно есть, — всегда первая строка списка. Центрируем её, как
-// selectRecord делает для строки именинника.
-function scrollToTodayDay(items) {
+// Вход в список дней по 🥚: buildDays фильтрует дни от сегодняшнего JDN
+// (dayStart) и сортирует, поэтому сегодняшнее событие, когда оно есть, —
+// всегда первая строка списка. Если сегодня есть совпадение — скроллим вверх
+// к заголовку религиозных дней и выделяем первую строку; иначе — только
+// скролл к списку без выделения. Вход через 🔽 (gotoSameDay) этот путь
+// минует: там своя прокрутка к MM-DD с подсветкой.
+function enterDaysView(items) {
     try {
-        if (!dayKind || !items || !items.length || items[0][0] !== dayStart) return;
-        const row = document.getElementById(dayKind).querySelector(".row");
-        if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (!dayKind || !items || !items.length) return;
+        const el = document.getElementById(dayKind);
+        if (items[0][0] === dayStart) {
+            const row = el.querySelector(".row");
+            if (row) row.classList.add("selected");
+        }
+        // Скроллим к самому верху страницы (не к заголовку): заголовок
+        // религиозных дней и первая строка списка остаются на виду.
+        window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) { }
 }
 
@@ -2634,7 +2645,7 @@ const sameDateIdxs = () => {
 // выбранной записи (пара 02-28↔02-29 учитывается sameDateMds). Терминальный
 // шаг навигации 🔼🔽 (см. stepSame): если null — шагов после записей нет.
 // buildDays перезаписывает dayStart/dayEnd, но всегда от «сегодня» — вызов
-// идемпотентен и не конфликтует с scrollToTodayDay.
+// идемпотентен и не конфликтует с enterDaysView.
 function sameDateDay() {
     if (!dayKind) return null;
     const mds = sameDateMds();
@@ -2657,7 +2668,10 @@ function gotoSameDay() {
     try {
         const day = sameDateDay();
         if (!day) return;
-        if (!religionMode) toggleReligionBtns();
+        if (!religionMode) {
+            sameDayNav = true;
+            try { toggleReligionBtns(); } finally { sameDayNav = false; }
+        }
         const items = buildDays(dayKind);
         const el = document.getElementById(dayKind);
         for (const row of el.querySelectorAll(".row")) row.classList.remove("selected");
