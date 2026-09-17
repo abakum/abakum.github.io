@@ -1914,6 +1914,10 @@ function toggleReligionBtns() {
         savedUiDisp = null;
         rb.style.display = "none";
         if (dayKind) hideDaysDiv(dayKind);
+        // 🔙 из режима религии: возвращаем ранее выбранную запись БД —
+        // hideResult() при входе спрятал её результат, а selectedIdx
+        // сохраняется (в т.ч. после gotoSameDay из навигации 🔼🔽).
+        if (selectedIdx >= 0 && db[selectedIdx]) selectRecord(selectedIdx);
     }
     updateReligionActions();
     renderTitle();
