@@ -350,6 +350,7 @@
         #list div.row { cursor: pointer; }
         #list div.row:hover, .days div.row:hover { background: var(--btn); }
         #list div.row.selected { background: var(--sel); }
+        .days div.row.selected { background: var(--sel); }
         #list span.n, .days span.n { flex: 1; color: var(--muted); }
         #list span.d, .days span.d { color: var(--muted); }
         #resultText {
@@ -565,8 +566,8 @@
         <div class="btnrow">
             <button type="button" id="topBtn" onclick="toTop()" title="Наверх">🔝</button>
             <button type="button" id="srcBtn" onclick="scrollToSourceRow()" title="К строке источника" style="display:none;">🔙</button>
-            <button type="button" id="nextBtn" onclick="stepToday(1)" title="Следующий именинник" style="display:none;">🔽</button>
-            <button type="button" id="prevBtn" onclick="stepToday(-1)" title="Предыдущий именинник" style="display:none;">🔼</button>
+            <button type="button" id="nextBtn" onclick="stepSame(1)" title="Следующая запись с этой датой" style="display:none;">🔽</button>
+            <button type="button" id="prevBtn" onclick="stepSame(-1)" title="Предыдущая запись с этой датой" style="display:none;">🔼</button>
             <button type="button" id="detailBtn" onclick="toggleDetail()" title="Сжато">⋯</button>
             <button onclick="copyResult()" title="Копировать текст">⎘</button>
             <button type="button" id="qrBtn" onclick="toggleResultQr()" title="Показать QR результата">⛶</button>
@@ -1890,8 +1891,11 @@ let religionMode = false;
 
 function toggleReligionBtns() {
     const rb = document.getElementById("religionBtns");
+    const egg = document.getElementById("eggBtn");
     const on = rb.style.display === "none";
     religionMode = on;
+    egg.textContent = on ? "🔙" : "🥚";
+    egg.title = on ? "Назад" : "Пасхальное яйцо";
     if (on) {
         savedUiDisp = [];
         const els = [document.getElementById("recForm"), document.getElementById("cityRow"), document.getElementById("list"),
@@ -2036,8 +2040,12 @@ async function renderSwVersion() {
     if (vkminiapp && vkBuildVersion.startsWith("stage-")) {
         // Stage: текст версии — ссылка на прямой VK-хостинг-URL (без
         // launch-параметров): веб-версия для теста 🔔 web-push и PWA.
+        // target="_blank": в айфрейме мини-аппа клик иначе перезагрузил бы
+        // сам айфрейм вместо нового документа.
         const a = document.createElement("a");
         a.href = location.origin + location.pathname;
+        a.target = "_blank";
+        a.rel = "noopener";
         a.textContent = label;
         a.style.color = "var(--muted)";
         el.appendChild(a);
@@ -2589,7 +2597,7 @@ function hashSelect() {
 // Автотап при каждом открытии (веб и ВК): сегодняшняя MM-DD (МСК, с правилом
 // 02-28→02-29 невисокосного года, паритет sw.js dbLabels) ищется в записях
 // базы — выбирается первая из них (подъезд к результату делает selectRecord
-// для обоих режимов), далее между именинниками дня навигируют 🔼🔽. Затем —
+// для обоих режимов), далее между записями с тем же MM-DD навигируют 🔼🔽. Затем —
 // при выбранном религиозном календаре — дни («тап по яйцу» открывает список
 // от сегодняшней даты). Явный #N из hashSelect приоритетнее.
 
@@ -2600,6 +2608,61 @@ function todayMds() {
     const md = pad(m) + "-" + pad(d);
     const leap = y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0);
     return md === "02-28" && !leap ? [md, "02-29"] : [md];
+}
+
+// MM-DD выбранной записи с симметричной парой 02-28↔02-29 (паритет sw.js
+// dbLabels). Для выбранной записи pairing не зависит от високосности:
+// сохранённая дата — факт, тезки по MM-DD ищутся с обеих сторон пары.
+function sameDateMds() {
+    const r = db[selectedIdx];
+    if (!r || typeof r.d !== "string") return [];
+    const md = r.d.slice(5);
+    return md === "02-28" || md === "02-29" ? ["02-28", "02-29"] : [md];
+}
+
+// Индексы записей БД с MM-DD выбранной записи (сортированы как db).
+const sameDateIdxs = () => {
+    const mds = sameDateMds();
+    return db.map((r, i) => r && typeof r.d === "string" && mds.includes(r.d.slice(5)) ? i : -1).filter(i => i >= 0);
+};
+
+// Первый религиозный день выбранного календаря, чей MM-DD совпадает с MM-DD
+// выбранной записи (пара 02-28↔02-29 учитывается sameDateMds). Терминальный
+// шаг навигации 🔼🔽 (см. stepSame): если null — шагов после записей нет.
+// buildDays перезаписывает dayStart/dayEnd, но всегда от «сегодня» — вызов
+// идемпотентен и не конфликтует с scrollToTodayDay.
+function sameDateDay() {
+    if (!dayKind) return null;
+    const mds = sameDateMds();
+    if (!mds.length) return null;
+    for (const [j, name] of buildDays(dayKind)) {
+        const [, m, d] = jdnToGreg(j);
+        const md = String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+        if (mds.includes(md)) return { j, name };
+    }
+    return null;
+}
+
+// Переход 🔼🔽 к религиозному дню: «тап по 🥚» (toggleReligionBtns сам
+// рендерит список и скроллит к сегодняшнему дню), затем прокрутка к строке
+// совпавшего дня и подсветка .selected — как selectRecord для именинника.
+// Стрелки в список дней не добавляются: resultSec в режиме религии скрыт,
+// из дня навигация не продолжается. Строки ищутся по jdn+имени среди items
+// buildDays(dayKind) — ровно те, из которых renderDays строит .row.
+function gotoSameDay() {
+    try {
+        const day = sameDateDay();
+        if (!day) return;
+        if (!religionMode) toggleReligionBtns();
+        const items = buildDays(dayKind);
+        const el = document.getElementById(dayKind);
+        for (const row of el.querySelectorAll(".row")) row.classList.remove("selected");
+        const k = items.findIndex(([j, name]) => j === day.j && name === day.name);
+        const row = el.children[k];
+        if (!row) return;
+        row.classList.add("selected");
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch (e) { }
 }
 
 // Индексы записей БД, отмечающихся сегодня (сортированы как db).
@@ -2659,25 +2722,33 @@ function checkDayRollover() {
     autoTapToday();
 }
 
-// Навигация 🔼🔽 между именинниками сегодняшнего дня (см. updateTodayNav).
-function stepToday(dir) {
-    const idxs = todayIdxs();
+// Навигация 🔼🔽 между записями с MM-DD выбранной записи (см. updateTodayNav).
+// Шаг за последнюю запись ведёт к религиозному дню выбранного календаря —
+// gotoSameDay открывает список дней, прокручивает и подсвечивает строку.
+function stepSame(dir) {
+    const idxs = sameDateIdxs();
     const p = idxs.indexOf(selectedIdx);
     const q = p + dir;
-    if (p < 0 || q < 0 || q >= idxs.length) return;
+    if (p < 0 || q < 0) return;
+    if (q >= idxs.length) {
+        if (dir > 0) gotoSameDay();
+        return;
+    }
     selectRecord(idxs[q]);
     startEdit(idxs[q]);
 }
 
-// Кнопки 🔼🔽 в row результата: первый именинник из нескольких — только 🔽,
-// промежуточный — 🔼 и 🔽, последний — только 🔼; один/не сегодня — скрыты.
+// Кнопки 🔼🔽 в row результата: первая запись из нескольких с одним MM-DD —
+// только 🔽, промежуточная — 🔼 и 🔽, последняя — только 🔼 (или 🔼🔽, если
+// дальше есть религиозный день); одна/нет пары (в т.ч. selectedIdx вне БД) —
+// скрыты.
 function updateTodayNav() {
-    const idxs = todayIdxs();
+    const idxs = sameDateIdxs();
     const p = idxs.indexOf(selectedIdx);
     const last = idxs.length - 1;
-    const show = p >= 0 && last > 0;
-    document.getElementById("prevBtn").style.display = show && p > 0 ? "" : "none";
-    document.getElementById("nextBtn").style.display = show && p < last ? "" : "none";
+    const hasDay = p >= 0 && !!sameDateDay();
+    document.getElementById("prevBtn").style.display = p >= 0 && p > 0 ? "" : "none";
+    document.getElementById("nextBtn").style.display = p >= 0 && (p < last || (p === last && hasDay)) ? "" : "none";
 }
 
 function logoutYandex() {
