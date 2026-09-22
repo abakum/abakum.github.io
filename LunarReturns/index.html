@@ -482,60 +482,123 @@
             position: static; height: auto;
             flex: 0 0 12px; align-self: stretch;
         }
+        /* Отступ-разделитель перед группой операций с базой в тулбаре. */
+        #toolbar .grp { margin-left: 10px; }
+        /* Режим подсказок (html.help-mode): курсор и лёгкий пунктир на
+           объяснённых элементах; без постоянных обводок — не перегружать. */
+        html.help-mode [aria-label] { cursor: help; }
+        html.help-mode [aria-label]:hover,
+        html.help-mode [aria-label]:active {
+            outline: 1px dashed var(--border2);
+            outline-offset: 1px;
+        }
+        /* Панель подсказок: плавающая снизу, НЕ модальная — без фона-заглушки
+           и кнопок; тап по следующему элементу перерисовывает её, выход —
+           только красный ❓ (глиф эмодзи сам красный). z-index ниже диалогов
+           (#pasteOverlay 100, #confirmOverlay 101). Дополнительный отступ
+           после подвала в режиме подсказок: у нижнего края страницы ❓ не
+           уходит под панель. */
+        #helpPanel {
+            display: none;
+            position: fixed;
+            left: 50%;
+            bottom: 0;
+            transform: translateX(-50%);
+            width: min(var(--colW, 336px), calc(100vw - 24px));
+            box-sizing: border-box;
+            max-height: 45vh;
+            overflow-y: auto;
+            background: var(--surface);
+            border: 1px solid var(--border2);
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            padding: 10px 12px;
+            box-shadow: 0 -4px 16px rgba(0, 0, 0, .18);
+            z-index: 50;
+            font-size: .95em;
+        }
+        #helpPanel.open { display: block; }
+        #helpTitle { font-weight: 600; margin-bottom: 4px; }
+        #helpMsg { white-space: pre-line; }
+        html.help-mode #footerSec { margin-bottom: 46vh; }
+        /* Перечёркнутый глиф: диагональная черта поверх эмодзи обозначает
+           выключаемое состояние — глаз с чертой «Скрыть детали», вопрос
+           с чертой «Выключить подсказки». Глиф в обоих состояниях один и тот
+           же (ⓘ/❔ не совпадали по размеру с эмодзи — разные шрифты). */
+        #footerToggle, #helpBtn { position: relative; }
+        #footerToggle.open::after, #helpBtn.on::after {
+            content: "";
+            position: absolute;
+            left: 6px; right: 6px;
+            top: 50%;
+            height: 2px;
+            margin-top: -1px;
+            background: currentColor;
+            border-radius: 1px;
+            transform: rotate(-40deg);
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
     <div id="ptrMoon" aria-hidden="true"></div>
     <div id="ptrStars" aria-hidden="true"></div>
+    <!-- Панель подсказок — вне #ptrWrap: у обёртки есть transform, и fixed
+         внутри неё отсчитывался бы от обёртки, а не от вьюпорта (панель
+         уезжала бы при прокрутке). -->
+    <div id="helpPanel" aria-hidden="true">
+        <div id="helpTitle"></div>
+        <div id="helpMsg"></div>
+    </div>
     <div id="ptrWrap">
     <h1 id="titleH1"><img src="1f319.webp" alt="🌙" width="24" height="24" style="vertical-align:-3px;"> Лунно-солнечные юбилеи</h1>
 
 <div id="cols">
     <section>
         <form id="recForm" class="btnrow" onsubmit="submitRecord(); return false;">
-            <input type="text" id="fName" maxlength="64" placeholder="Имя" style="flex:1 1 8em;">
+            <input type="text" id="fName" maxlength="64" placeholder="Имя" style="flex:1 1 8em;" aria-label="Имя события&#10;Короткое имя человека или события — попадёт в список и в результат расчёта.">
             <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;" title="Дата — по времени места события">
                 <span id="dateWrap" style="position:relative;">
-                    <input type="date" id="fDate" style="width:7em;" title="Дата — по времени места события">
+                    <input type="date" id="fDate" style="width:7em;" title="Дата — по времени места события" aria-label="Дата события&#10;Дата по времени места события. Из неё считается лунно-солнечный юбилей.">
                     <span id="fDatePh" aria-hidden="true">Дата</span>
                 </span>
-                <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:2em;padding:4px 2px;" title="Час — по времени места события">
-                <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:2em;padding:4px 2px;" title="Минуты — по времени места события">
+                <input type="number" id="fHour" min="0" max="23" placeholder="12" style="width:2em;padding:4px 2px;" title="Час — по времени места события" aria-label="Час события&#10;Час по времени места события, 0–23. Можно оставить пустым — тогда берётся полдень.">
+                <input type="number" id="fMin" min="0" max="59" placeholder="0" style="width:2em;padding:4px 2px;" title="Минуты — по времени места события" aria-label="Минуты события&#10;Минуты по времени места события, 0–59. Можно оставить пустыми.">
             </span>
-            <button id="addBtn" type="submit" title="Добавить">➕</button>
-            <button type="button" id="delBtn" onclick="deleteCurrent()" title="Удалить" style="display:none;">➖</button>
+            <button id="addBtn" type="submit" title="Добавить" aria-label="Добавить запись&#10;Добавляет запись в базу. Когда выбрана существующая запись, кнопка становится 💾 и сохраняет изменения.">➕</button>
+            <button type="button" id="delBtn" onclick="deleteCurrent()" title="Удалить" style="display:none;" aria-label="Удалить запись&#10;Появляется, когда запись выбрана или редактируется. Удаляет её из базы после подтверждения.">➖</button>
         </form>
-        <div class="btnrow" id="cityRow">
+        <div class="btnrow" id="cityRow" aria-label="Место события&#10;Город, по часовому поясу которого считается событие. Без выбора — по Москве.">
             <select id="fCity" style="flex:1 1 100%;" onchange="updateCitySelectColor()"></select>
         </div>
-        <div id="list"></div>
-        <div id="orthodox" class="days" style="display:none;"></div>
-        <div id="islam" class="days" style="display:none;"></div>
-        <div id="buddhist" class="days" style="display:none;"></div>
-        <div id="catholic" class="days" style="display:none;"></div>
-        <div id="jewish" class="days" style="display:none;"></div>
+        <div id="list" aria-label="Список записей&#10;События базы, отсортированные по дате. Тап по строке выбирает запись и показывает расчёт."></div>
+        <div id="orthodox" class="days" style="display:none;" aria-label="Православные дни&#10;Список значимых дат православного календаря."></div>
+        <div id="islam" class="days" style="display:none;" aria-label="Исламские дни&#10;Список значимых дат исламского календаря."></div>
+        <div id="buddhist" class="days" style="display:none;" aria-label="Буддийские дни&#10;Список значимых дат буддийского календаря."></div>
+        <div id="catholic" class="days" style="display:none;" aria-label="Католические дни&#10;Список значимых дат католического календаря."></div>
+        <div id="jewish" class="days" style="display:none;" aria-label="Иудейские дни&#10;Список значимых дат иудейского календаря."></div>
         <div class="btnrow" id="toolbar">
-            <button type="button" id="eggBtn" onclick="toggleReligionBtns()" title="Пасхальное яйцо">🥚</button>
+            <button type="button" id="eggBtn" onclick="toggleReligionBtns()" title="Пасхалочка" aria-label="Пасхалочка&#10;Открывает религиозные календари: православный, исламский, буддийский, католический и иудейский.">🥚</button>
             <span id="religionBtns" style="display:none;">
-                <button type="button" onclick="toggleDays('orthodox')" title="Православные дни">☦️</button>
-                <button type="button" onclick="toggleDays('islam')" title="Исламские дни">☪️</button>
-                <button type="button" onclick="toggleDays('buddhist')" title="Буддийские дни">☸️</button>
-                <button type="button" onclick="toggleDays('catholic')" title="Католические дни">✝️</button>
-                <button type="button" onclick="toggleDays('jewish')" title="Иудейские дни">✡️</button>
+                <button type="button" onclick="toggleDays('orthodox')" title="Православные дни" aria-label="Православные дни&#10;Показывает или скрывает список значимых дат православного календаря.">☦️</button>
+                <button type="button" onclick="toggleDays('islam')" title="Исламские дни" aria-label="Исламские дни&#10;Показывает или скрывает список значимых дат исламского календаря.">☪️</button>
+                <button type="button" onclick="toggleDays('buddhist')" title="Буддийские дни" aria-label="Буддийские дни&#10;Показывает или скрывает список значимых дат буддийского календаря.">☸️</button>
+                <button type="button" onclick="toggleDays('catholic')" title="Католические дни" aria-label="Католические дни&#10;Показывает или скрывает список значимых дат католического календаря.">✝️</button>
+                <button type="button" onclick="toggleDays('jewish')" title="Иудейские дни" aria-label="Иудейские дни&#10;Показывает или скрывает список значимых дат иудейского календаря.">✡️</button>
             </span>
-            <button id="pushBtn" onclick="togglePush()" title="Включить уведомления о днях">🔕</button>
-            <button id="loginBtn" onclick="loginYandex()" title="Войти через Яндекс">🔑</button>
-            <button id="cloudPutBtn" onclick="cloudPut(this)" title="Сохранить базу в облако" style="display:none;">📤</button>
-            <button id="cloudGetBtn" onclick="cloudGet(this)" title="Загрузить базу из облака" style="display:none;">📥</button>
-            <button onclick="clearDb()" title="Очистить всю базу">❌</button>
-            <button onclick="pasteDb()" title="Вставить базу из буфера">📋</button>
-            <button onclick="copyDb()" title="Скопировать базу">⎘</button>
-            <button onclick="showDbQr()" title="Показать базу как QR">⛶</button>
-            <button type="button" id="daysCopyBtn" onclick="copyDays()" title="Скопировать дни" style="display:none;">⎘</button>
-            <button type="button" id="daysQrBtn" onclick="showDaysQr()" title="Показать дни как QR" style="display:none;">⛶</button>
+            <button id="pushBtn" onclick="togglePush()" title="Включить уведомления о днях" aria-label="Уведомления о днях&#10;Включает или выключает ежедневное напоминание в 09:00, если сегодня событие из базы или религиозный день.">🔕</button>
+            <button id="loginBtn" onclick="loginYandex()" title="Войти через Яндекс" aria-label="Вход через Яндекс&#10;Нужен только вне ВКонтакте: хранит базу в облаке Яндекса. После входа кнопка становится 🔒 и выполняет выход.">🔑</button>
+            <button id="cloudPutBtn" onclick="cloudPut(this)" title="Сохранить базу в облако" style="display:none;" aria-label="Сохранить базу в облако&#10;Отправляет записи базы в облако, чтобы продолжить на другом устройстве или восстановить после переустановки.">📤</button>
+            <button id="cloudGetBtn" onclick="cloudGet(this)" title="Загрузить базу из облака" style="display:none;" aria-label="Загрузить базу из облака&#10;Приносит записи из облака. Если на устройстве уже есть записи, предложит объединить их с облачными.">📥</button>
+            <button type="button" id="clearBtn" class="grp" onclick="clearDb()" title="Очистить всю базу" aria-label="Очистить всю базу&#10;После подтверждения удаляет все записи с устройства. Если база нужна — сначала сохраните её в облако или скопируйте.">🗑</button>
+            <button onclick="pasteDb()" title="Вставить базу из буфера" aria-label="Вставить базу&#10;Открывает диалог для вставки базы (JSON), скопированной на другом устройстве.">📋</button>
+            <button onclick="copyDb()" title="Скопировать базу" aria-label="Скопировать базу&#10;Копирует все записи в буфер обмена (JSON) — для переноса на другое устройство.">⎘</button>
+            <button onclick="showDbQr()" title="Показать базу как QR" aria-label="QR базы&#10;Показывает всю базу как QR-код: отсканируйте его другим устройством, чтобы перенести записи.">⛶</button>
+            <button type="button" id="daysCopyBtn" onclick="copyDays()" title="Скопировать дни" style="display:none;" aria-label="Скопировать дни&#10;Копирует список религиозных дней в буфер обмена.">⎘</button>
+            <button type="button" id="daysQrBtn" onclick="showDaysQr()" title="Показать дни как QR" style="display:none;" aria-label="QR дней&#10;Показывает список религиозных дней как QR-код.">⛶</button>
         </div>
-        <div id="daysQr" class="qr"></div>
-        <div id="dbQr" class="qr"></div>
+        <div id="daysQr" class="qr" aria-label="QR-код дней&#10;Здесь появляется QR-код со списком религиозных дней."></div>
+        <div id="dbQr" class="qr" aria-label="QR-код базы&#10;Здесь появляется QR-код со всеми записями базы."></div>
     </section>
 
     <div id="pasteOverlay" onclick="pasteOverlayBackdrop(event)">
@@ -559,39 +622,40 @@
         </div>
     </div>
 
-    <div id="colSplitter" title="Изменить ширину"></div>
+    <div id="colSplitter" title="Изменить ширину" aria-label="Разделитель колонок&#10;Потяните, чтобы изменить ширину колонки. На широком экране появляется вторая колонка с результатом."></div>
 
     <section id="resultSec" style="display:none;">
-        <textarea id="resultText" rows="12" readonly></textarea>
+        <textarea id="resultText" rows="12" readonly aria-label="Результат&#10;Расчёт выбранной записи: годы, когда солнечный день рождения совпадает с лунным (ведическим Титхи)."></textarea>
         <div class="btnrow">
-            <button type="button" id="topBtn" onclick="toTop()" title="Наверх">🔝</button>
-            <button type="button" id="srcBtn" onclick="scrollToSourceRow()" title="К строке источника" style="display:none;">🔙</button>
-            <button type="button" id="nextBtn" onclick="stepSame(1)" title="Следующая запись с этой датой" style="display:none;">🔽</button>
-            <button type="button" id="prevBtn" onclick="stepSame(-1)" title="Предыдущая запись с этой датой" style="display:none;">🔼</button>
-            <button type="button" id="detailBtn" onclick="toggleDetail()" title="Сжато">⋯</button>
-            <button onclick="copyResult()" title="Копировать текст">⎘</button>
-            <button type="button" id="qrBtn" onclick="toggleResultQr()" title="Показать QR результата">⛶</button>
+            <button type="button" id="topBtn" onclick="toTop()" title="Наверх" aria-label="Наверх&#10;Прокручивает страницу к началу.">🔝</button>
+            <button type="button" id="srcBtn" onclick="scrollToSourceRow()" title="К строке источника" style="display:none;" aria-label="К строке источника&#10;Показывает в списке запись, по которой построен результат.">🔙</button>
+            <button type="button" id="nextBtn" onclick="stepSame(1)" title="Следующая запись с этой датой" style="display:none;" aria-label="Следующая запись&#10;Переходит к следующей записи с той же датой (число и месяц), если их несколько.">🔽</button>
+            <button type="button" id="prevBtn" onclick="stepSame(-1)" title="Предыдущая запись с этой датой" style="display:none;" aria-label="Предыдущая запись&#10;Переходит к предыдущей записи с той же датой (число и месяц).">🔼</button>
+            <button type="button" id="detailBtn" onclick="toggleDetail()" title="Сжато" aria-label="Сжато&#10;Сжато — юбилеи кроме одинарных (двойные, тройные...). Подробно — все юбилеи.">⋯</button>
+            <button onclick="copyResult()" title="Скопировать текст" aria-label="Скопировать текст&#10;Копирует текст результата в буфер обмена.">⎘</button>
+            <button type="button" id="qrBtn" onclick="toggleResultQr()" title="Показать QR результата" aria-label="QR результата&#10;Показывает или скрывает QR-код с текстом результата.">⛶</button>
         </div>
-        <div class="qr" id="resultQr"></div>
+        <div class="qr" id="resultQr" aria-label="QR результата&#10;Здесь появляется QR-код с текстом текущего расчёта."></div>
     </section>
 </div>
 
     <section id="footerSec">
-    <button type="button" id="footerToggle" onclick="toggleFooter()" title="Показать детали" aria-expanded="false" aria-controls="footer">👁</button>
+    <button type="button" id="footerToggle" onclick="toggleFooter()" title="Посмотреть детали" aria-expanded="false" aria-controls="footer" aria-label="Детали&#10;Раскрывает согласия, теорию расчёта, журнал уведомлений и версию.">👁</button>
+    <button type="button" id="helpBtn" onclick="toggleHelpMode()" title="Включить подсказки" aria-pressed="false" aria-label="Подсказки&#10;Включает режим подсказок: коснитесь любого элемента — снизу появится его описание. Перечёркнутый вопрос выключает режим.">❓</button>
     <div id="footer" hidden>
-    <label id="pdConsentLabel" style="display:block; font-size:0.9em; color:var(--muted);">
+    <label id="pdConsentLabel" style="display:block; font-size:0.9em; color:var(--muted);" aria-label="Согласие на облако&#10;Разрешает хранить названия событий и даты в облаке Яндекса (152-ФЗ, GDPR). Без согласия база живёт только на устройстве, кнопки облака скрыты.">
         <input type="checkbox" id="pdConsent">
         <span id="pdConsentText">Разрешаю хранить🔑📤 персональные данные (ПДн: названия событий и даты) в облаке Яндекс согласно 152-ФЗ и GDPR.</span> <span id="pdWithdrawNote" style="display:none;">Отзыв согласия удаляет ПДн из облака Яндекс.</span>
     </label>
-    <label id="pdPushConsentLabel" style="display:none; font-size:0.9em; color:var(--muted);">
+    <label id="pdPushConsentLabel" style="display:none; font-size:0.9em; color:var(--muted);" aria-label="Согласие на уведомления&#10;Разрешает хранить идентификатор ВКонтакте и даты без названий для отправки уведомлений (152-ФЗ, GDPR). Отзыв согласия удаляет подписку.">
         <input type="checkbox" id="pdPushConsent">
         <span id="pdPushConsentText">Разрешаю хранить уведомления🔔 (Уведомления: идентификатор пользователя ВКонтакте и даты без годов и без названий событий) в облаке Яндекс согласно 152-ФЗ и GDPR.</span> <span id="pdPushWithdrawNote" style="display:none;">Отзыв согласия удаляет Уведомления из облака Яндекса.</span>
     </label>
-    <p id="pdLocalNote" style="display:none; font-size:0.9em; color:var(--muted);">
+    <p id="pdLocalNote" style="display:none; font-size:0.9em; color:var(--muted);" aria-label="Локальное хранение&#10;Напоминание: без согласия персональные данные хранятся только на этом устройстве.">
         Пусть ПДн хранятся только локально на моём устройстве.
     </p>
 
-    <p id="status">Годы, когда обычный солнечный день рождения совпадает с лунным днем рождения (ведическим Титхи), называют лунно-солнечными юбилеями. В этот день Солнце (дух) и Луна (душа) воссоединяются как в миг Вашего первого вздоха. 
+    <p id="status" aria-label="Статус и теория&#10;Сообщения приложения и краткая теория лунно-солнечных юбилеев.">Годы, когда обычный солнечный день рождения совпадает с лунным днем рождения (ведическим Титхи), называют лунно-солнечными юбилеями. В этот день Солнце (дух) и Луна (душа) воссоединяются как в миг Вашего первого вздоха. 
 <br>
 Юбилей может произойти уже через <b>11 лет</b>, но это случается лишь с теми, кто родился в первые 4 часа титхи, и если на эти 11 лет выпало ровно 2 високосных года. Остальным юбилей придётся ждать <b>19 лет</b>.
 <br>
@@ -601,7 +665,7 @@
 </p>
 <div id="pushlog" style="display:none; font-size:0.85em; color:var(--muted2); white-space:pre-line;"></div>
 
-<div id="swver" style="font-size:0.85em; color:var(--muted2); min-height:1.2em;">
+<div id="swver" style="font-size:0.85em; color:var(--muted2); min-height:1.2em;" aria-label="Версия&#10;Версия приложения и текущей сборки.">
     <span id="swverText"></span>
 </div>
     </div>
@@ -1186,8 +1250,12 @@ function footerOpen() { return !document.getElementById("footer").hidden; }
 function setFooter(open, persist) {
     document.getElementById("footer").hidden = !open;
     const b = document.getElementById("footerToggle");
-    b.textContent = open ? "ⓘ" : "👁";
-    b.title = open ? "Скрыть детали" : "Показать детали";
+    // Всегда 👁; открытое состояние — CSS-черта поверх (.open::after), т.е.
+    // «перечёркнутый глаз»: глиф ⓘ был текстовым и визуально мельче соседних
+    // эмодзи (❔), VS16 не помог.
+    b.textContent = "👁";
+    b.classList.toggle("open", open);
+    b.title = open ? "Скрыть детали" : "Посмотреть детали";
     b.setAttribute("aria-expanded", String(open));
     if (persist) { try { localStorage.setItem(FOOTER_KEY, open ? "1" : "0"); } catch (e) {} }
 }
@@ -1898,7 +1966,10 @@ function toggleReligionBtns() {
     const on = rb.style.display === "none";
     religionMode = on;
     egg.textContent = on ? "🔙" : "🥚";
-    egg.title = on ? "Назад" : "Пасхальное яйцо";
+    egg.title = on ? "Назад" : "Пасхалочка";
+    egg.setAttribute("aria-label", on
+        ? "Назад\nВозврат к базе лунно-солнечных юбилеев. Выход из базы религиозных дней."
+        : "Пасхалочка\nОткрывает религиозные календари: православный, исламский, буддийский, католический и иудейский.");
     if (on) {
         savedUiDisp = [];
         const els = [document.getElementById("recForm"), document.getElementById("cityRow"), document.getElementById("list"),
@@ -3541,10 +3612,139 @@ function recalcLayout() {
     splitter.addEventListener("pointercancel", endDrag);
 })();
 
-// Escape закрывает диалог подтверждения как отмена.
+// Escape закрывает диалог подтверждения как отмена, а режим подсказок выключает.
 document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && document.getElementById("confirmOverlay").style.display === "flex") closeConfirm(false);
+    if (e.key !== "Escape") return;
+    if (document.getElementById("confirmOverlay").style.display === "flex") closeConfirm(false);
+    else if (helpMode) exitHelpMode();
 });
+
+// ---- Режим подсказок (❓; включён — перечёркнут CSS-чертой) ----
+// Тексты объяснений хранятся в aria-label элементов ("Заголовок\nТекст") —
+// этот же источник читают скринридеры. Панель #helpPanel плавающая, без
+// кнопок: тап по следующему элементу перерисовывает её; выход из режима —
+// только красный ❓ (кнопка #helpBtn от перехвата освобождена). При входе
+// форма заполняется данными Ады (или первой записи), чтобы были видны ВСЕ
+// кнопки редактирования и результата; при выходе состояние восстанавливается.
+let helpMode = false;
+let helpSaved = null;
+
+function helpPanelShow(title, msg) {
+    document.getElementById("helpTitle").textContent = title;
+    document.getElementById("helpMsg").textContent = msg;
+    document.getElementById("helpPanel").classList.add("open");
+}
+
+function helpPanelHide() {
+    document.getElementById("helpPanel").classList.remove("open");
+}
+
+function snapshotForm() {
+    return {
+        name: document.getElementById("fName").value,
+        date: document.getElementById("fDate").value,
+        hour: document.getElementById("fHour").value,
+        min: document.getElementById("fMin").value,
+        city: document.getElementById("fCity").value,
+        selectedIdx: selectedIdx,
+        editingIdx: editingIdx
+    };
+}
+
+function restoreForm(s) {
+    document.getElementById("fName").value = s.name;
+    document.getElementById("fDate").value = s.date;
+    syncDatePh();
+    document.getElementById("fHour").value = s.hour;
+    document.getElementById("fMin").value = s.min;
+    document.getElementById("fCity").value = s.city;
+    updateCitySelectColor();
+    editingIdx = s.editingIdx;
+    const addBtn = document.getElementById("addBtn");
+    addBtn.textContent = editingIdx >= 0 ? "💾" : "➕";
+    addBtn.title = editingIdx >= 0 ? "Сохранить" : "Добавить";
+    selectedIdx = (s.selectedIdx >= 0 && s.selectedIdx < db.length) ? s.selectedIdx : -1;
+    if (selectedIdx >= 0) {
+        renderList();
+        renderResult();
+    } else {
+        renderList();
+        hideResult();
+    }
+}
+
+function enterHelpMode() {
+    helpMode = true;
+    document.documentElement.classList.add("help-mode");
+    const b = document.getElementById("helpBtn");
+    b.textContent = "❓";
+    b.title = "Выключить подсказки";
+    b.setAttribute("aria-pressed", "true");
+    b.classList.add("on");
+    // Режим религиозных дней: базу не трогаем (никаких возвратов на основной
+    // экран и подстановки Ады) — вступление то же, дальше объясняются дни.
+    if (religionMode) {
+        helpPanelShow("Режим подсказок",
+            "Коснитесь любого элемента — здесь появится его описание.\nПеречёркнутый вопрос выключает режим.");
+        return;
+    }
+    helpSaved = { ui: snapshotForm(), religion: false };
+    // Заполняем форму записью Ады (или первой), чтобы показать все кнопки.
+    let i = db.findIndex(r => r.n === "Ада");
+    if (i < 0) i = db.length ? 0 : -1;
+    if (i >= 0) {
+        selectRecord(i);
+        startEdit(i);
+    }
+    helpPanelShow("Режим подсказок",
+        "Коснитесь любого элемента — здесь появится его описание.\nПеречёркнутый вопрос выключает режим.");
+}
+
+function exitHelpMode() {
+    helpMode = false;
+    document.documentElement.classList.remove("help-mode");
+    const b = document.getElementById("helpBtn");
+    b.textContent = "❓";
+    b.title = "Включить подсказки";
+    b.setAttribute("aria-pressed", "false");
+    b.classList.remove("on");
+    helpPanelHide();
+    if (helpSaved) {
+        const wasReligion = helpSaved.religion;
+        const ui = helpSaved.ui;
+        helpSaved = null;
+        restoreForm(ui);
+        if (wasReligion && !religionMode) toggleReligionBtns();
+    }
+}
+
+function toggleHelpMode() {
+    if (helpMode) exitHelpMode(); else enterHelpMode();
+}
+
+// Перехват тапов в capture-фазе: реальное действие не срабатывает (submit,
+// удаление, фокус, нативные пикеры), объяснённый элемент рисует панель.
+// Диалоги (подтверждение/вставка) и сама кнопка режима живут обычной жизнью.
+function helpGate(e) {
+    if (!helpMode) return;
+    const t = e.target;
+    if (!(t instanceof Element)) return;
+    if (t.closest("#helpPanel") || t.closest("#helpBtn")) return;
+    if (document.getElementById("confirmOverlay").classList.contains("open")) return;
+    if (document.getElementById("pasteOverlay").classList.contains("open")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type !== "click") return;
+    const el = t.closest("[aria-label]");
+    if (!el) return;
+    // Заголовок панели — всегда текущий title-хинт элемента (он динамический:
+    // «Сохранить», «Сжато/Подробно», «Посмотреть/Скрыть детали»); без title —
+    // первая строка aria-label. Тело — описание из aria-label.
+    const parts = el.getAttribute("aria-label").split("\n");
+    helpPanelShow((el.title || "").trim() || parts[0] || "", parts.slice(1).join("\n"));
+}
+document.addEventListener("pointerdown", helpGate, true);
+document.addEventListener("click", helpGate, true);
 
 // Применяем сохранённое состояние подвала до loadDb(): ошибки старта (напр.
 // «Локальная база повреждена») через status(..., true) раскрыт его поверх.
