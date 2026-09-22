@@ -117,8 +117,9 @@
             --text: #1a1a1a;
             --sel: #e8f5e9;
             --err: #c62828;
+            --note: #fdf3c4;
         }
-        :root.theme-light { color-scheme: light; --bg: #f9f9f9; --surface: #fff; --border: #ddd; --border2: #bbb; --btn: #f0f0f0; --btn-h: #e0e0e0; --muted: #555; --muted2: #777; --text: #1a1a1a; --sel: #e8f5e9; --err: #c62828; }
+        :root.theme-light { color-scheme: light; --bg: #f9f9f9; --surface: #fff; --border: #ddd; --border2: #bbb; --btn: #f0f0f0; --btn-h: #e0e0e0; --muted: #555; --muted2: #777; --text: #1a1a1a; --sel: #e8f5e9; --err: #c62828; --note: #fdf3c4; }
         @media (prefers-color-scheme: dark) {
             :root:not(.theme-light) {
                 color-scheme: dark;
@@ -133,6 +134,7 @@
                 --text: #e6e6ea;
                 --sel: #274232;
                 --err: #ef9a9a;
+                --note: #3a331c;
             }
         }
         :root.theme-dark {
@@ -148,6 +150,7 @@
             --text: #e6e6ea;
             --sel: #274232;
             --err: #ef9a9a;
+            --note: #3a331c;
         }
         /* Подложка (чек-лист ВК: цветная, не чёрная и не белая, видна при
            подтягивании за верхний край): вечернее небо — от голубого к тёплому
@@ -508,7 +511,7 @@
             box-sizing: border-box;
             max-height: 45vh;
             overflow-y: auto;
-            background: var(--surface);
+            background: var(--note);
             border: 1px solid var(--border2);
             border-bottom: none;
             border-radius: 8px 8px 0 0;
@@ -625,7 +628,7 @@
     <div id="colSplitter" title="Изменить ширину" aria-label="Разделитель колонок&#10;Потяните, чтобы изменить ширину колонки. На широком экране появляется вторая колонка с результатом."></div>
 
     <section id="resultSec" style="display:none;">
-        <textarea id="resultText" rows="12" readonly aria-label="Результат&#10;Расчёт выбранной записи: годы, когда солнечный день рождения совпадает с лунным (ведическим Титхи)."></textarea>
+        <textarea id="resultText" rows="12" readonly aria-label="Результат&#10;Расчёт выбранной записи: юбилейные годы. Ждать обычных юбилеев 5 лет скучно. Если можно праздновать чаще почему бы нам это не делать!"></textarea>
         <div class="btnrow">
             <button type="button" id="topBtn" onclick="toTop()" title="Наверх" aria-label="Наверх&#10;Прокручивает страницу к началу.">🔝</button>
             <button type="button" id="srcBtn" onclick="scrollToSourceRow()" title="К строке источника" style="display:none;" aria-label="К строке источника&#10;Показывает в списке запись, по которой построен результат.">🔙</button>
