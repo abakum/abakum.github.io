@@ -559,7 +559,7 @@
 <div id="cols">
     <section>
         <form id="recForm" class="btnrow" onsubmit="submitRecord(); return false;">
-            <input type="text" id="fName" maxlength="64" placeholder="Имя" style="flex:1 1 8em;" aria-label="Имя события&#10;Короткое имя человека или события — попадёт в список и в результат расчёта.">
+            <input type="text" id="fName" maxlength="64" placeholder="Событие" style="flex:1 1 8em;" aria-label="Название события&#10;Если в названии есть «+» (Иван+Мария), это свадьба: к годовщине добавится её название (серебряная, золотая…).">
             <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;" title="Дата — по времени места события">
                 <span id="dateWrap" style="position:relative;">
                     <input type="date" id="fDate" style="width:7em;" title="Дата — по времени места события" aria-label="Дата события&#10;Дата по времени места события. Из неё считается лунно-солнечный юбилей.">
@@ -643,7 +643,7 @@
 </div>
 
     <section id="footerSec">
-    <button type="button" id="footerToggle" onclick="toggleFooter()" title="Посмотреть детали" aria-expanded="false" aria-controls="footer" aria-label="Детали&#10;Раскрывает согласия, теорию расчёта, журнал уведомлений и версию.">👁</button>
+    <button type="button" id="footerToggle" onclick="toggleFooter()" title="Посмотреть детали" aria-expanded="false" aria-controls="footer" aria-label="Детали&#10;Раскрывает блок согласий, сообщения приложения, журнал уведомлений и версию.">👁</button>
     <button type="button" id="helpBtn" onclick="toggleHelpMode()" title="Включить подсказки" aria-pressed="false" aria-label="Подсказки&#10;Включает режим подсказок: коснитесь любого элемента — снизу появится его описание. Перечёркнутый вопрос выключает режим.">❓</button>
     <div id="footer" hidden>
     <label id="pdConsentLabel" style="display:block; font-size:0.9em; color:var(--muted);" aria-label="Согласие на облако&#10;Разрешает хранить названия событий и даты в облаке Яндекса (152-ФЗ, GDPR). Без согласия база живёт только на устройстве, кнопки облака скрыты.">
@@ -658,7 +658,7 @@
         Пусть ПДн хранятся только локально на моём устройстве.
     </p>
 
-    <p id="status" aria-label="Статус и теория&#10;Сообщения приложения и краткая теория лунно-солнечных юбилеев.">Годы, когда обычный солнечный день рождения совпадает с лунным днем рождения (ведическим Титхи), называют лунно-солнечными юбилеями. В этот день Солнце (дух) и Луна (душа) воссоединяются как в миг Вашего первого вздоха. 
+    <p id="status" aria-label="Статус&#10;Сообщения приложения.">Годы, когда обычный солнечный день рождения совпадает с лунным днем рождения (ведическим Титхи), называют лунно-солнечными юбилеями. В этот день Солнце (дух) и Луна (душа) воссоединяются как в миг Вашего первого вздоха. 
 <br>
 Юбилей может произойти уже через <b>11 лет</b>, но это случается лишь с теми, кто родился в первые 4 часа титхи, и если на эти 11 лет выпало ровно 2 високосных года. Остальным юбилей придётся ждать <b>19 лет</b>.
 <br>
@@ -666,7 +666,7 @@
 <b>Ритм Луны:</b> возвращение фазы Луны складывается из циклов в 3 и 5 лет. Их сумма (3+5) дает 8-летний цикл (Октаэтерис).<br>
 <b>Великое слияние:</b> сложение лунного 8-летнего и недельного 11-летнего циклов (8+11) дает 19-летний Метонов цикл. При этом +38 часов 11 минут погрешности 8-летнего цикла складываются с -36 часами 6 минутами погрешности 11-летнего цикла, снижая общую погрешность до 2 часов 5 минут.</li>
 </p>
-<div id="pushlog" style="display:none; font-size:0.85em; color:var(--muted2); white-space:pre-line;"></div>
+<div id="pushlog" style="display:none; font-size:0.85em; color:var(--muted2); white-space:pre-line;" aria-label="Журнал уведомлений&#10;Записи об отправленных уведомлениях: время, размер базы и текст. Кнопка «Очистить журнал» удаляет записи."></div>
 
 <div id="swver" style="font-size:0.85em; color:var(--muted2); min-height:1.2em;" aria-label="Версия&#10;Версия приложения и текущей сборки.">
     <span id="swverText"></span>
@@ -1259,6 +1259,8 @@ function setFooter(open, persist) {
     b.textContent = "👁";
     b.classList.toggle("open", open);
     b.title = open ? "Скрыть детали" : "Посмотреть детали";
+    b.setAttribute("aria-label", "Детали\n" + (open ? "Скрывает" : "Раскрывает")
+        + " блок согласий, сообщения приложения, журнал уведомлений и версию.");
     b.setAttribute("aria-expanded", String(open));
     if (persist) { try { localStorage.setItem(FOOTER_KEY, open ? "1" : "0"); } catch (e) {} }
 }
@@ -1383,7 +1385,7 @@ function submitRecord() {
     const h = readNum("fHour", 23);
     const m = readNum("fMin", 59);
     if (!n || !/^\d{4}-\d{2}-\d{2}$/.test(d)) {
-        status("Укажите имя и дату события", true);
+        status("Укажите название и дату события", true);
         // Фокус в первое незаполненное поле.
         if (!n) document.getElementById("fName").focus();
         else {
@@ -2139,7 +2141,7 @@ async function renderPushLog() {
     const el = document.getElementById("pushlog");
     const log = await idbGetLog();
     if (!log.length) { el.style.display = "none"; return; }
-    el.textContent = "Журнал пушей:\n" + log.map(r => {
+    el.textContent = "Журнал уведомлений:\n" + log.map(r => {
         const main = r.t +
             " — db:" + (r.db === null ? "нет" : r.db) +
             " days:" + (r.days === null ? "нет" : r.days);
