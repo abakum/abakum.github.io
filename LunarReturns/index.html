@@ -365,7 +365,7 @@
             resize: none;
         }
         .qr img, .qr svg { max-width: 100%; height: auto; }
-        #status { color: var(--muted); min-height: 1.2em; overflow-wrap: anywhere; }
+        #status { color: var(--muted); min-height: 1.2em; overflow-wrap: anywhere; white-space: pre-line; }
         #status.error { color: var(--err); }
         /* Кнопка-глаз: вход в подвал (#footer: согласия, статус/теория,
            журнал пушей, версия). Стиль — как у всех кнопок. Отступ до
@@ -525,7 +525,7 @@
         #helpMsg { white-space: pre-line; }
         html.help-mode #footerSec { margin-bottom: 46vh; }
         /* Перечёркнутый глиф: диагональная черта поверх эмодзи обозначает
-           выключаемое состояние — глаз с чертой «Скрыть детали», вопрос
+            выключаемое состояние — глаз с чертой «Свернуть», вопрос
            с чертой «Выключить подсказки». Глиф в обоих состояниях один и тот
            же (ⓘ/❔ не совпадали по размеру с эмодзи — разные шрифты). */
         #footerToggle, #helpBtn { position: relative; }
@@ -643,7 +643,7 @@
 </div>
 
     <section id="footerSec">
-    <button type="button" id="footerToggle" onclick="toggleFooter()" title="Посмотреть детали" aria-expanded="false" aria-controls="footer" aria-label="Детали&#10;Раскрывает блок согласий, сообщения приложения, журнал уведомлений и версию.">👁</button>
+    <button type="button" id="footerToggle" onclick="toggleFooter()" title="Ещё" aria-expanded="false" aria-controls="footer" aria-label="Ещё&#10;Раскрывает блок согласий, сообщения приложения, журнал уведомлений и версию.">👁</button>
     <button type="button" id="helpBtn" onclick="toggleHelpMode()" title="Включить подсказки" aria-pressed="false" aria-label="Подсказки&#10;Включает режим подсказок: коснитесь любого элемента — снизу появится его описание. Перечёркнутый вопрос выключает режим.">❓</button>
     <div id="footer" hidden>
     <label id="pdConsentLabel" style="display:block; font-size:0.9em; color:var(--muted);" aria-label="Согласие на облако&#10;Разрешает хранить названия событий и даты в облаке Яндекса (152-ФЗ, GDPR). Без согласия база живёт только на устройстве, кнопки облака скрыты.">
@@ -687,13 +687,18 @@ const PD_CONSENT_KEY = "lunarreturns.pdConsent";
 const PD_PUSH_CONSENT_KEY = "lunarreturns.pdPushConsent";
 const VKPUSH_KEY = "lunarreturns.vkpush";
 const VKPUSH_PROBE_KEY = "lunarreturns.vkpushProbe";
+// Флаг «демо-режим первого старта показан»: без ключа ВК-мини-апп при пустой
+// базе сеет демо-записи, раскрывает подвал и включает режим подсказок (см.
+// loadDb() и init-блок в конце body). Синхронизируется с облаком ВК через
+// блоб lr_s_blob, чтобы демо не повторилось на новом origin.
+const FIRST_KEY = "lunarreturns.first";
 // Тема ("dark"/"light"): пишется applyTheme(), читается ранним скриптом в head
 // до первого кадра — убирает светлую вспышку при PTR-reload в нативном клиенте.
 const THEME_KEY = "lunarreturns.theme";
 // Настройки, синхронизируемые с облаком ВКонтакте (ОДИН блоб-ключ lr_s_blob
 // в VKWebAppStorage; значения — не ПДн). Запись — lsSet() (дебаунс → один
 // вызов), чтение/применение — vkRestoreCloud() на свежем origin.
-const LR_LS_KEYS = [DAYS_KEY, PD_CONSENT_KEY, PD_PUSH_CONSENT_KEY, VKPUSH_KEY, VKPUSH_PROBE_KEY, THEME_KEY];
+const LR_LS_KEYS = [DAYS_KEY, PD_CONSENT_KEY, PD_PUSH_CONSENT_KEY, VKPUSH_KEY, VKPUSH_PROBE_KEY, THEME_KEY, FIRST_KEY];
 // Префикс СТАРЫХ поштучных ключей настроек (миграция на блоб в
 // vkRestoreSettings; объявлен здесь, т.к. используется в нескольких местах).
 const LR_S_PREFIX = "lr_s_";
@@ -747,6 +752,9 @@ qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
 
 let db = [];
 let adaSeeded = false;
+// Только что сеяна демо-база первого старта (VK, пустая база, нет FIRST_KEY).
+// Пустое облако ВК (vkDbGet) её не затирает заготовкой «Ада».
+let lrDemoSeeded = false;
 let selectedIdx = -1;
 let editingIdx = -1;
 let detailMode = false;
@@ -754,6 +762,16 @@ let yandexToken = "";
 // VK Mini App определяется по параметру vk_app_id в URL, который VK всегда
 // добавляет при запуске мини-аппа (см. dev.vk.com/mini-apps/development/launch-params).
 const vkminiapp = new URLSearchParams(location.search).has("vk_app_id");
+// Спец-режим локального теста демо первого старта: ?vk_app_id=1. База и флаг
+// демо стираются ДО loadDb() (демо сеется каждый раз), vkRestoreCloud() не
+// вызывается — вне клиента ВК он падал бы с «Ошибка загрузки/восстановления».
+const vkTest = new URLSearchParams(location.search).get("vk_app_id") === "1";
+if (vkTest) {
+    try {
+        localStorage.removeItem(DB_KEY);
+        localStorage.removeItem(FIRST_KEY);
+    } catch (e) { }
+}
 // Платформа клиента: гейтов пушей от неё больше нет — по доке
 // VKWebAppAllowNotifications поддерживает Android, iOS, Mobile Web и Web
 // (фактическая выдача разрешения на stage проверяется тестом).
@@ -1069,6 +1087,42 @@ function lrSeedJson() {
     return JSON.stringify([{ n: "Ада", d: "1815-12-10" }]);
 }
 
+// Демо-база первого старта в VK (модерация 4.1.6.4: пустой первый экран
+// непонятен). Имена звёзд айтишников и их свадьбы («Имя+Имя» — годовщины
+// свадьбы: серебряная, золотая…), и две записи с равными
+// MM-DD (Ада и Ross Gardler, оба 10 декабря) — чтобы работали стрелки 🔼🔽.
+// Время рождения не сеем: авторитетные источники дают только даты.
+function lrDemoRecords() {
+    return [
+        { n: "Дональд Кнут", d: "1938-01-10" },
+        { n: "Сергей+Люси", d: "2007-05-01" },
+        { n: "Алан Тьюринг", d: "1912-06-23" },
+        { n: "Грейс Хоппер", d: "1906-12-09" },
+        { n: "Ада", d: "1815-12-10" },
+        { n: "Ross Gardler", d: "1969-12-10" },
+        { n: "Ада+Уильям", d: "1835-07-08" }
+    ];
+}
+
+// Сценарий вместо теории в статусе при демо-старте: подробная пошаговая
+// экскурсия, не подписи кнопок. Без упоминания ❓ в роли входа — режим
+// подсказок уже включён (упоминается только выход из него).
+function lrDemoStatus() {
+    status("Перед вами пример базы — пройдите по шагам.\n"
+        + "1) Режим подсказок уже включён: тапните по любой кнопке — внизу появится её описание. Протапайте все кнопки подряд, чтобы познакомиться с ними.\n"
+        + "2) Потом выключите подсказки: тапните по перечёркнутому ❓.\n"
+        + "3) Удалите событие «Ада»: тапните по строке «Ада 1815-12-10» — имя и дата появятся в форме сверху. Теперь нажмите ➖ и подтвердите ✅ — строка исчезнет из списка.\n"
+        + "4) Посчитайте годовщины свадьбы: тапните по строке «Сергей+Люси 2007-05-01».\n"
+        + "5) Добавьте событие Ада. Если поля формы не пусты — сначала нажмите 💾, поля очистятся. Затем впишите в форму имя «Ада» и дату 1815-12-10 и нажмите ➕. Запись встанет в список по дате.\n"
+        + "6) Переименуйте «Грейс Хоппер» в «Грейс»: тапните по её строке, исправьте имя в форме, нажмите 💾 — новое имя появится в списке.\n"
+        + "7) Перенесите базу: нажмите ⎘ — вся база скопируется в буфер обмена. (Можно тапнуть на кнопку показа QR-кода ⛶ и отсканировать его другим устойством.)\n"
+        + "8) Очистите базу: нажмите 🗑 и подтвердите ✅ — список опустеет.\n"
+        + "9) Верните базу: нажмите 📋 — откроется форма куда можно вставить буфер обмена, подтвердите импорт 📋, и все события вернутся в список.\n"
+        + "10) Сохраните базу в облако: поставьте галочку «Разрешаю хранить…» и нажмите 📤. Теперь даже после очистки или переустановки базу можно вернуть кнопкой 📥.\n"
+        + "11) Поиграйтесь с расчётами: тапните по строке «Ада 1815-12-10» — в форме расчёта тапните 🔽 - увидите расчёт для Ross Gardler, у него та же дата события — 10 декабря, стрелки будут переключать расчёт между ними. Нажмите ⋯ — сжатый список заменится полным, где перечислены все юбилеи подряд; повторное нажатие вернёт сжатый. Нажмите ⎘ — текст расчёта скопируется в буфер обмена. Нажмите ⛶ — под расчётом появится QR-код с текстом расчёта, повторное нажатие спрячет его. Нажмите 🔝 — страница плавно поднимется наверх к форме. Нажмите 🔙 — список прокрутится к строке события, по которой построен расчёт.\n"
+        + "Дальше — сами: заведите свои события!");
+}
+
 // База «пустая по сути»: ничего или только стартовая заготовка «Ада» —
 // спрашивать при импорте нечего, просто заменяем.
 function dbIsTrivial() {
@@ -1258,8 +1312,8 @@ function setFooter(open, persist) {
     // эмодзи (❔), VS16 не помог.
     b.textContent = "👁";
     b.classList.toggle("open", open);
-    b.title = open ? "Скрыть детали" : "Посмотреть детали";
-    b.setAttribute("aria-label", "Детали\n" + (open ? "Скрывает" : "Раскрывает")
+    b.title = open ? "Свернуть" : "Ещё";
+    b.setAttribute("aria-label", "Ещё\n" + (open ? "Скрывает" : "Раскрывает")
         + " блок согласий, сообщения приложения, журнал уведомлений и версию.");
     b.setAttribute("aria-expanded", String(open));
     if (persist) { try { localStorage.setItem(FOOTER_KEY, open ? "1" : "0"); } catch (e) {} }
@@ -1283,6 +1337,27 @@ function loadDb() {
             if (Array.isArray(parsed)) { db = parsed.filter(validRecord); sortDb(); }
         }
     } catch (e) { broken = true; }
+    // Демо-режим первого старта — только в ВК-мини-аппе: вне ВК модераторов,
+    // которым нужно изображать из себя неподготовленного юзера, нет.
+    if (vkminiapp) {
+        let first = false;
+        try { first = !localStorage.getItem(FIRST_KEY); } catch (e) { first = true; }
+        if (first) {
+            // Флаг ставим сразу у любого первого старта в VK (в т.ч. у
+            // «старого» пользователя с непустой базой — демо ему не нужно),
+            // чтобы демо не показалось позже.
+            try { localStorage.setItem(FIRST_KEY, "1"); } catch (e) {}
+            if (db.length === 0) {
+                db = lrDemoRecords();
+                sortDb();
+                adaSeeded = true;
+                lrDemoSeeded = true;
+                // Персистим сразу: иначе reload до первого изменения (FIRST_KEY
+                // уже стоит) заменил бы демо заготовкой «Ада».
+                localStorage.setItem(DB_KEY, JSON.stringify(db));
+            }
+        }
+    }
     if (db.length === 0) {
         db = [{ n: "Ада", d: "1815-12-10" }];
         adaSeeded = true;
@@ -1447,9 +1522,10 @@ function submitRecord() {
     renderList();
     refreshDbQr();
     if (wasEdit) {
-        // Редактирование: форма очищена — очищаем и результат с выделением строки.
+        // Редактирование: форма очищена — очищаем и результат с выделением
+        // строки; в двухколонке вместо пустоты показываем «Сейчас».
         selectedIdx = -1;
-        hideResult();
+        hideResultOrNow();
         renderList();
     } else {
         // Добавление: выделяем новую запись, показываем её результат и
@@ -1496,7 +1572,7 @@ async function removeRecord(i) {
     db.splice(i, 1);
     if (db.length === 0) adaSeeded = false;
     if (!saveDb()) { renderList(); refreshDbQr(); return; }
-    if (selectedIdx === i) { selectedIdx = -1; hideResult(); }
+    if (selectedIdx === i) { selectedIdx = -1; hideResultOrNow(); }
     if (selectedIdx > i) selectedIdx--;
     if (editingIdx === i) cancelEdit();
     renderList();
@@ -1649,6 +1725,16 @@ function hideResult() {
     document.getElementById("resultSec").style.display = "none";
     document.getElementById("prevBtn").style.display = "none";
     document.getElementById("nextBtn").style.display = "none";
+}
+
+// Вместо пустой колонки результата (модерация 4.1.6.4: на десктопе после
+// 💾/➖ половина экрана резко пустела) в двухколоночном режиме показываем
+// «Сейчас»; в одноколоночной мобильной версии оставляем как было: скролл к
+// результату после очистки формы сбивал бы с толку. selectedIdx сбрасывает
+// вызывающий (renderNow его не трогает).
+function hideResultOrNow() {
+    if (isTwoCol()) renderNow();
+    else hideResult();
 }
 
 // QR результата скрыт по умолчанию; показывается кнопкой ⛶. Текст храним,
@@ -3174,6 +3260,12 @@ async function vkDbGet() {
                 incoming.push(val);
             }
         }
+        // Демо-база первого старта не затирается пустым облаком: статуса
+        // (сценарий) и режима подсказок это не касается, adaSeeded уже взведён.
+        if (empty && lrDemoSeeded) {
+            refreshDbQr();
+            return;
+        }
         let emptyMsg = "В облаке ВКонтакте пусто и дата рождения в профиле не указана — заготовка: Ада";
         if (empty) {
             incoming = [{ n: "Ада", d: "1815-12-10" }];
@@ -3674,7 +3766,7 @@ function restoreForm(s) {
         renderResult();
     } else {
         renderList();
-        hideResult();
+        hideResultOrNow();
     }
 }
 
@@ -3743,7 +3835,7 @@ function helpGate(e) {
     const el = t.closest("[aria-label]");
     if (!el) return;
     // Заголовок панели — всегда текущий title-хинт элемента (он динамический:
-    // «Сохранить», «Сжато/Подробно», «Посмотреть/Скрыть детали»); без title —
+    // «Сохранить», «Сжато/Подробно», «Ещё/Свернуть»); без title —
     // первая строка aria-label. Тело — описание из aria-label.
     const parts = el.getAttribute("aria-label").split("\n");
     helpPanelShow((el.title || "").trim() || parts[0] || "", parts.slice(1).join("\n"));
@@ -3767,6 +3859,14 @@ initPdConsent();
 initPushConsent();
 checkOAuthHash();
 if (!hashSelect()) autoTapToday();
+// Демо первого старта в VK: раскрываем подвал и включаем режим подсказок,
+// статус — сценарий работы (вместо теории). Подвал раскрывается БЕЗ persist:
+// на следующих стартах он снова скрыт, если пользователь сам не оставил.
+if (lrDemoSeeded) {
+    setFooter(true, false);
+    enterHelpMode();
+    lrDemoStatus();
+}
 refreshPushBtn();
 renderPushLog();
 renderSwVersion();
@@ -3783,11 +3883,11 @@ if (vkminiapp) {
         const afterInit = () => {
             refreshThemeFromBridge();
             applyTheme();
-            vkRestoreCloud();
+            if (!vkTest) vkRestoreCloud();
         };
         vkBridge.send("VKWebAppInit").then(afterInit, () => {
             applyTheme();
-            vkRestoreCloud();
+            if (!vkTest) vkRestoreCloud();
         });
     }
     applyVkUi();
