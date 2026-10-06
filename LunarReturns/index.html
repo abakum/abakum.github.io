@@ -46,8 +46,10 @@
             // html.vk:not(.vk-mweb)). mobile_web определяется по URL так же,
             // как в vk-bridge. #demo=1 включает VK-режим и вне клиента ВК
             // (замена бывшего ?vk_app_id=1, см. demoParam в конце body).
-            if (q.has("vk_app_id")
-                || location.hash.slice(1).split("&").indexOf("demo=1") >= 0) {
+            // Прямая ссылка ВК передаёт фрагмент после # query-параметром
+            // hash (дока ВК, «Передача произвольных параметров») — читаем оба.
+            var h = location.hash.slice(1) || (q.get("hash") || "");
+            if (q.has("vk_app_id") || h.split("&").indexOf("demo=1") >= 0) {
                 root.classList.add("vk");
                 if (q.get("vk_platform") === "mobile_web") root.classList.add("vk-mweb");
             }
@@ -767,13 +769,21 @@ let yandexToken = "";
 // (vkWipeAllCloud), и перезапускает страницу location.replace БЕЗ
 // параметров: экскурсия первого старта отлаживается на честном холодном
 // запуске. Замена бывшего спец-режима ?vk_app_id=1: demoParam также
-// эмулирует VK-режим (VK-UI, посев демо) в этом проходе.
-const demoParam = location.hash.slice(1).split("&").includes("demo=1");
+// эмулирует VK-режим (VK-UI, посев демо) в этом проходе. В клиенте/iframe ВК
+// прямая ссылка передаёт фрагмент после # query-параметром hash (дока ВК,
+// «Передача произвольных параметров») — читаем оба источника.
+const demoHash = location.hash.slice(1) ||
+    (new URLSearchParams(location.search).get("hash") || "");
+const demoParam = demoHash.split("&").includes("demo=1");
 if (demoParam) {
     try { localStorage.clear(); } catch (e) { }
-    // Hash стираем сразу (как checkOAuthHash): случайный reload/PTR в этом
-    // проходе не должен повторять сброс.
-    history.replaceState(null, "", location.pathname + location.search);
+    // Hash (фрагмент и query-параметр hash ВК) стираем сразу (как
+    // checkOAuthHash): случайный reload/PTR в этом проходе не должен
+    // повторять сброс.
+    const dq = new URLSearchParams(location.search);
+    dq.delete("hash");
+    const ds = dq.toString();
+    history.replaceState(null, "", location.pathname + (ds ? "?" + ds : ""));
 }
 // VK Mini App определяется по параметру vk_app_id в URL, который VK всегда
 // добавляет при запуске мини-аппа (см. dev.vk.com/mini-apps/development/launch-params).
@@ -3962,7 +3972,14 @@ if (demoParam) {
     // не уходят и не могут загрязнить облако после зачистки.
     const done = () => {
         try { localStorage.clear(); } catch (e) { }
-        idbWipeKv().finally(() => location.replace(location.pathname + location.search));
+        // Перезапуск без параметров: вырезаем и query-параметр hash ВК
+        // (иначе цикл сброса), фрагмент уже стёрт ранним блоком.
+        idbWipeKv().finally(() => {
+            const q = new URLSearchParams(location.search);
+            q.delete("hash");
+            const s = q.toString();
+            location.replace(location.pathname + (s ? "?" + s : ""));
+        });
     };
     if (window.vkBridge)
         vkBridge.send("VKWebAppInit").then(vkWipeAllCloud, vkWipeAllCloud).then(done, done);
