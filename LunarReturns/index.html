@@ -598,7 +598,7 @@
             <button id="cloudPutBtn" onclick="cloudPut(this)" title="Сохранить список событий в облако" style="display:none;" aria-label="Сохранить список событий в облако&#10;Сохраняет список событий в облако, чтобы продолжить на другом устройстве или восстановить после переустановки.">📤</button>
             <button id="cloudGetBtn" onclick="cloudGet(this)" title="Загрузить список событий из облака" style="display:none;" aria-label="Загрузить список событий из облака&#10;Добавляет в список событий устройства список событий из облака или заменяет список событий устройства на список событий из облака.">📥</button>
             <button type="button" id="clearBtn" class="grp" onclick="clearDb()" title="Очистить весь список событий" aria-label="Очистить весь список событий&#10;После подтверждения удаляет все события с устройства. Если список событий нужен — сначала сохраните его в облако или скопируйте.">🗑</button>
-            <button onclick="pasteDb()" title="Вставить список событий из буфера" aria-label="Вставить список событий&#10;Добавляет в список событий устройства список событий из буфера или заменяет список событий устройства на список событий из буфера (JSON, скопированный на другом устройстве).">📋</button>
+            <button onclick="pasteDb()" title="Вставить список событий из буфера" aria-label="Вставить список событий&#10;Добавляет в список событий устройства список событий из буфера или заменяет список событий устройства на список событий из буфера: JSON, скопированный на другом устройстве, либо строки вида «Ада 18151210», «Ада 1815-12-10 14:30», «Ада 1815-12-10 12:30 (Пермь)», «Ада 1815-12-10 12:30 МСК+2».">📋</button>
             <button onclick="copyDb()" title="Скопировать список событий" aria-label="Скопировать список событий&#10;Копирует все события в буфер обмена (JSON) — для переноса на другое устройство.">⎘</button>
             <button onclick="showDbQr()" title="Показать список событий как QR" aria-label="QR списка событий&#10;Показывает весь список событий как QR-код: отсканируйте его другим устройством, чтобы перенести события.">⛶</button>
             <button type="button" id="daysCopyBtn" onclick="copyDays()" title="Скопировать дни" style="display:none;" aria-label="Скопировать дни&#10;Копирует список религиозных дней в буфер обмена.">⎘</button>
@@ -610,7 +610,7 @@
 
     <div id="pasteOverlay" onclick="pasteOverlayBackdrop(event)">
         <div id="pasteDialog">
-            <textarea id="pasteFallbackArea" placeholder="Вставьте JSON списка событий сюда"></textarea>
+            <textarea id="pasteFallbackArea" placeholder="Вставьте JSON списка событий (кнопка ⎘ «Скопировать список событий» или скан QR-кода кнопки ⛶) либо строки вида: «Ада 18151210», «Ада 1815-12-10 14:30», «Ада 1815-12-10 12:30 (Пермь)», «Ада 1815-12-10 12:30 МСК+2»"></textarea>
             <div class="btnrow">
                 <button type="button" onclick="pasteFallbackImport()" title="Вставить и импортировать">📋</button>
                 <button type="button" onclick="hidePasteDialog()" title="Отмена">❌</button>
@@ -748,6 +748,77 @@ function cityDiffMin(city, d) {
     let diff = ep[1];
     for (let i = 2; i < ep.length; i += 2) if (d >= ep[i]) diff = ep[i + 1];
     return diff * 60;
+}
+
+const CITY_INDEX = (() => {
+    const m = {};
+    for (const c in CITY_ZONE) m[c.toLowerCase()] = c;
+    return m;
+})();
+
+// "МСК+2", "UTC-3", "ГМТ+5" → минут от UTC; null если не сдвиг
+function explicitZoneMinutes(s) {
+    const m = s.toLowerCase().match(/^(мск|москв[а-яё]*|utc|gmt|гмт|гринвич|гринуич)\s*([+-])\s*(\d{1,2})$/i);
+    if (!m) return null;
+    const base = m[1].startsWith("мск") || m[1].startsWith("москв") ? 3 : 0;
+    return (base + (m[2] === "+" ? 1 : -1) * Number(m[3])) * 60;
+}
+
+// 1: название, 2-4: дата, 5-6: время, 7: зона в скобках, 8: зона без скобок.
+// В отличие от lunarreturns.js — без \b вокруг группы зоны: в юникод-режиме
+// \b не срабатывает на кириллице и «МСК+2» без скобок не разбиралось.
+const TRIGGER_RE = /^(.+?)\s+(\d{4})[-./]?(\d{2})[-./]?(\d{2})(?:\s+(\d{1,2})(?:[:.\u0433]?(\d{2}))?)?\s*(?:\(\s*([^)]+?)\s*\)|((?:UTC|GMT|ГМТ|Гринвич|Гринуич|[Мм]оскв[а-яё]*|[Мм]ск)\s*[+-]\s*\d{1,2}))?\s*$/iu;
+
+// Разбор строки «Событие 19630927», «Событие 1963-09-27 14:30»,
+// «Событие 1963-09-27 12:30 (Пермь)», «Событие 1963-09-27 12:30 МСК+2»
+// в запись МСК {n, d[, h, m]} — как в lunarreturns.js.
+function parseTrigger(text) {
+    const m = text.trim().match(TRIGGER_RE);
+    if (!m) return null;
+    const n = m[1].trim();
+    const y = Number(m[2]), mo = Number(m[3]), dd = Number(m[4]);
+    if (mo < 1 || mo > 12 || dd < 1 || dd > 31) return null;
+    const givenTime = m[5] !== undefined;
+    let hh = 12, mm = 0;
+    if (givenTime) {
+        hh = Number(m[5]);
+        mm = m[6] !== undefined ? Number(m[6]) : 0;
+        if (hh > 23 || mm > 59) return null;
+    }
+    const d = y + "-" + String(mo).padStart(2, "0") + "-" + String(dd).padStart(2, "0");
+    let zone = (m[7] || m[8] || "").trim();
+    let diffMin = 3 * 60; // по умолчанию МСК
+    if (zone) {
+        const explicit = explicitZoneMinutes(zone);
+        if (explicit !== null) {
+            // explicit — абсолютное смещение от UTC; cityDiffMin даёт смещение
+            // относительно МСК, приводим к нему: UTC+0 12:30 → МСК 15:30.
+            diffMin = explicit - 3 * 60;
+        } else if (CITY_INDEX[zone.toLowerCase()]) {
+            diffMin = cityDiffMin(CITY_INDEX[zone.toLowerCase()], d);
+        } else {
+            return null;
+        }
+    }
+    const pad = (x, l) => String(x).padStart(l, "0");
+    // без времени и пояса — как в приложении: { n, d }, расчёт в полдень;
+    // время без пояса уже МСК — сдвиг только при явной зоне
+    const rec = { n };
+    if (givenTime || zone) {
+        if (zone) {
+            const msk = new Date(Date.UTC(y, mo - 1, dd, hh, mm, 0) - diffMin * 60000);
+            rec.d = msk.getUTCFullYear() + "-" + pad(msk.getUTCMonth() + 1, 2) + "-" + pad(msk.getUTCDate(), 2);
+            rec.h = msk.getUTCHours();
+            rec.m = msk.getUTCMinutes();
+        } else {
+            rec.d = d;
+            rec.h = hh;
+            rec.m = mm;
+        }
+    } else {
+        rec.d = d;
+    }
+    return rec;
 }
 
 qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
@@ -2583,15 +2654,21 @@ function pasteDb() {
 }
 
 async function importDbText(text) {
-    let incoming;
+    let incoming = null;
+    let parsed;
     try {
-        incoming = JSON.parse(text);
-    } catch (e) {
-        status("В буфере не JSON событий", true);
-        return;
+        parsed = JSON.parse(text);
+    } catch (e) { parsed = null; }
+    if (Array.isArray(parsed) && parsed.every(validRecord)) incoming = parsed;
+    if (!incoming) {
+        // Не JSON — пробуем текст: строки «Событие 19630927»,
+        // «Событие 1963-09-27 14:30», «Событие 1963-09-27 12:30 (Пермь)»,
+        // «Событие 1963-09-27 12:30 МСК+2»; нераспознанные строки молча пропускаем.
+        incoming = text.split(/\s*\n+\s*/).filter(Boolean)
+            .map(parseTrigger).filter(r => r && validRecord(r));
     }
-    if (!Array.isArray(incoming) || !incoming.every(validRecord)) {
-        status("Неверный формат списка событий", true);
+    if (!incoming.length) {
+        status("В буфере нет списка событий", true);
         return;
     }
     const doMerge = !dbIsTrivial() && await confirmAuto("Импорт", "✅ — добавить в список событий устройства (" + incoming.length + " соб.)\n❌ — заменить список событий устройства на импортируемый");
