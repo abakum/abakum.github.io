@@ -44,8 +44,10 @@
             // Ранние классы VK: до первого кадра, чтобы оверлей «Дата» не
             // промелькивал при reload в нативных клиентах ВК (см. ниже
             // html.vk:not(.vk-mweb)). mobile_web определяется по URL так же,
-            // как в vk-bridge.
-            if (q.has("vk_app_id")) {
+            // как в vk-bridge. #demo=1 включает VK-режим и вне клиента ВК
+            // (замена бывшего ?vk_app_id=1, см. demoParam в конце body).
+            if (q.has("vk_app_id")
+                || location.hash.slice(1).split("&").indexOf("demo=1") >= 0) {
                 root.classList.add("vk");
                 if (q.get("vk_platform") === "mobile_web") root.classList.add("vk-mweb");
             }
@@ -757,19 +759,25 @@ let selectedIdx = -1;
 let editingIdx = -1;
 let detailMode = false;
 let yandexToken = "";
+// Отладка холодного первого запуска: #demo=1 — проход-сброс. Hash, а не
+// query: в вебвью ВК launch-параметры затирают query, а фрагмент #
+// сохраняется — на этом уже держатся checkOAuthHash и #N. Проход стирает
+// ВСЕ локальные переменные (localStorage; IndexedDB и повторная зачистка —
+// в done() init-блока), в клиенте ВК — также всё облако ВК
+// (vkWipeAllCloud), и перезапускает страницу location.replace БЕЗ
+// параметров: экскурсия первого старта отлаживается на честном холодном
+// запуске. Замена бывшего спец-режима ?vk_app_id=1: demoParam также
+// эмулирует VK-режим (VK-UI, посев демо) в этом проходе.
+const demoParam = location.hash.slice(1).split("&").includes("demo=1");
+if (demoParam) {
+    try { localStorage.clear(); } catch (e) { }
+    // Hash стираем сразу (как checkOAuthHash): случайный reload/PTR в этом
+    // проходе не должен повторять сброс.
+    history.replaceState(null, "", location.pathname + location.search);
+}
 // VK Mini App определяется по параметру vk_app_id в URL, который VK всегда
 // добавляет при запуске мини-аппа (см. dev.vk.com/mini-apps/development/launch-params).
-const vkminiapp = new URLSearchParams(location.search).has("vk_app_id");
-// Спец-режим локального теста демо первого старта: ?vk_app_id=1. Список событий и флаг
-// демо стираются ДО loadDb() (демо сеется каждый раз), vkRestoreCloud() не
-// вызывается — вне клиента ВК он падал бы с «Ошибка загрузки/восстановления».
-const vkTest = new URLSearchParams(location.search).get("vk_app_id") === "1";
-if (vkTest) {
-    try {
-        localStorage.removeItem(DB_KEY);
-        localStorage.removeItem(FIRST_KEY);
-    } catch (e) { }
-}
+const vkminiapp = new URLSearchParams(location.search).has("vk_app_id") || demoParam;
 // Платформа клиента: гейтов пушей от неё больше нет — по доке
 // VKWebAppAllowNotifications поддерживает Android, iOS, Mobile Web и Web
 // (фактическая выдача разрешения на stage проверяется тестом).
@@ -1138,7 +1146,7 @@ function lrDemoStatus() {
         + "\n"
         + "ОБЛАКО И СОГЛАСИЯ (в подвале под списком)\n"
         + "13) В подвале поставьте галочку «Разрешаю хранить…» — под списком событий появятся кнопки 📤 и 📥.\n"
-        + "14) Нажмите 📤 — список событий сохранится в облако ВКонтакте. Нажмите 📥 — это добавит в список событий устройства список событий из облака или заменит список событий устройства на список событий из облака. Теперь список переживёт очистку и переустановку.\n"
+        + "14) Нажмите 📤 — список событий сохранится в облако. Нажмите 📥 — это добавит в список событий устройства список событий из облака или заменит список событий устройства на список событий из облака. Теперь список переживёт очистку и переустановку.\n"
         + "15) Снимите галочку «Разрешаю…» — приложение предложит удалить ПДн из облака; согласитесь ✅. Кнопки 📤/📥 скроются.\n"
         + "\n"
         + "РАСЧЁТ\n"
@@ -1156,7 +1164,7 @@ function lrDemoStatus() {
         + "ИНТЕРФЕЙС И РАСКЛАДКА\n"
         + "22) На широком экране (альбомная ориентация) появляется вторая колонка с результатом; между колонками — разделитель. Потяните его мышью/пальцем, чтобы изменить ширину первой колонки. Ширина запоминается.\n"
         + "23) В портретной ориентации телефона раскладка всегда одноколоночная и разделитель справа.\n"
-        + "24) Тема (светлая/тёмная) следует системной или теме приложения ВК; при оттягивании страницы вниз сверху показывается «небо» с луной в текущей фазе на фоне знака зодиака, в котором она находится.\n"
+        + "24) Тема (светлая/тёмная) следует системной или теме приложения (в мини-аппе — теме ВК); при оттягивании страницы вниз сверху показывается «небо» с луной в текущей фазе на фоне знака зодиака, в котором она находится.\n"
         + "\n"
         // Уведомления — последним пунктом и только если кнопка 🔕/🔔 видна.
         + (document.getElementById("pushBtn").offsetParent !== null
@@ -1383,25 +1391,24 @@ function loadDb() {
             if (Array.isArray(parsed)) { db = parsed.filter(validRecord); sortDb(); }
         }
     } catch (e) { broken = true; }
-    // Демо-режим первого старта — только в ВК-мини-аппе: вне ВК модераторов,
-    // которым нужно изображать из себя неподготовленного юзера, нет.
-    if (vkminiapp) {
-        let first = false;
-        try { first = !localStorage.getItem(FIRST_KEY); } catch (e) { first = true; }
-        if (first) {
-            // Флаг ставим сразу у любого первого старта в VK (в т.ч. у
-            // «старого» пользователя с непустым списком событий — демо ему не нужно),
-            // чтобы демо не показалось позже.
-            try { localStorage.setItem(FIRST_KEY, "1"); } catch (e) {}
-            if (db.length === 0) {
-                db = lrDemoRecords();
-                sortDb();
-                adaSeeded = true;
-                lrDemoSeeded = true;
-                // Персистим сразу: иначе reload до первого изменения (FIRST_KEY
-                // уже стоит) заменил бы демо заготовкой «Ада».
-                localStorage.setItem(DB_KEY, JSON.stringify(db));
-            }
+    // Демо-режим первого старта — любому первому пользователю (веб и ВК):
+    // экскурсия общая, облако в шагах описано нейтрально. Отладка холодного
+    // старта — #demo=1 (проход-сброс и перезапуск, см. demoParam).
+    let first = false;
+    try { first = !localStorage.getItem(FIRST_KEY); } catch (e) { first = true; }
+    if (first) {
+        // Флаг ставим сразу у любого первого старта (в т.ч. у «старого»
+        // пользователя с непустым списком событий — демо ему не нужно),
+        // чтобы демо не показалось позже.
+        try { localStorage.setItem(FIRST_KEY, "1"); } catch (e) {}
+        if (db.length === 0) {
+            db = lrDemoRecords();
+            sortDb();
+            adaSeeded = true;
+            lrDemoSeeded = true;
+            // Персистим сразу: иначе reload до первого изменения (FIRST_KEY
+            // уже стоит) заменил бы демо заготовкой «Ада».
+            localStorage.setItem(DB_KEY, JSON.stringify(db));
         }
     }
     if (db.length === 0) {
@@ -3264,6 +3271,20 @@ async function vkLegacyWipe(from) {
     }
 }
 
+// Полное затирание облака ВК (#demo=1 в клиенте ВК): ВСЕ ключи — настройки
+// (lr_s_blob), счётчик/чанки списка событий и легаси lr_s_*. Состояние
+// «новый пользователь» для отладки экскурсии первого старта. Не отвергает
+// промис: ошибки — в статус, вызывающий идёт дальше (vkRestoreCloud).
+async function vkWipeAllCloud() {
+    try {
+        const keys = await vkStorageGetKeys();
+        for (const k of keys) await vkStorageSet(k, "");
+        status("Облако ВКонтакте очищено (#demo=1)");
+    } catch (e) {
+        status("Не удалось очистить облако ВКонтакте: " + vkErr(e), true);
+    }
+}
+
 async function vkDbGet() {
     try {
         const cnt = await vkGetCnt();
@@ -3495,6 +3516,17 @@ async function idbPutDb() {
         });
         idb.close();
     } catch (e) { }
+}
+
+// Полная очистка хранилища kv в IndexedDB (проход-сброс #demo=1): копия
+// списка событий, версия SW, лог push — всё локальное. Не отвергает промис.
+function idbWipeKv() {
+    return idbOpen().then(idb => new Promise((res, rej) => {
+        const tx = idb.transaction("kv", "readwrite");
+        tx.objectStore("kv").clear();
+        tx.oncomplete = () => { idb.close(); res(); };
+        tx.onerror = () => rej(tx.error);
+    })).catch(() => { });
 }
 
 function dbDates() {
@@ -3920,7 +3952,22 @@ renderPushLog();
 renderSwVersion();
 renderOriginLinks();
 idbPutDb();
-if (vkminiapp) {
+if (demoParam) {
+    // Проход-сброс (#demo=1): перезапустить страницу без параметров, чтобы
+    // отладить честный холодный первый запуск. Локальные переменные уже
+    // стёрты ранним блоком; здесь зачищаем и то, что успел написать этот
+    // проход (демо-сид, тема, colw), и IndexedDB (idbWipeKv); в клиенте ВК —
+    // также всё облако (vkWipeAllCloud). vkRestoreCloud в этом проходе НЕ
+    // вызывается: lrBlobHold остаётся 1 — отложенные записи блоба настроек
+    // не уходят и не могут загрязнить облако после зачистки.
+    const done = () => {
+        try { localStorage.clear(); } catch (e) { }
+        idbWipeKv().finally(() => location.replace(location.pathname + location.search));
+    };
+    if (window.vkBridge)
+        vkBridge.send("VKWebAppInit").then(vkWipeAllCloud, vkWipeAllCloud).then(done, done);
+    else done();
+} else if (vkminiapp) {
     // Мини-апп ВКонтакте: сервис-воркер и PWA не используются.
     // Инициализируем vk-bridge и включаем VK-интерфейс (тексты согласия,
     // скрытие 🔑 Яндекса; пуши — ВК-нативные).
@@ -3931,11 +3978,11 @@ if (vkminiapp) {
         const afterInit = () => {
             refreshThemeFromBridge();
             applyTheme();
-            if (!vkTest) vkRestoreCloud();
+            vkRestoreCloud();
         };
         vkBridge.send("VKWebAppInit").then(afterInit, () => {
             applyTheme();
-            if (!vkTest) vkRestoreCloud();
+            vkRestoreCloud();
         });
     }
     applyVkUi();
