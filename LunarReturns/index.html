@@ -757,21 +757,28 @@ let adaSeeded = false;
 // Только что сеян демо-список событий первого старта (VK, пустой список событий, нет FIRST_KEY).
 // Пустое облако ВК (vkDbGet) её не затирает заготовкой «Ада».
 let lrDemoSeeded = false;
+// Отложенный посев демо (ВК, свежий origin, FIRST_KEY нет): «новый
+// пользователь» ВК = пустой localStorage И пустое облако ВК — решение
+// принимает vkRestoreCloud/vkDbGet по итогам восстановления. Старому
+// пользователю при обновлении версии демо/экскурсия не показываются,
+// а его список из облака тихо замещает пустой локальный (без диалога
+// «Импорт»). См. lrSeedDemoNow.
+let lrDemoPending = false;
 let selectedIdx = -1;
 let editingIdx = -1;
 let detailMode = false;
 let yandexToken = "";
-// Отладка холодного первого запуска: #demo=1 — проход-сброс. Hash, а не
-// query: в вебвью ВК launch-параметры затирают query, а фрагмент #
-// сохраняется — на этом уже держатся checkOAuthHash и #N. Проход стирает
-// ВСЕ локальные переменные (localStorage; IndexedDB и повторная зачистка —
-// в done() init-блока), в клиенте ВК — также всё облако ВК
-// (vkWipeAllCloud), и перезапускает страницу location.replace БЕЗ
-// параметров: экскурсия первого старта отлаживается на честном холодном
-// запуске. Замена бывшего спец-режима ?vk_app_id=1: demoParam также
-// эмулирует VK-режим (VK-UI, посев демо) в этом проходе. В клиенте/iframe ВК
-// прямая ссылка передаёт фрагмент после # query-параметром hash (дока ВК,
-// «Передача произвольных параметров») — читаем оба источника.
+// Отладка холодного первого запуска: #demo=1 — проход-сброс БЕЗ релоада
+// (location.replace в вебвью ВК не срабатывает). Hash, а не query: в вебвью
+// ВК launch-параметры затирают query, а фрагмент # сохраняется — на этом уже
+// держатся checkOAuthHash и #N. Проход стирает ВСЕ локальные переменные
+// ДО разбора (localStorage здесь; IndexedDB — в init-блоке), loadDb сеет
+// демо с нуля и сразу открывает экскурсию (lrDemoSeeded); в конце прохода
+// чистится облако ВК (vkWipeAllCloud) и IndexedDB. Замена бывшего
+// спец-режима ?vk_app_id=1: demoParam также эмулирует VK-режим (VK-UI,
+// посев демо) в этом проходе. В клиенте/iframe ВК прямая ссылка передаёт
+// фрагмент после # query-параметром hash (дока ВК, «Передача произвольных
+// параметров») — читаем оба источника.
 const demoHash = location.hash.slice(1) ||
     (new URLSearchParams(location.search).get("hash") || "");
 const demoParam = demoHash.split("&").includes("demo=1");
@@ -1185,6 +1192,29 @@ function lrDemoStatus() {
     status(tourText);
 }
 
+// Посев демо первого старта с экскурсией. Веб — сразу из loadDb (новый
+// пользователь = пустой localStorage). ВК — отложенно: только после того,
+// как vkRestoreCloud/vkDbGet подтвердили «облако пусто» (см. lrDemoPending).
+// Ставит FIRST_KEY, персистит список, открывает подвал и режим подсказок.
+function lrSeedDemoNow() {
+    lrDemoPending = false;
+    try { localStorage.setItem(FIRST_KEY, "1"); } catch (e) { }
+    db = lrDemoRecords();
+    sortDb();
+    adaSeeded = true;
+    lrDemoSeeded = true;
+    try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (e) { }
+    selectedIdx = -1;
+    hideResult();
+    renderList();
+    refreshDbQr();
+    setFooter(true, false);
+    enterHelpMode();
+    lrDemoStatus();
+    autoTapToday();
+    idbPutDb();
+}
+
 // Список событий «пустой по сути»: ничего или только стартовая заготовка «Ада» —
 // спрашивать при импорте нечего, просто заменяем.
 function dbIsTrivial() {
@@ -1401,11 +1431,19 @@ function loadDb() {
             if (Array.isArray(parsed)) { db = parsed.filter(validRecord); sortDb(); }
         }
     } catch (e) { broken = true; }
-    // Демо-режим первого старта — любому первому пользователю (веб и ВК):
-    // экскурсия общая, облако в шагах описано нейтрально. Отладка холодного
-    // старта — #demo=1 (проход-сброс и перезапуск, см. demoParam).
+    // Демо-режим первого старта. Новый пользователь: веб — пустой
+    // localStorage; ВК на свежем origin — пустой localStorage И пустое
+    // облако ВК, поэтому посев отложен (lrDemoPending, решает
+    // vkRestoreCloud). Отладка холодного старта — #demo=1 (проход-сброс,
+    // см. demoParam).
     let first = false;
     try { first = !localStorage.getItem(FIRST_KEY); } catch (e) { first = true; }
+    if (first && vkminiapp && window.__lrFreshOrigin && !demoParam) {
+        // Не сеем ни демо, ни «Аду», FIRST_KEY не ставим: список решит
+        // восстановление облака (lrSeedDemoNow или тихая замена в vkDbGet).
+        lrDemoPending = true;
+        return;
+    }
     if (first) {
         // Флаг ставим сразу у любого первого старта (в т.ч. у «старого»
         // пользователя с непустым списком событий — демо ему не нужно),
@@ -3220,14 +3258,32 @@ async function vkBackfillSettings() {
 // автозаписи (тема) не затирают блоб до или во время чтения.
 async function vkRestoreCloud() {
     try {
-        if (!window.vkBridge) return;
+        if (!window.vkBridge) {
+            if (lrDemoPending) lrSeedDemoNow();
+            return;
+        }
         try {
             if (await vkRestoreSettings()) vkApplyRestoredSettings();
         } catch (e) {
             status("Ошибка восстановления настроек: " + vkErr(e), true);
         }
         await vkBackfillSettings();
-        if (!window.__lrFreshOrigin || !pdConsentGiven()) return;
+        if (lrDemoPending) {
+            // Старый пользователь виден по FIRST_KEY из блоба (loadDb при
+            // отложенном посеве его не ставил): демо и экскурсия не нужны.
+            let fk = null;
+            try { fk = localStorage.getItem(FIRST_KEY); } catch (e) { }
+            if (fk) lrDemoPending = false;
+        }
+        if (!window.__lrFreshOrigin || !pdConsentGiven()) {
+            // Согласия нет → списка ПДн в облаке быть не может (а FIRST_KEY
+            // из блоба уже проверен выше): оставшийся pending — новый
+            // пользователь, сеем демо. (Если restore настроек упал и
+            // согласие неизвестно — тоже сеем: демо безвредно, свой список
+            // пользователь подтянет кнопкой 📥.)
+            if (lrDemoPending) lrSeedDemoNow();
+            return;
+        }
         try {
             await cloudRun(() => vkDbGet());
             autoTapToday();
@@ -3345,6 +3401,15 @@ async function vkDbGet() {
             refreshDbQr();
             return;
         }
+        // Отложенный посев (ВК, свежий origin): облако списка пусто → новый
+        // пользователь (FIRST_KEY в блобе тоже не было — иначе vkRestoreCloud
+        // уже отменил посев): демо + экскурсия. Непустое облако → старый:
+        // посев отменяем, ниже тихая миграция (db пуст = тривиален).
+        if (empty && lrDemoPending) {
+            lrSeedDemoNow();
+            return;
+        }
+        lrDemoPending = false;
         let emptyMsg = "В облаке ВКонтакте пусто и дата рождения в профиле не указана — заготовка: Ада";
         if (empty) {
             incoming = [{ n: "Ада", d: "1815-12-10" }];
@@ -3963,24 +4028,15 @@ renderSwVersion();
 renderOriginLinks();
 idbPutDb();
 if (demoParam) {
-    // Проход-сброс (#demo=1): перезапустить страницу без параметров, чтобы
-    // отладить честный холодный первый запуск. Локальные переменные уже
-    // стёрты ранним блоком; здесь зачищаем и то, что успел написать этот
-    // проход (демо-сид, тема, colw), и IndexedDB (idbWipeKv); в клиенте ВК —
-    // также всё облако (vkWipeAllCloud). vkRestoreCloud в этом проходе НЕ
+    // Проход-сброс (#demo=1) без релоада: location.replace в вебвью ВК не
+    // срабатывает. Локальные переменные стёрты ранним блоком ДО разбора,
+    // loadDb засеял демо с нуля, экскурсия уже открыта (lrDemoSeeded выше).
+    // Осталось: облако ВК (vkWipeAllCloud) и IndexedDB (idbWipeKv +
+    // пересохранение сид-списка idbPutDb). vkRestoreCloud в этом проходе НЕ
     // вызывается: lrBlobHold остаётся 1 — отложенные записи блоба настроек
     // не уходят и не могут загрязнить облако после зачистки.
-    const done = () => {
-        try { localStorage.clear(); } catch (e) { }
-        // Перезапуск без параметров: вырезаем и query-параметр hash ВК
-        // (иначе цикл сброса), фрагмент уже стёрт ранним блоком.
-        idbWipeKv().finally(() => {
-            const q = new URLSearchParams(location.search);
-            q.delete("hash");
-            const s = q.toString();
-            location.replace(location.pathname + (s ? "?" + s : ""));
-        });
-    };
+    applyVkUi();
+    const done = () => idbWipeKv().then(idbPutDb, idbPutDb);
     if (window.vkBridge)
         vkBridge.send("VKWebAppInit").then(vkWipeAllCloud, vkWipeAllCloud).then(done, done);
     else done();
@@ -4001,6 +4057,10 @@ if (demoParam) {
             applyTheme();
             vkRestoreCloud();
         });
+    } else if (lrDemoPending) {
+        // Страховка: vk-bridge не загрузился — облако недоступно, отложенный
+        // посев не разрешится сам (vkRestoreCloud не вызывается).
+        lrSeedDemoNow();
     }
     applyVkUi();
 } else if ("serviceWorker" in navigator && location.protocol === "https:") {
